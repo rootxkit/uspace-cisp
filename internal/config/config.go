@@ -1,0 +1,438 @@
+// Package config loads, validates and redacts the CISP_* environment of
+// each process (docs/PLAN.md section 11). One struct per process; every
+// problem is reported at once as a *core.FieldError naming the variable;
+// a CISP_* variable that is not in the catalogue is refused, so a typo
+// never silently takes a default.
+package config
+
+import (
+	"log/slog"
+	"net"
+	"net/url"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/rootxkit/uspace-core/core"
+)
+
+// Common is what every process reads.
+type Common struct {
+	LogLevel        string
+	StatusInterval  time.Duration
+	ShutdownTimeout time.Duration
+	OTelEndpoint    string
+
+	vars map[string]string
+}
+
+// API is the configuration of cmd/api.
+type API struct {
+	Common
+
+	HTTPAddr       string
+	HandlerTimeout time.Duration
+	MaxBodyBytes   int64
+
+	DatabaseURL   string
+	TimeseriesURL string
+	NATSURL       string
+	NATSCredsFile string
+
+	TokenIssuer       string
+	TokenJWKSURL      string
+	Audiences         []string
+	AuthorityClientID string
+	ANSPClientID      string
+	ANSPJWKSURL       string
+	ANSPMTLSSubject   string
+	MTLSMode          string
+
+	SigningKeyFile     string
+	SigningKID         string
+	SigningKeyPrevFile string
+	SessionKeyFile     string
+	SecretsKey         string
+
+	PublicBaseURL             string
+	IssuerURL                 string
+	ReadMaxAge                time.Duration
+	PublicRPM                 int64
+	MaxPublicationBytes       int64
+	MaxSubscriptionsPerClient int64
+	BrandingFile              string
+}
+
+// Deliver is the configuration of cmd/deliver.
+type Deliver struct {
+	Common
+
+	HTTPAddr string
+
+	DatabaseURL   string
+	TimeseriesURL string
+	NATSURL       string
+	NATSCredsFile string
+
+	SigningKeyFile string
+	SigningKID     string
+	IssuerURL      string
+
+	DeliveryLogRetentionDays int64
+	AllowPrivateCallbacks    bool
+	AllowInsecureCallbacks   bool
+}
+
+// Ctl is the configuration of cmd/cispctl.
+type Ctl struct {
+	Common
+
+	DatabaseURL   string
+	TimeseriesURL string
+
+	SigningKeyFile     string
+	SigningKID         string
+	SigningKeyPrevFile string
+	SessionKeyFile     string
+	SecretsKey         string
+}
+
+func loadCommon(e *env) Common {
+	return Common{
+		LogLevel:        e.str(EnvLogLevel),
+		StatusInterval:  e.seconds(EnvStatusIntervalS),
+		ShutdownTimeout: e.seconds(EnvShutdownTimeoutS),
+		OTelEndpoint:    e.str(EnvOTelEndpoint),
+	}
+}
+
+// LoadAPI reads the api configuration from environ (os.Environ() form)
+// and validates it. The error, when not nil, is FieldErrors.
+func LoadAPI(environ []string) (*API, error) {
+	e := newEnv(environ)
+	c := &API{
+		Common:         loadCommon(e),
+		HTTPAddr:       e.str(EnvHTTPAddr),
+		HandlerTimeout: e.seconds(EnvHandlerTimeoutS),
+		MaxBodyBytes:   e.integer(EnvMaxBodyBytes),
+
+		DatabaseURL:   e.str(EnvDatabaseURL),
+		TimeseriesURL: e.str(EnvTimeseriesURL),
+		NATSURL:       e.str(EnvNATSURL),
+		NATSCredsFile: e.str(EnvNATSCredsFile),
+
+		TokenIssuer:       e.str(EnvTokenIssuer),
+		TokenJWKSURL:      e.str(EnvTokenJWKSURL),
+		Audiences:         e.list(EnvAudiences),
+		AuthorityClientID: e.str(EnvAuthorityClientID),
+		ANSPClientID:      e.str(EnvANSPClientID),
+		ANSPJWKSURL:       e.str(EnvANSPJWKSURL),
+		ANSPMTLSSubject:   e.str(EnvANSPMTLSSubject),
+		MTLSMode:          e.str(EnvMTLSMode),
+
+		SigningKeyFile:     e.str(EnvSigningKeyFile),
+		SigningKID:         e.str(EnvSigningKID),
+		SigningKeyPrevFile: e.str(EnvSigningKeyPrevFile),
+		SessionKeyFile:     e.str(EnvSessionKeyFile),
+		SecretsKey:         e.str(EnvSecretsKey),
+
+		PublicBaseURL:             e.str(EnvPublicBaseURL),
+		IssuerURL:                 e.str(EnvIssuerURL),
+		ReadMaxAge:                e.seconds(EnvReadMaxAgeS),
+		PublicRPM:                 e.integer(EnvPublicRPM),
+		MaxPublicationBytes:       e.integer(EnvMaxPublicationBytes),
+		MaxSubscriptionsPerClient: e.integer(EnvMaxSubscriptionsPerClient),
+		BrandingFile:              e.str(EnvBrandingFile),
+	}
+	return c, finish(e, &c.Common, c.Validate)
+}
+
+// LoadDeliver reads and validates the deliver configuration.
+func LoadDeliver(environ []string) (*Deliver, error) {
+	e := newEnv(environ)
+	c := &Deliver{
+		Common:   loadCommon(e),
+		HTTPAddr: e.str(EnvDeliverHTTPAddr),
+
+		DatabaseURL:   e.str(EnvDatabaseURL),
+		TimeseriesURL: e.str(EnvTimeseriesURL),
+		NATSURL:       e.str(EnvNATSURL),
+		NATSCredsFile: e.str(EnvNATSCredsFile),
+
+		SigningKeyFile: e.str(EnvSigningKeyFile),
+		SigningKID:     e.str(EnvSigningKID),
+		IssuerURL:      e.str(EnvIssuerURL),
+
+		DeliveryLogRetentionDays: e.integer(EnvDeliveryLogRetentionDays),
+		AllowPrivateCallbacks:    e.boolean(EnvAllowPrivateCallbacks),
+		AllowInsecureCallbacks:   e.boolean(EnvAllowInsecureCallbacks),
+	}
+	return c, finish(e, &c.Common, c.Validate)
+}
+
+// LoadCtl reads and validates the cispctl configuration.
+func LoadCtl(environ []string) (*Ctl, error) {
+	e := newEnv(environ)
+	c := &Ctl{
+		Common:        loadCommon(e),
+		DatabaseURL:   e.str(EnvDatabaseURL),
+		TimeseriesURL: e.str(EnvTimeseriesURL),
+
+		SigningKeyFile:     e.str(EnvSigningKeyFile),
+		SigningKID:         e.str(EnvSigningKID),
+		SigningKeyPrevFile: e.str(EnvSigningKeyPrevFile),
+		SessionKeyFile:     e.str(EnvSessionKeyFile),
+		SecretsKey:         e.str(EnvSecretsKey),
+	}
+	return c, finish(e, &c.Common, c.Validate)
+}
+
+func finish(e *env, common *Common, validate func() error) error {
+	common.vars = e.used
+	e.unknown()
+	probs := e.probs
+	if err := validate(); err != nil {
+		if more, ok := err.(FieldErrors); ok { //nolint:errorlint // Validate returns FieldErrors unwrapped
+			probs = append(probs, more...)
+		}
+	}
+	if len(probs) == 0 {
+		return nil
+	}
+	return probs
+}
+
+// Level is the slog level named by LogLevel (info when it is not valid;
+// Validate reports that case).
+func (c *Common) Level() slog.Level {
+	var l slog.Level
+	if err := l.UnmarshalText([]byte(c.LogLevel)); err != nil {
+		return slog.LevelInfo
+	}
+	return l
+}
+
+// Redacted is every variable this process read with its effective value,
+// for the startup log: secrets are "***", the credentials inside URLs are
+// "***", file paths and everything else are printed as they are.
+func (c *Common) Redacted() map[string]string {
+	out := make(map[string]string, len(c.vars))
+	for name, value := range c.vars {
+		v, _ := lookupVar(name)
+		switch {
+		case value == "":
+			out[name] = ""
+		case v.Secret:
+			out[name] = "***"
+		case v.SecretURL:
+			out[name] = redactURL(value)
+		default:
+			out[name] = value
+		}
+	}
+	return out
+}
+
+// RedactedNames is the sorted list of the variables Redacted covers.
+func (c *Common) RedactedNames() []string {
+	names := make([]string, 0, len(c.vars))
+	for name := range c.vars {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+var credentialParams = []string{"password", "pass", "token", "sslpassword", "secret"}
+
+// redactURL replaces the userinfo password (or a bare token in the user
+// position) and credential query parameters with "***". A value that does
+// not parse is redacted whole: it cannot be shown safely.
+func redactURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" {
+		return "***"
+	}
+	var b strings.Builder
+	b.WriteString(u.Scheme)
+	b.WriteString("://")
+	if u.User != nil {
+		if _, hasPassword := u.User.Password(); hasPassword {
+			b.WriteString(u.User.Username())
+			b.WriteString(":***@")
+		} else {
+			b.WriteString("***@")
+		}
+	}
+	b.WriteString(u.Host)
+	b.WriteString(u.EscapedPath())
+	if u.RawQuery != "" {
+		q := u.Query()
+		for key := range q {
+			for _, p := range credentialParams {
+				if strings.EqualFold(key, p) {
+					q.Set(key, "***")
+				}
+			}
+		}
+		b.WriteString("?")
+		b.WriteString(strings.ReplaceAll(q.Encode(), "%2A%2A%2A", "***"))
+	}
+	return b.String()
+}
+
+// Validate checks the common variables.
+func (c *Common) Validate() error {
+	var p FieldErrors
+	if c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error" {
+		p = append(p, core.Fieldf(EnvLogLevel, "%q is not one of debug, info, warn, error", c.LogLevel))
+	}
+	p = durationIn(p, EnvStatusIntervalS, c.StatusInterval, time.Second, time.Hour)
+	p = durationIn(p, EnvShutdownTimeoutS, c.ShutdownTimeout, time.Second, 5*time.Minute)
+	p = urlOK(p, EnvOTelEndpoint, c.OTelEndpoint, "http", "https")
+	return orNil(p)
+}
+
+// Validate checks every api variable and returns every problem at once.
+func (c *API) Validate() error {
+	p := asProblems(c.Common.Validate())
+	p = addrOK(p, EnvHTTPAddr, c.HTTPAddr)
+	p = durationIn(p, EnvHandlerTimeoutS, c.HandlerTimeout, time.Second, 5*time.Minute)
+	p = intIn(p, EnvMaxBodyBytes, c.MaxBodyBytes, 1024, 1<<30)
+	p = urlOK(p, EnvDatabaseURL, c.DatabaseURL, "postgres", "postgresql")
+	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
+	p = urlOK(p, EnvNATSURL, c.NATSURL, "nats", "tls")
+	p = urlOK(p, EnvTokenIssuer, c.TokenIssuer, "http", "https")
+	p = urlOK(p, EnvTokenJWKSURL, c.TokenJWKSURL, "http", "https")
+	for i, h := range c.Audiences {
+		if !hostOK(h) {
+			p = append(p, core.Fieldf(EnvAudiences+"["+strconv.Itoa(i)+"]", "%q is not a host name (no scheme, path or spaces)", h))
+		}
+	}
+	p = clientIDOK(p, EnvAuthorityClientID, c.AuthorityClientID)
+	p = clientIDOK(p, EnvANSPClientID, c.ANSPClientID)
+	p = urlOK(p, EnvANSPJWKSURL, c.ANSPJWKSURL, "http", "https")
+	if c.MTLSMode != MTLSRequired && c.MTLSMode != MTLSOff {
+		p = append(p, core.Fieldf(EnvMTLSMode, "%q is not one of required, off", c.MTLSMode))
+	}
+	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
+		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
+	}
+	p = urlOK(p, EnvPublicBaseURL, c.PublicBaseURL, "http", "https")
+	p = urlOK(p, EnvIssuerURL, c.IssuerURL, "http", "https")
+	p = durationIn(p, EnvReadMaxAgeS, c.ReadMaxAge, 0, 24*time.Hour)
+	p = intIn(p, EnvPublicRPM, c.PublicRPM, 1, 1_000_000)
+	p = intIn(p, EnvMaxPublicationBytes, c.MaxPublicationBytes, 1024, 1<<30)
+	p = intIn(p, EnvMaxSubscriptionsPerClient, c.MaxSubscriptionsPerClient, 1, 10_000)
+	return orNil(p)
+}
+
+// Validate checks every deliver variable and returns every problem at once.
+func (c *Deliver) Validate() error {
+	p := asProblems(c.Common.Validate())
+	p = addrOK(p, EnvDeliverHTTPAddr, c.HTTPAddr)
+	p = urlOK(p, EnvDatabaseURL, c.DatabaseURL, "postgres", "postgresql")
+	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
+	p = urlOK(p, EnvNATSURL, c.NATSURL, "nats", "tls")
+	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
+		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
+	}
+	p = urlOK(p, EnvIssuerURL, c.IssuerURL, "http", "https")
+	p = intIn(p, EnvDeliveryLogRetentionDays, c.DeliveryLogRetentionDays, 1, 3650)
+	return orNil(p)
+}
+
+// Validate checks every cispctl variable and returns every problem at once.
+func (c *Ctl) Validate() error {
+	p := asProblems(c.Common.Validate())
+	p = urlOK(p, EnvDatabaseURL, c.DatabaseURL, "postgres", "postgresql")
+	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
+	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
+		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
+	}
+	return orNil(p)
+}
+
+var idPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
+func asProblems(err error) FieldErrors {
+	if p, ok := err.(FieldErrors); ok { //nolint:errorlint // Validate returns FieldErrors unwrapped
+		return p
+	}
+	return nil
+}
+
+func orNil(p FieldErrors) error {
+	if len(p) == 0 {
+		return nil
+	}
+	return p
+}
+
+func durationIn(p FieldErrors, name string, d, lo, hi time.Duration) FieldErrors {
+	if d < lo || d > hi {
+		return append(p, core.Fieldf(name, "%d s is outside %d..%d s", int64(d/time.Second), int64(lo/time.Second), int64(hi/time.Second)))
+	}
+	return p
+}
+
+func intIn(p FieldErrors, name string, n, lo, hi int64) FieldErrors {
+	if n < lo || n > hi {
+		return append(p, core.Fieldf(name, "%d is outside %d..%d", n, lo, hi))
+	}
+	return p
+}
+
+func addrOK(p FieldErrors, name, addr string) FieldErrors {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return append(p, core.Fieldf(name, "%q is not host:port", addr))
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil || n < 0 || n > 65535 {
+		return append(p, core.Fieldf(name, "port %q is not 0..65535", port))
+	}
+	return p
+}
+
+// urlOK accepts an empty value (not configured) or an absolute URL with
+// one of the schemes and a host. The problem never repeats the value: a
+// URL may carry a password.
+func urlOK(p FieldErrors, name, raw string, schemes ...string) FieldErrors {
+	if raw == "" {
+		return p
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return append(p, core.Fieldf(name, "not a URL"))
+	}
+	ok := false
+	for _, s := range schemes {
+		if strings.EqualFold(u.Scheme, s) {
+			ok = true
+		}
+	}
+	if !ok {
+		return append(p, core.Fieldf(name, "scheme %q is not one of %s", u.Scheme, strings.Join(schemes, ", ")))
+	}
+	if u.Host == "" {
+		return append(p, core.Fieldf(name, "has no host"))
+	}
+	return p
+}
+
+func hostOK(h string) bool {
+	if h == "" || len(h) > 253 {
+		return false
+	}
+	return !strings.ContainsAny(h, "/ \t@?#") && !strings.Contains(h, "://")
+}
+
+func clientIDOK(p FieldErrors, name, id string) FieldErrors {
+	if !idPattern.MatchString(id) {
+		return append(p, core.Fieldf(name, "%q must be 1-64 of A-Z a-z 0-9 . _ -", id))
+	}
+	return p
+}

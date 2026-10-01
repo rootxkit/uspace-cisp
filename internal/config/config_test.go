@@ -69,6 +69,8 @@ func TestDefaults(t *testing.T) {
 		{EnvMaxPublicationBytes, api.MaxPublicationBytes, int64(32 << 20)},
 		{EnvMaxSubscriptionsPerClient, api.MaxSubscriptionsPerClient, int64(20)},
 		{EnvBrandingFile, api.BrandingFile, ""},
+		{EnvDatabaseMaxConns, api.DatabaseMaxConns, int64(8)},
+		{EnvTimeseriesMaxConns, api.TimeseriesMaxConns, int64(2)},
 	}
 	for _, c := range checks {
 		if c.got != c.want {
@@ -216,6 +218,10 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvPublicRPM, "0", "1", loadAPIErr},
 		{EnvMaxPublicationBytes, "1073741825", "1073741824", loadAPIErr},
 		{EnvMaxSubscriptionsPerClient, "twenty", "20", loadAPIErr},
+		{EnvDatabaseMaxConns, "0", "1", loadAPIErr},
+		{EnvTimeseriesMaxConns, "1001", "1000", loadAPIErr},
+		{EnvDatabaseMaxConns, "0", "8", loadDeliverErr},
+		{EnvTimeseriesMaxConns, "0", "2", loadDeliverErr},
 		{EnvDeliverHTTPAddr, "localhost", "localhost:8081", loadDeliverErr},
 		{EnvDeliveryLogRetentionDays, "0", "3650", loadDeliverErr},
 		{EnvAllowPrivateCallbacks, "yes", "true", loadDeliverErr},
@@ -228,6 +234,7 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvDatabaseURL, "redis://db", "postgres://db/cisp", loadCtlErr},
 		{EnvTimeseriesURL, "redis://db", "postgres://db/cisp_ts", loadCtlErr},
 		{EnvSigningKID, "kid 1", "kid-1", loadCtlErr},
+		{EnvDatabaseMaxConns, "many", "3", loadCtlErr},
 		{EnvLogLevel, "loud", "error", loadCtlErr},
 	}
 	for _, c := range cases {

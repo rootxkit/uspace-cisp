@@ -1,0 +1,15 @@
+-- WP-1: the delivery log (written by deliver only, WP-6).
+
+-- name: InsertDeliveryAttempt :exec
+INSERT INTO delivery_attempts (
+    at, delivery_id, subscription_id, change_id, attempt, status_code, error,
+    latency_ms, payload_bytes, deliver_instance
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+
+-- name: ListDeliveryAttempts :many
+SELECT at, delivery_id, subscription_id, change_id, attempt, status_code, error,
+       latency_ms, payload_bytes, deliver_instance
+FROM delivery_attempts
+WHERE subscription_id = sqlc.arg(subscription_id) AND at < sqlc.arg(before)
+ORDER BY at DESC
+LIMIT sqlc.arg(max_rows);

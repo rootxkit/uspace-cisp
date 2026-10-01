@@ -32,6 +32,8 @@ const (
 	EnvOTelEndpoint              = "CISP_OTEL_ENDPOINT"
 	EnvDatabaseURL               = "CISP_DATABASE_URL"
 	EnvTimeseriesURL             = "CISP_TIMESERIES_URL"
+	EnvDatabaseMaxConns          = "CISP_DATABASE_MAX_CONNS"
+	EnvTimeseriesMaxConns        = "CISP_TIMESERIES_MAX_CONNS"
 	EnvNATSURL                   = "CISP_NATS_URL"
 	EnvNATSCredsFile             = "CISP_NATS_CREDS_FILE" //nolint:gosec // G101: a variable name, not a credential
 	EnvTokenIssuer               = "CISP_TOKEN_ISSUER"    //nolint:gosec // G101: a variable name, not a credential
@@ -71,6 +73,8 @@ var Catalogue = []Var{
 	// Stores and the bus.
 	{Name: EnvDatabaseURL, Default: "", SecretURL: true},
 	{Name: EnvTimeseriesURL, Default: "", SecretURL: true},
+	{Name: EnvDatabaseMaxConns, Default: "8"},
+	{Name: EnvTimeseriesMaxConns, Default: "2"},
 	{Name: EnvNATSURL, Default: "", SecretURL: true},
 	{Name: EnvNATSCredsFile, Default: ""},
 

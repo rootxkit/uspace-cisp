@@ -1,0 +1,240 @@
+openapi: 3.1.0
+info:
+  title: uspace-cisp national CIS publication API
+  version: 0.1.0
+  description: |
+    The Common Information Service of the Georgian U-space
+    system-of-systems (Reg. (EU) 2021/664 Art. 5). This file is the
+    contract: an endpoint that is not in it does not exist, and changes
+    within /v1 are additive only. Every error is
+    application/problem+json in the shape of the Problem schema.
+
+    Skeleton (WP-0): health, readiness and the status stub. Every other
+    work package adds its paths under its tag; see api/README.md.
+servers:
+  - url: /
+tags:
+  - name: health
+    description: Liveness and readiness of one process instance.
+  - name: publications
+    description: Publication intake from the authority (F1).
+  - name: restrictions
+    description: Dynamic restrictions from the ANSP (F2).
+  - name: datasets
+    description: Reads, versions and the change feed (F3 pull).
+  - name: subscriptions
+    description: Webhook subscriptions (F3 push).
+  - name: stream
+    description: The WebSocket change stream.
+  - name: console
+    description: The CISP operators' console.
+  - name: status
+    description: Service status for consumers and consoles.
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      tags: [health]
+      summary: Liveness
+      description: 200 while the process runs. Says nothing about dependencies.
+      security: []
+      responses:
+        "200":
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        default:
+          $ref: "#/components/responses/Problem"
+  /readyz:
+    get:
+      operationId: getReadyz
+      tags: [health]
+      summary: Readiness
+      description: |
+        200 only when the database is reachable and its migrations are
+        current. A NATS outage is reported in checks.nats but does not
+        make the instance unready (it is ready, degraded). Every check
+        names its state; a check that is not implemented yet says so and
+        counts as not ready, never as ok.
+      security: []
+      responses:
+        "200":
+          description: Ready to serve.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "503":
+          description: Not ready; checks names why.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/status:
+    get:
+      operationId: getStatus
+      tags: [status]
+      summary: Service status (stub)
+      description: |
+        Per dataset the current version, per publisher the heartbeat and
+        staleness, and the degraded dependencies with their since-times.
+        Not implemented yet: answers 501 not_implemented.
+      security:
+        - ecosystemToken: []
+        - consoleSession: []
+      responses:
+        "200":
+          description: The service status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+        "501":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+components:
+  securitySchemes:
+    ecosystemToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 machine token from the authority's token service; aud is this host.
+    consoleSession:
+      type: http
+      scheme: bearer
+      description: Console session JWT forwarded by the web BFF (scope "session").
+
+  responses:
+    Problem:
+      description: An error, as RFC 9457 problem details.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  schemas:
+    Problem:
+      type: object
+      description: |
+        The ecosystem-wide error body (RFC 9457), the same shape as
+        uspace-lab schemas/common/problem/v1.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: https://schemas.uspace.ge/problems/<slug>
+          examples: ["https://schemas.uspace.ge/problems/not_implemented"]
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          description: The request path, or the request id.
+        errors:
+          type: array
+          description: Field problems, at most 100; truncated says when more existed.
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/FieldProblem"
+        truncated:
+          type: boolean
+    FieldProblem:
+      type: object
+      required: [field, reason]
+      properties:
+        field:
+          type: string
+          description: The JSON path or parameter name.
+        reason:
+          type: string
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        checks:
+          type: object
+          required: [database, migrations, nats]
+          properties:
+            database:
+              type: string
+              description: ok, not configured, or unreachable with the reason.
+            migrations:
+              type: string
+              description: ok, or pending with what is pending.
+            nats:
+              type: string
+              description: ok, not configured, or disconnected.
+
+    Status:
+      type: object
+      description: Stub of the status document (docs/PLAN.md section 6.3).
+      required: [now, datasets, publishers, degraded]
+      properties:
+        now:
+          type: string
+          format: date-time
+        datasets:
+          type: array
+          items:
+            type: object
+            required: [dataset, current_version]
+            properties:
+              dataset:
+                type: string
+              current_version:
+                type: integer
+                format: int64
+                minimum: 0
+              updated_at:
+                type: string
+                format: date-time
+        publishers:
+          type: array
+          items:
+            type: object
+            required: [client_id, stale]
+            properties:
+              client_id:
+                type: string
+              last_heartbeat_at:
+                type: string
+                format: date-time
+              stale:
+                type: boolean
+        degraded:
+          type: array
+          items:
+            type: object
+            required: [component, since]
+            properties:
+              component:
+                type: string
+                enum: [database, nats, jwks]
+              since:
+                type: string
+                format: date-time

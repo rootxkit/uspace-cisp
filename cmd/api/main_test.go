@@ -123,7 +123,7 @@ func TestRunWithoutStores(t *testing.T) {
 	}
 	code, body := get(t, r.base+"/readyz")
 	if code != 503 || !strings.Contains(body, `"database":"not configured"`) ||
-		!strings.Contains(body, `"migrations":"pending (WP-1)"`) || !strings.Contains(body, `"nats":"not configured"`) {
+		!strings.Contains(body, `"migrations":"not configured"`) || !strings.Contains(body, `"nats":"not configured"`) {
 		t.Errorf("readyz = %d %s", code, body)
 	}
 	if code, body := get(t, r.base+"/metrics"); code != 200 || !strings.Contains(body, "go_goroutines") || !strings.Contains(body, "cisp_http_request_seconds") {

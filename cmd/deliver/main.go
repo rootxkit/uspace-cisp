@@ -16,11 +16,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/rootxkit/uspace-cisp/internal/config"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
+	"github.com/rootxkit/uspace-cisp/internal/store"
 )
 
 const process = "deliver"
@@ -62,6 +64,27 @@ func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer) 
 	}
 	logger.InfoContext(ctx, "starting", "version", version, "config", cfg.Redacted())
 
+	// deliver is the only writer of the timeseries tree and never
+	// migrates it (docs/PLAN.md section 5.3): pending migrations stop the
+	// start with exit 2; a database it cannot ask is logged and the start
+	// continues.
+	if cfg.TimeseriesURL != "" {
+		pool, err := store.OpenPool(ctx, store.PoolConfig{
+			URL: cfg.TimeseriesURL, ApplicationName: "uspace-cisp-" + process, MaxConns: int32(cfg.TimeseriesMaxConns),
+		})
+		if err != nil {
+			logger.ErrorContext(ctx, "timeseries pool refused", "error", err.Error())
+			return 1
+		}
+		defer pool.Close()
+		if pending, err := pendingTimeseries(ctx, pool); err != nil {
+			logger.WarnContext(ctx, "migrations not checked at start", "tree", string(store.TreeTimeseries), "error", err.Error())
+		} else if len(pending) > 0 {
+			logger.ErrorContext(ctx, "migrations pending; run cispctl migrate timeseries first", "tree", string(store.TreeTimeseries), "pending", pending)
+			return 2
+		}
+	}
+
 	reg := obs.NewRegistry()
 	status := obs.NewStatus(process, reg, time.Now())
 	// Nothing is delivered until WP-6; the gauge says so in every status
@@ -83,4 +106,12 @@ func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer) 
 	}, h, status, logger)
 	logger.Info("stopped")
 	return code
+}
+
+func pendingTimeseries(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	db := store.OpenSQL(pool)
+	defer func() { _ = db.Close() }()
+	return store.Pending(ctx, db, store.TreeTimeseries)
 }

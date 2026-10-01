@@ -29,6 +29,10 @@ func TestConfigCheckOK(t *testing.T) {
 	code, out, errOut := runCtl([]string{"config", "check"}, []string{
 		"CISP_DATABASE_URL=postgres://cisp_api:hunter2-pw@db/cisp",
 		"CISP_SECRETS_KEY=very-secret-key-material",
+		"CISP_TOKEN_ISSUER=https://authority.example.test/",
+		"CISP_TOKEN_JWKS_URL=https://authority.example.test/.well-known/jwks.json",
+		"CISP_AUDIENCES=uspace-cisp.example.test",
+		"CISP_ANSP_MTLS_SUBJECT=CN=ansp-01",
 	})
 	if code != exitOK || !strings.Contains(out, "config check: ok") {
 		t.Fatalf("config check = %d %q %q", code, out, errOut)
@@ -143,6 +147,11 @@ func TestBinary(t *testing.T) {
 			env = append(env, kv)
 		}
 	}
+	// The variables of the api that have no default (config check
+	// validates every process).
+	env = append(env, "CISP_TOKEN_ISSUER=https://authority.example.test/",
+		"CISP_TOKEN_JWKS_URL=https://authority.example.test/.well-known/jwks.json",
+		"CISP_AUDIENCES=uspace-cisp.example.test", "CISP_ANSP_MTLS_SUBJECT=CN=ansp-01")
 	for _, c := range []struct {
 		args []string
 		want int

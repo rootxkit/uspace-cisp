@@ -46,6 +46,9 @@ type API struct {
 
 	TokenIssuer       string
 	TokenJWKSURL      string
+	LabIssuer         string
+	LabJWKSURL        string
+	JWKSCacheFile     string
 	Audiences         []string
 	AuthorityClientID string
 	ANSPClientID      string
@@ -56,8 +59,13 @@ type API struct {
 	SigningKeyFile     string
 	SigningKID         string
 	SigningKeyPrevFile string
+	SigningKIDPrev     string
 	SessionKeyFile     string
 	SecretsKey         string
+
+	// PublisherSignatureMaxSkew bounds how far the iat of a publisher's
+	// detached signature may be from now, either way.
+	PublisherSignatureMaxSkew time.Duration
 
 	PublicBaseURL             string
 	IssuerURL                 string
@@ -104,6 +112,7 @@ type Ctl struct {
 	SigningKeyFile     string
 	SigningKID         string
 	SigningKeyPrevFile string
+	SigningKIDPrev     string
 	SessionKeyFile     string
 	SecretsKey         string
 }
@@ -137,6 +146,9 @@ func LoadAPI(environ []string) (*API, error) {
 
 		TokenIssuer:       e.str(EnvTokenIssuer),
 		TokenJWKSURL:      e.str(EnvTokenJWKSURL),
+		LabIssuer:         e.str(EnvLabIssuer),
+		LabJWKSURL:        e.str(EnvLabJWKSURL),
+		JWKSCacheFile:     e.str(EnvJWKSCacheFile),
 		Audiences:         e.list(EnvAudiences),
 		AuthorityClientID: e.str(EnvAuthorityClientID),
 		ANSPClientID:      e.str(EnvANSPClientID),
@@ -147,8 +159,11 @@ func LoadAPI(environ []string) (*API, error) {
 		SigningKeyFile:     e.str(EnvSigningKeyFile),
 		SigningKID:         e.str(EnvSigningKID),
 		SigningKeyPrevFile: e.str(EnvSigningKeyPrevFile),
+		SigningKIDPrev:     e.str(EnvSigningKIDPrev),
 		SessionKeyFile:     e.str(EnvSessionKeyFile),
 		SecretsKey:         e.str(EnvSecretsKey),
+
+		PublisherSignatureMaxSkew: e.seconds(EnvPublisherSigMaxSkewS),
 
 		PublicBaseURL:             e.str(EnvPublicBaseURL),
 		IssuerURL:                 e.str(EnvIssuerURL),
@@ -201,6 +216,7 @@ func LoadCtl(environ []string) (*Ctl, error) {
 		SigningKeyFile:     e.str(EnvSigningKeyFile),
 		SigningKID:         e.str(EnvSigningKID),
 		SigningKeyPrevFile: e.str(EnvSigningKeyPrevFile),
+		SigningKIDPrev:     e.str(EnvSigningKIDPrev),
 		SessionKeyFile:     e.str(EnvSessionKeyFile),
 		SecretsKey:         e.str(EnvSecretsKey),
 	}
@@ -324,8 +340,20 @@ func (c *API) Validate() error {
 	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)
 	p = intIn(p, EnvTimeseriesMaxConns, c.TimeseriesMaxConns, 1, 1000)
 	p = urlOK(p, EnvNATSURL, c.NATSURL, "nats", "tls")
+	p = required(p, EnvTokenIssuer, c.TokenIssuer)
 	p = urlOK(p, EnvTokenIssuer, c.TokenIssuer, "http", "https")
-	p = urlOK(p, EnvTokenJWKSURL, c.TokenJWKSURL, "http", "https")
+	p = required(p, EnvTokenJWKSURL, c.TokenJWKSURL)
+	p = jwksURLOK(p, EnvTokenJWKSURL, c.TokenJWKSURL)
+	p = urlOK(p, EnvLabIssuer, c.LabIssuer, "http", "https")
+	p = jwksURLOK(p, EnvLabJWKSURL, c.LabJWKSURL)
+	p = together(p, EnvLabIssuer, c.LabIssuer, EnvLabJWKSURL, c.LabJWKSURL)
+	if c.LabIssuer != "" && c.LabIssuer == c.TokenIssuer {
+		p = append(p, core.Fieldf(EnvLabIssuer, "equals %s; the lab issuer is a second, different issuer", EnvTokenIssuer))
+	}
+	p = required(p, EnvJWKSCacheFile, c.JWKSCacheFile)
+	if len(c.Audiences) == 0 {
+		p = append(p, core.Fieldf(EnvAudiences, "not set: list the hosts tokens for this CISP name in aud (no default)"))
+	}
 	for i, h := range c.Audiences {
 		if !hostOK(h) {
 			p = append(p, core.Fieldf(EnvAudiences+"["+strconv.Itoa(i)+"]", "%q is not a host name (no scheme, path or spaces)", h))
@@ -333,13 +361,19 @@ func (c *API) Validate() error {
 	}
 	p = clientIDOK(p, EnvAuthorityClientID, c.AuthorityClientID)
 	p = clientIDOK(p, EnvANSPClientID, c.ANSPClientID)
-	p = urlOK(p, EnvANSPJWKSURL, c.ANSPJWKSURL, "http", "https")
-	if c.MTLSMode != MTLSRequired && c.MTLSMode != MTLSOff {
+	if c.AuthorityClientID == c.ANSPClientID {
+		p = append(p, core.Fieldf(EnvANSPClientID, "equals %s; each publisher has its own client id", EnvAuthorityClientID))
+	}
+	p = jwksURLOK(p, EnvANSPJWKSURL, c.ANSPJWKSURL)
+	switch c.MTLSMode {
+	case MTLSRequired:
+		p = required(p, EnvANSPMTLSSubject, c.ANSPMTLSSubject)
+	case MTLSOff:
+	default:
 		p = append(p, core.Fieldf(EnvMTLSMode, "%q is not one of required, off", c.MTLSMode))
 	}
-	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
-		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
-	}
+	p = signingKeysOK(p, c.SigningKeyFile, c.SigningKID, c.SigningKeyPrevFile, c.SigningKIDPrev)
+	p = durationIn(p, EnvPublisherSigMaxSkewS, c.PublisherSignatureMaxSkew, time.Second, time.Hour)
 	p = urlOK(p, EnvPublicBaseURL, c.PublicBaseURL, "http", "https")
 	p = urlOK(p, EnvIssuerURL, c.IssuerURL, "http", "https")
 	p = durationIn(p, EnvReadMaxAgeS, c.ReadMaxAge, 0, 24*time.Hour)
@@ -373,10 +407,69 @@ func (c *Ctl) Validate() error {
 	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
 	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)
 	p = intIn(p, EnvTimeseriesMaxConns, c.TimeseriesMaxConns, 1, 1000)
-	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
-		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
-	}
+	p = signingKeysOK(p, c.SigningKeyFile, c.SigningKID, c.SigningKeyPrevFile, c.SigningKIDPrev)
 	return orNil(p)
+}
+
+// signingKeysOK checks the kids of the signing key and of the previous
+// one: well-formed, each set with its file, and distinct.
+func signingKeysOK(p FieldErrors, file, kid, prevFile, prevKID string) FieldErrors {
+	if kid != "" && !idPattern.MatchString(kid) {
+		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", kid))
+	}
+	if prevKID != "" && !idPattern.MatchString(prevKID) {
+		p = append(p, core.Fieldf(EnvSigningKIDPrev, "%q must be 1-64 of A-Z a-z 0-9 . _ -", prevKID))
+	}
+	p = together(p, EnvSigningKeyFile, file, EnvSigningKID, kid)
+	p = together(p, EnvSigningKeyPrevFile, prevFile, EnvSigningKIDPrev, prevKID)
+	if prevFile != "" && file == "" {
+		p = append(p, core.Fieldf(EnvSigningKeyPrevFile, "set without %s: a previous key needs a current one", EnvSigningKeyFile))
+	}
+	if kid != "" && kid == prevKID {
+		p = append(p, core.Fieldf(EnvSigningKIDPrev, "equals %s; the two keys need distinct kids", EnvSigningKID))
+	}
+	return p
+}
+
+// required reports an empty value of a variable that has no default.
+func required(p FieldErrors, name, value string) FieldErrors {
+	if value == "" {
+		return append(p, core.Fieldf(name, "not set; it has no default"))
+	}
+	return p
+}
+
+// together reports one of a pair set without the other.
+func together(p FieldErrors, nameA, a, nameB, b string) FieldErrors {
+	switch {
+	case a != "" && b == "":
+		return append(p, core.Fieldf(nameB, "not set, but %s is: set both or neither", nameA))
+	case a == "" && b != "":
+		return append(p, core.Fieldf(nameA, "not set, but %s is: set both or neither", nameB))
+	}
+	return p
+}
+
+// jwksURLOK accepts an empty value or an https URL; plain http only for
+// a loopback host (uspace-core/auth refuses the rest at start; this says
+// so with the variable's name first).
+func jwksURLOK(p FieldErrors, name, raw string) FieldErrors {
+	before := len(p)
+	p = urlOK(p, name, raw, "http", "https")
+	if raw == "" || len(p) > before {
+		return p
+	}
+	u, err := url.Parse(raw)
+	if err == nil && strings.EqualFold(u.Scheme, "http") && !loopback(u.Hostname()) {
+		return append(p, core.Fieldf(name, "plain http is allowed for localhost only; use https"))
+	}
+	return p
+}
+
+// loopback is the hosts uspace-core/auth lets a JWKS URL reach over
+// plain http.
+func loopback(host string) bool {
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 var idPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)

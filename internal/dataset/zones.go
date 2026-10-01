@@ -103,11 +103,10 @@ func judgeable(f *ed318.Feature, path string, c *collector) *Warning {
 		c.add(field, "the zone cannot be built for judgement (ed318.ToZones): "+reason)
 		return nil
 	}
-	return &Warning{
-		Field: field,
-		Reason: "zone " + quote(f.Properties.Identifier) + " is accepted, but " + reason +
-			"; consumers evaluate its applicability with ed318.Applies",
+	if !strings.Contains(reason, "ed318.Applies") {
+		reason += "; consumers evaluate its applicability with ed318.Applies"
 	}
+	return &Warning{Field: field, Reason: "zone " + quote(f.Properties.Identifier) + " is accepted, but " + reason}
 }
 
 // rebase turns a path into the one-feature collection ("features[0]...")

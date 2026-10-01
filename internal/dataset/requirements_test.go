@@ -91,8 +91,10 @@ func TestUSpaceRefusalPairs(t *testing.T) {
 		{
 			name:    "service_performance not an object",
 			breakIt: func(d doc) { block(d)["service_performance"] = 1 },
-			fix:     func(d doc) { block(d)["service_performance"] = doc{"nid_update_hz": 1, "ti_update_hz": 1, "cis_latency_s": 1, "fa_s": 30} },
-			field:   blockPath + ".service_performance", phrase: "must be an object",
+			fix: func(d doc) {
+				block(d)["service_performance"] = doc{"nid_update_hz": 1, "ti_update_hz": 1, "cis_latency_s": 1, "fa_s": 30}
+			},
+			field: blockPath + ".service_performance", phrase: "must be an object",
 		},
 		{
 			name:    "max_height_agl_m of zero",

@@ -160,7 +160,8 @@ func (s *Store) RefusedAttempts(ctx context.Context, ds publication.Dataset, pub
 		return nil, fmt.Errorf("attempts: %w", err)
 	}
 	out := make([]Attempt, 0, len(rows))
-	for _, r := range rows {
+	for i := range rows {
+		r := &rows[i]
 		a := Attempt{
 			ID: r.ID, Dataset: publication.Dataset(r.Dataset), PublisherClientID: r.PublisherClientID,
 			ReceivedAt: r.ReceivedAt, Outcome: r.Outcome, PublicationID: r.PublicationID,
@@ -211,7 +212,8 @@ func (s *Store) Versions(ctx context.Context, ds publication.Dataset, before int
 		return nil, fmt.Errorf("versions: %w", err)
 	}
 	out := make([]Version, 0, len(rows))
-	for _, r := range rows {
+	for i := range rows {
+		r := &rows[i]
 		out = append(out, Version{
 			ID: r.ID, Dataset: publication.Dataset(r.Dataset), Version: r.Version,
 			PublisherClientID: r.PublisherClientID, ReceivedAt: r.ReceivedAt, BodySHA256: r.BodySha256,
@@ -262,7 +264,7 @@ type PublisherState struct {
 	LastHeartbeatAt     *time.Time
 	LastHeartbeatSentAt *time.Time
 	// ActiveRefs is nil when the publisher declared none.
-	ActiveRefs []string
+	ActiveRefs  []string
 	StaleAfterS int
 }
 

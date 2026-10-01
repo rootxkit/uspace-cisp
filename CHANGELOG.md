@@ -19,3 +19,18 @@ additively within `/v1`.
   the OpenAPI 3.1 skeleton with `oapi-codegen`; the goose migration
   trees; the Makefile, the CI workflow, the Dockerfile and the reference
   deployment (`deploy/`).
+- WP-1 store and versions: every table of the plan's data model in the
+  two goose trees (insert-only `publications`, `publication_attempts`,
+  `features`, `changes` and monthly-partitioned, hash-chained `events`;
+  `features_current` unique across `zones`, `uspace_airspace` and
+  `restrictions`; the `delivery_attempts` hypertable with its compression
+  and 90-day retention policies); `internal/publication` (canonical
+  feature rows, diff, apply, delta, change records, the deterministic
+  snapshot body, ETags); `internal/store` (pools, the embedded goose
+  runner, sqlc queries, the publication transaction with the per-dataset
+  advisory lock, the bounded snapshot cache that serves stale when the
+  database is gone); `internal/bus` (connect without giving up, the
+  `CIS_CHANGES` stream, publish with acknowledgement and deduplication);
+  `cispctl migrate`, `migrate status`, `rebuild-current` and
+  `set-retention`; `api` and `deliver` refuse to start with pending
+  migrations; `CISP_DATABASE_MAX_CONNS` and `CISP_TIMESERIES_MAX_CONNS`.

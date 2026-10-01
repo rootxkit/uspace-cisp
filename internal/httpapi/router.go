@@ -7,8 +7,10 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -44,19 +46,32 @@ type Options struct {
 	// RouteMiddleware wraps the handler of a route, keyed by its ServeMux
 	// pattern ("GET /v1/status"): authentication, scopes, the publisher
 	// binding, the mTLS check, the body signature. It runs inside the
-	// handler deadline and after the body cap; a route without an entry
-	// runs none, so a header only an mTLS route checks is read nowhere
-	// else.
+	// handler deadline and after the body cap. It is fail-closed: every
+	// operation of api/openapi.yaml outside PublicRoutes must have an
+	// entry, and NewRouter refuses a missing one (and one for a pattern
+	// that is no operation, which would be a typo guarding nothing). A
+	// header only an mTLS route checks is read nowhere else.
 	RouteMiddleware map[string]func(http.Handler) http.Handler
 	// Now is the clock for durations; nil: time.Now.
 	Now func() time.Time
 }
 
+// PublicRoutes are the operations served without authentication: the
+// liveness and readiness probes and the CISP's public signing keys.
+// Every other operation needs an Options.RouteMiddleware entry.
+var PublicRoutes = map[string]bool{
+	"GET /healthz":               true,
+	"GET /readyz":                true,
+	"GET /.well-known/jwks.json": true,
+}
+
 // NewRouter registers the generated routes of api/openapi.yaml on a
 // ServeMux, answers unmatched paths and methods with problem+json, and
-// wraps the result in the middleware chain.
-func NewRouter(server gen.StrictServerInterface, opts Options) http.Handler {
-	mux := http.NewServeMux()
+// wraps the result in the middleware chain. It refuses (and the process
+// does not start) when an operation outside PublicRoutes has no
+// RouteMiddleware entry, or an entry names no operation.
+func NewRouter(server gen.StrictServerInterface, opts Options) (http.Handler, error) {
+	mux := &recordingMux{ServeMux: http.NewServeMux()}
 	strict := gen.NewStrictHandlerWithOptions(server, nil, gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestError,
 		ResponseErrorHandlerFunc: responseError(opts.Logger),
@@ -65,7 +80,51 @@ func NewRouter(server gen.StrictServerInterface, opts Options) http.Handler {
 		BaseRouter:       mux,
 		ErrorHandlerFunc: requestError,
 	})
-	return Wrap(mux, opts)
+	if err := CheckRouteAuth(mux.patterns, opts.RouteMiddleware); err != nil {
+		return nil, err
+	}
+	return Wrap(mux.ServeMux, opts), nil
+}
+
+// recordingMux records every pattern the generated code registers.
+type recordingMux struct {
+	*http.ServeMux
+	patterns []string
+}
+
+// HandleFunc registers and records pattern.
+func (m *recordingMux) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Request)) {
+	m.patterns = append(m.patterns, pattern)
+	m.ServeMux.HandleFunc(pattern, h)
+}
+
+// CheckRouteAuth is the fail-closed rule of RouteMiddleware over the
+// registered operation patterns: every one outside PublicRoutes has an
+// entry, and every entry is one of them.
+func CheckRouteAuth(patterns []string, byRoute map[string]func(http.Handler) http.Handler) error {
+	known := make(map[string]bool, len(patterns))
+	var missing, unknown []string
+	for _, p := range patterns {
+		known[p] = true
+		if !PublicRoutes[p] && byRoute[p] == nil {
+			missing = append(missing, p)
+		}
+	}
+	for p := range byRoute {
+		if !known[p] {
+			unknown = append(unknown, p)
+		}
+	}
+	sort.Strings(missing)
+	sort.Strings(unknown)
+	var errs []error
+	if len(missing) > 0 {
+		errs = append(errs, fmt.Errorf("operations without an authentication entry (refusing to serve them open): %s", strings.Join(missing, ", ")))
+	}
+	if len(unknown) > 0 {
+		errs = append(errs, fmt.Errorf("authentication entries for no operation: %s", strings.Join(unknown, ", ")))
+	}
+	return errors.Join(errs...)
 }
 
 // Wrap puts the middleware chain around mux. Exported for the processes

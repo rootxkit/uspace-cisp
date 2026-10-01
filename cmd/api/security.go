@@ -116,9 +116,11 @@ func (s *security) retry(ctx context.Context, tick <-chan time.Time) {
 	}
 }
 
-// routes is the middleware of the routes that exist so far. GET
-// /v1/status takes an ecosystem token with cis.read (console sessions
-// arrive with WP-8).
+// routes is the middleware of every operation outside
+// httpapi.PublicRoutes. The router is fail-closed: an operation added to
+// api/openapi.yaml without an entry here stops the start. GET /v1/status
+// takes an ecosystem token with cis.read (console sessions arrive with
+// WP-8).
 func (s *security) routes() map[string]func(http.Handler) http.Handler {
 	return map[string]func(http.Handler) http.Handler{
 		"GET /v1/status": s.guard.RequireScopes(auth.ScopeRead),

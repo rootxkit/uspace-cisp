@@ -81,7 +81,7 @@ func waitCode(t *testing.T, code chan int) int {
 }
 
 func TestServeStartsAndStopsCleanly(t *testing.T) {
-	r := startServe(t, NewRouter(&Server{}, Options{}), time.Second)
+	r := startServe(t, mustRouter(t, &Server{}, Options{RouteMiddleware: openRoutes()}), time.Second)
 	resp, err := http.Get("http://" + r.addr + "/healthz")
 	if err != nil {
 		t.Fatal(err)

@@ -141,7 +141,14 @@ func newFixture(t *testing.T, server gen.StrictServerInterface, opts Options) fi
 	opts.Logger = obs.NewLogger(logs, "api", slog.LevelInfo)
 	opts.Status = obs.NewStatus("api", nil, time.Now())
 	opts.Registerer = prometheus.NewRegistry()
-	return fixture{h: NewRouter(server, opts), status: opts.Status, logs: logs}
+	if opts.RouteMiddleware == nil {
+		opts.RouteMiddleware = openRoutes()
+	}
+	h, err := NewRouter(server, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fixture{h: h, status: opts.Status, logs: logs}
 }
 
 func (f fixture) do(req *http.Request) *httptest.ResponseRecorder {
@@ -481,8 +488,8 @@ func TestProblemErrorsCapped(t *testing.T) {
 func TestMetricsHistogramShared(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	status := obs.NewStatus("api", nil, time.Now())
-	_ = NewRouter(&Server{}, Options{Registerer: reg, Status: status})
-	_ = NewRouter(&Server{}, Options{Registerer: reg, Status: status})
+	_, _ = NewRouter(&Server{}, Options{Registerer: reg, Status: status, RouteMiddleware: openRoutes()})
+	_, _ = NewRouter(&Server{}, Options{Registerer: reg, Status: status, RouteMiddleware: openRoutes()})
 	if status.Degraded() {
 		t.Error("a second router on the same registry degraded the status")
 	}
@@ -492,7 +499,7 @@ func TestMetricsHistogramConflictIsVisible(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(prometheus.NewCounter(prometheus.CounterOpts{Name: "cisp_http_request_seconds", Help: "x"}))
 	status := obs.NewStatus("api", nil, time.Now())
-	_ = NewRouter(&Server{}, Options{Registerer: reg, Status: status})
+	_, _ = NewRouter(&Server{}, Options{Registerer: reg, Status: status, RouteMiddleware: openRoutes()})
 	if !status.Degraded() {
 		t.Error("a histogram that could not register is silent")
 	}

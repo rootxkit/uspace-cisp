@@ -153,7 +153,7 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		ready.NATS = natsCheck(nc)
 	}
 
-	router := httpapi.NewRouter(&httpapi.Server{Ready: ready, Keys: sec.keys}, httpapi.Options{
+	router, err := httpapi.NewRouter(&httpapi.Server{Ready: ready, Keys: sec.keys}, httpapi.Options{
 		Logger:          logger,
 		Status:          status,
 		Registerer:      reg,
@@ -162,6 +162,10 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		MaxBodyBytes:    cfg.MaxBodyBytes,
 		RouteMiddleware: sec.routes(),
 	})
+	if err != nil {
+		logger.ErrorContext(ctx, "routes refused", "error", err.Error())
+		return 1
+	}
 	top := http.NewServeMux()
 	top.Handle("GET /metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	top.Handle("/", router)

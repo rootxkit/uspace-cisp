@@ -10,7 +10,7 @@ import (
 )
 
 func TestProbe(t *testing.T) {
-	srv := httptest.NewServer(NewRouter(&Server{}, Options{}))
+	srv := httptest.NewServer(mustRouter(t, &Server{}, Options{RouteMiddleware: openRoutes()}))
 	defer srv.Close()
 	addr := srv.Listener.Addr().String()
 

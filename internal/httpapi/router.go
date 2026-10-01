@@ -41,6 +41,13 @@ type Options struct {
 	// RouteBodyCaps raises (or lowers) the cap of a route, keyed by its
 	// ServeMux pattern ("PUT /v1/publications/{dataset}").
 	RouteBodyCaps map[string]int64
+	// RouteMiddleware wraps the handler of a route, keyed by its ServeMux
+	// pattern ("GET /v1/status"): authentication, scopes, the publisher
+	// binding, the mTLS check, the body signature. It runs inside the
+	// handler deadline and after the body cap; a route without an entry
+	// runs none, so a header only an mTLS route checks is read nowhere
+	// else.
+	RouteMiddleware map[string]func(http.Handler) http.Handler
 	// Now is the clock for durations; nil: time.Now.
 	Now func() time.Time
 }
@@ -100,12 +107,31 @@ func Wrap(mux *http.ServeMux, opts Options) http.Handler {
 	panics := opts.Status.Component("http").Counter("handler_panics", "Handler panics turned into 500 responses.")
 
 	h := unmatched(mux)
+	h = routeMiddleware(h, opts.RouteMiddleware)
 	h = deadline(h, opts.HandlerTimeout)
 	h = bodyCap(h, opts.MaxBodyBytes, opts.RouteBodyCaps)
 	h = tracing(h, opts.Tracer)
 	h = recoverer(h, opts.Logger, panics)
 	h = access(h, opts.Logger, hist, mux, opts.Now)
 	return requestID(h)
+}
+
+// routeMiddleware runs the matched route's middleware, if any.
+func routeMiddleware(next http.Handler, byRoute map[string]func(http.Handler) http.Handler) http.Handler {
+	if len(byRoute) == 0 {
+		return next
+	}
+	wrapped := make(map[string]http.Handler, len(byRoute))
+	for route, mw := range byRoute {
+		wrapped[route] = mw(next)
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h, ok := wrapped[routeOf(r.Context())]; ok {
+			h.ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 var probeMethods = []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete}

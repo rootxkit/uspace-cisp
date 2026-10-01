@@ -22,6 +22,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/rootxkit/uspace-cisp/internal/auth"
 	"github.com/rootxkit/uspace-cisp/internal/config"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
@@ -82,11 +83,18 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 
 	reg := obs.NewRegistry()
 	status := obs.NewStatus(process, reg, time.Now())
-	if cfg.MTLSMode == config.MTLSOff {
-		// A disabled safeguard is shown at error level every period
-		// (CLAUDE.md hard rule 4).
-		status.Component("mtls").SetDegraded("CISP_MTLS_MODE=off: the ANSP's client certificate is not checked")
+	// A disabled safeguard is shown at error level every period
+	// (CLAUDE.md hard rule 4).
+	auth.ReportMTLS(status.Component("mtls"), cfg.MTLSMode)
+
+	sec, err := startSecurity(ctx, cfg, status, logger)
+	if err != nil {
+		logger.ErrorContext(ctx, "authentication refused", "error", err.Error())
+		return 1
 	}
+	retry := time.NewTicker(jwksRetryInterval)
+	defer retry.Stop()
+	go sec.retry(ctx, retry.C)
 
 	tp, shutdownTracer, err := obs.NewTracerProvider(ctx, cfg.OTelEndpoint, process, version)
 	if err != nil {
@@ -145,13 +153,14 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		ready.NATS = natsCheck(nc)
 	}
 
-	router := httpapi.NewRouter(&httpapi.Server{Ready: ready}, httpapi.Options{
-		Logger:         logger,
-		Status:         status,
-		Registerer:     reg,
-		Tracer:         tp,
-		HandlerTimeout: cfg.HandlerTimeout,
-		MaxBodyBytes:   cfg.MaxBodyBytes,
+	router := httpapi.NewRouter(&httpapi.Server{Ready: ready, Keys: sec.keys}, httpapi.Options{
+		Logger:          logger,
+		Status:          status,
+		Registerer:      reg,
+		Tracer:          tp,
+		HandlerTimeout:  cfg.HandlerTimeout,
+		MaxBodyBytes:    cfg.MaxBodyBytes,
+		RouteMiddleware: sec.routes(),
 	})
 	top := http.NewServeMux()
 	top.Handle("GET /metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))

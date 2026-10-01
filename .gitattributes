@@ -1,0 +1,21 @@
+# Every text file is committed and checked out with LF line endings,
+# whatever the platform. Go, YAML, JSON and shell scripts all break or
+# churn under CRLF (a shell script with CRLF does not run on ubuntu CI).
+* text=auto eol=lf
+
+*.go text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.sql text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+Makefile text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Binary fixtures (none yet).
+*.png binary
+*.pgm binary

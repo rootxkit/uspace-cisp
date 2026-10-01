@@ -12,7 +12,8 @@ WP-6 (deliveries views read its tables; stub until it merges). WP-11
 ## Read first
 
 1. `CLAUDE.md`, `docs/PLAN.md §1.2` (no write path to content), `§1.3`
-   (D10), `§6.6`, `§8.1` (insider row, T7), `§8.2`, `§8.5`, `§15` Q13.
+   (D10), `§6.6` (the session shape and cookie names), `§8.1` (insider
+   row, T7), `§8.2`, `§8.5`, `§15` Q13 (decided).
 2. Spec `01 §2` users (`viewer`, `publisher_admin`, `admin`; publishers
    cannot edit content), `06 §3` (local accounts argon2id, MFA for
    admin roles, the BFF cookie, CSRF), `06 §2` T6, T7, `06 §5`
@@ -38,15 +39,23 @@ WP-6 (deliveries views read its tables; stub until it merges). WP-11
   per 15 min through the WP-4 limiter; `mfa_required` accounts need a
   valid TOTP (30 s step, ±1 step skew, a used code not accepted twice
   within its window: bounded memory, E-10); on success issue an RS256
-  JWT with `core/auth.Issuer` (`iss` = `CISP_CONSOLE_ISSUER`, `aud` =
-  `CISP_AUDIENCE`, `sub` = account id, `scope` = `console:<role>`, `jti`,
-  TTL 12 h), insert `sessions`, `events` row `session_issued`; the
-  response body carries the token once; the BFF (WP-9) stores it.
+  JWT with `core/auth.Issuer` in the one session shape every console in
+  the ecosystem uses (M20, `docs/PLAN.md §6.6`): `iss` =
+  `CISP_CONSOLE_ISSUER`, `aud` = the CISP's own host (the first entry of
+  `CISP_AUDIENCES`), `sub` = account id, **`scope = "session"`, `roles =
+  [<role>]`, `realm = "console"`**, `jti`, `kid`, TTL 12 h (idle 30 min
+  through the BFF's refresh); insert `sessions`, `events` row
+  `session_issued`; the response body carries the token once; the BFF
+  (WP-9) stores it in the `uspace_session` cookie. No `console:<role>`
+  scope: the role is read from `roles[]`.
 - `RequireRole(role)` middleware: verifies through the shared
-  `Verifier` (console issuer allow-listed with the static key set),
-  checks `sessions.revoked_at IS NULL` (a bounded in-memory negative
-  cache of revoked `jti`s refreshed every 10 s), orders `viewer <
-  publisher_admin < admin`; 401/403 as the machine side.
+  `Verifier` (console issuer allow-listed with the static key set,
+  `scope` must be exactly `session`), checks `sessions.revoked_at IS
+  NULL` (a bounded in-memory negative cache of revoked `jti`s refreshed
+  every 10 s), reads the role from `roles[]` (exactly one element here;
+  more than one or an unknown role → 403) and orders `viewer <
+  publisher_admin < admin`; 401/403 as the machine side. A machine
+  token on a console route (`scope` without `session`) is 403.
 - `DELETE /v1/console/session` revokes; `GET /v1/console/me`.
 - Accounts (`admin`): list, create (`username`, `role`, a one-time
   initial password returned once; `mfa_required` forced true for

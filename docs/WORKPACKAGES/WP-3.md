@@ -97,7 +97,8 @@ func For(kind Kind) Rules
    the problem);
 4. `dataset.For(kind).Validate(body)`; on problems: insert a
    `publication_attempts` row (`refused`), count
-   `publications_refused{dataset}`, answer 400 with `problems[]`;
+   `publications_refused{dataset}`, answer 400 with `errors[]` (the
+   problem body of `docs/PLAN.md §6`, `truncated: true` past 100);
 5. `store.PublishTx` with `reason: publication`, the signature and
    `kid`, the warnings; `ErrUnchanged` → 200 `{dataset, version, etag,
    unchanged: true}`; else 201 with the counts and `added[]`, `changed[]`,
@@ -109,10 +110,14 @@ func For(kind Kind) Rules
 `GET /v1/publications/{dataset}?limit=&before=`: versions list
 (`cis.read` or the publisher). `GET /v1/publications/{dataset}/attempts?since=`:
 the publisher's own refusals (403 for another client; console `admin`
-through WP-8 later). `POST /v1/publishers/heartbeat` `{sent_at}` with any
-`cis.publish:*` scope: upserts `publishers.last_heartbeat_at` for the
-caller's `sub`; 403 when `sub` is not a configured publisher. (WP-5 reads
-it for staleness.)
+through WP-8 later). `POST /v1/publishers/heartbeat` `{sent_at,
+active_refs?: []}` with any `cis.publish:*` scope, sent every 15 s by
+each publisher (`docs/PLAN.md §6.1`, M3): upserts
+`publishers.last_heartbeat_at` for the caller's `sub` and stores
+`active_refs` verbatim (a bounded list, ≤ 1 000 entries, 400 past it;
+the authority sends none, the ANSP its `ansp_ref`s); 403 when `sub` is
+not a configured publisher; 204. (WP-5 reads it for staleness and
+compares `active_refs` with its heads.)
 
 Snapshot signing: `PublishTx` takes the `jws.KeyRing` as its `Signer`.
 
@@ -131,7 +136,7 @@ and checked by `make generate-check`, so there is one source).
   `RunOwned("cisp")`): every accepted collection `PUT` → 201; `GET
   /v1/zones/versions/{v}` (through the store until WP-4's handler
   lands: call `store` directly and compare bytes) equals the input bytes;
-  every refusal → 400 whose `problems[]` contain the vector's path and
+  every refusal → 400 whose `errors[]` contain the vector's path and
   phrase. Collections with `USPACE` go to `uspace_airspace` and are
   given the requirements block by the test (document which cases).
 - E-01 pairs for every rule above (each refusal beside an acceptance
@@ -143,6 +148,9 @@ and checked by `make generate-check`, so there is one source).
   201 entries.
 - Idempotent re-PUT returns 200 `unchanged`; a re-PUT with one feature
   changed returns 201 with that id in `changed[]`.
+- Heartbeat: `{sent_at}` alone and with `active_refs` both 204 and
+  read back from `publishers`; 1 001 refs → 400 (E-10); a
+  non-publisher `sub` → 403.
 - `If-Match` absent → 428; stale → 412 with the current etag; the
   unsigned-and-invalid body → 401 naming only the signature.
 - Warnings path (E-02): a zone with an open-ended sunrise/sunset

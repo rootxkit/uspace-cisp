@@ -7,7 +7,8 @@ per PR. Branch `plan/initial`. Inputs: the spec at `uspace-lab/docs/spec/`
 `uspace-lab/knowledge/` (`LESSONS.md`, `scenarios.md` SC-12, SC-13,
 `vectors/`), the shared library `rootxkit/uspace-core` (`docs/PLAN.md`,
 `ed318`, `ed269`, `zones`, `geodesy`, `auth`, `vectors` public APIs at
-`v0.2.0`; `v1.0.0` imminent) and the predecessor `rootxkit/utm`
+`v1.0.0`), the cross-plan reconciliation of 2026-10-02 (decisions M1-M38
+and §2, applied throughout and recorded in §15) and the predecessor `rootxkit/utm`
 (`airspace/ed269.py`, `api/zone_routes.py`, U-03, U-04, U-09; read-only
 reference for behaviour, never for architecture).
 
@@ -15,7 +16,7 @@ Sections: 1 scope and role boundary; 2 architecture; 3 package layout;
 4 third-party dependencies; 5 data model and migrations; 6 the published
 API; 7 events on the bus; 8 security; 9 performance budgets; 10 testing
 strategy; 11 deployment; 12 milestones; 13 work packages and waves;
-14 engineering standards; 15 open questions and proposed answers.
+14 engineering standards; 15 open questions and decisions.
 
 ---
 
@@ -88,7 +89,7 @@ Next.js UI under `web/`, and one published OpenAPI 3.1 file
 | D8 | Identifiers are unique across `zones`, `uspace_airspace` and `restrictions` together, not only within a dataset. | A consumer merges the three into one `zones.Index`; `ed318.ToZones` refuses a colliding key. A collision at the CISP would break every USSP's cache. §15 Q17. |
 | D9 | The TimescaleDB database holds one hypertable, `delivery_attempts`; everything else is relational. `deliver` is the only writer of the hypertable, `api` the only writer of the relational database. | `03` preamble (one database pair per system, two migration trees never merged, LESSONS B-15); the delivery log is the CISP's only time series. §15 Q12. |
 | D10 | The console's accounts are local (argon2id), roles `viewer`, `publisher_admin`, `admin`; the session is an RS256 JWT issued by the CISP's own key and carried in an `HttpOnly` cookie by the Next.js BFF; verified by the same `uspace-core/auth.Verifier` as ecosystem tokens, with the console issuer allow-listed and a static key set. | `01 §2` users, `06 §3`, `00 §6.2` (one verifier). |
-| D11 | Migrations use `goose` (embedded), not `golang-migrate` as `03` says. | The owner's stack decision; recorded as a deviation in §15 Q21. |
+| D11 | Migrations use `goose` (embedded), not `golang-migrate` as `03` says; the version tables are `goose_db_version_relational` and `goose_db_version_timeseries` (one name per tree, the same in every repo). | The owner's stack decision; recorded as a deviation in §15 Q21. A tree run against the wrong database fails on the table name (cross-plan M36). |
 | D12 | No H3, no partitioning, no hot-path process. The CISP's rates are human-scale (`02 F1-F3`); subscription matching is a PostGIS `&&`. | `05 §2`: the CISP's only sub-second path is `deliver`. |
 
 ---
@@ -181,7 +182,7 @@ github.com/rootxkit/uspace-cisp
 ├── internal/stream/         WS hub for /v1/stream fed from the bus (WP-7)
 ├── internal/console/        console read models, accounts, audit queries, actions (WP-8)
 ├── web/                     Next.js App Router, uspace-ui, ka/en (WP-9, WP-10, WP-11)
-├── deploy/                  compose.yml, Caddyfile snippet, .env.example, images (WP-0)
+├── deploy/                  compose.yml, caddy/Caddyfile.snippet (reference copy), .env.example, images (WP-0)
 ├── test/integration/        build tag `integration`: real PostgreSQL/Timescale and NATS (WP-1 onward)
 ├── test/e2e/                compose-driven scenarios: kill the subscriber, kill NATS, kill the database (WP-6, WP-13)
 └── docs/                    this plan, WORKPACKAGES/, RUNBOOKS/ (WP-13 adds runbooks)
@@ -206,14 +207,14 @@ Everything else is the standard library.
 
 | Module | Used by | Why |
 |---|---|---|
-| `github.com/rootxkit/uspace-core` (by tag; `v0.2.0` now, `v1.0.0` as soon as it is tagged) | everywhere | the ED-318/ED-269 model, parse, export, mapping, applicability and daylight; the JWT verifier and issuer; geodesy; the vector harness (`00 §6.3`) |
+| `github.com/rootxkit/uspace-core` (by tag; `v1.0.0`, released; `v1.1.0` when core WP-14 ships the JWS helpers, §15 Q20) | everywhere | the ED-318/ED-269 model, parse, export, mapping, applicability and daylight; the JWT verifier and issuer; geodesy; the vector harness (`00 §6.3`) |
 | `github.com/oapi-codegen/oapi-codegen/v2` (tool, `go tool`) and `github.com/oapi-codegen/runtime` | `internal/httpapi/gen` | server and client types generated from `api/openapi.yaml`, strict-server mode, committed and verified offline in CI (owner's decision) |
 | `github.com/getkin/kin-openapi` (test only) | `internal/httpapi` tests | request and response validation against the spec in handler tests, so the spec is the contract, not a comment |
 | `github.com/jackc/pgx/v5` | `internal/store` | PostgreSQL driver and pool (owner's decision) |
 | `github.com/sqlc-dev/sqlc` (tool) | `internal/store` | typed queries generated from SQL, committed, verified in CI (owner's decision) |
 | `github.com/pressly/goose/v3` | `internal/store`, `cispctl` | embedded migrations, two trees (owner's decision) |
 | `github.com/nats-io/nats.go` | `internal/bus` | JetStream publish, durable pull consumers, KV not used here (owner's decision) |
-| `github.com/lestrrat-go/jwx/v3` | `internal/jws` | detached JWS (RFC 7797) verification and compact JWS signing; the same module `uspace-core/auth` already uses, so one JOSE implementation per binary |
+| `github.com/lestrrat-go/jwx/v3` | `internal/jws` | detached JWS (RFC 7797) verification and compact JWS signing; the same module `uspace-core/auth` already uses, so one JOSE implementation per binary. Interim: core `v1.1.0` (core WP-14) ships `auth.SignDetached`, `VerifyDetached`, `SignCompact`, `VerifyCompact` and a `KeyRing`; WP-2 may land first on `internal/jws` because it is on the critical path, and a follow-up switches to core and drops the direct import (M27, §15 Q20) |
 | `github.com/prometheus/client_golang` | `internal/obs` | metrics (owner's decision) |
 | `go.opentelemetry.io/otel` (+ `sdk`, `exporters/otlp/otlptrace/otlptracehttp`, `contrib/instrumentation/net/http/otelhttp`) | `internal/obs`, `internal/httpapi` | tracing (owner's decision); exporter off unless `CISP_OTEL_ENDPOINT` is set |
 | `golang.org/x/crypto` (argon2) | `internal/auth` | console password hashing (`06 §3` argon2id) |
@@ -235,7 +236,11 @@ components, symbology, ka/en, BFF helpers), `maplibre-gl` (through the
 kit), `openapi-typescript` (dev), `eslint` with the kit's config and the
 two project rules (no geometry import, no server-side business logic),
 `vitest` for unit tests of pure helpers, `@playwright/test` for one smoke
-test of the public map. Lockfile frozen (`npm ci`).
+test of the public map. Package manager `pnpm` with `packageManager`
+pinned in `package.json` and `pnpm-lock.yaml` frozen (`pnpm install
+--frozen-lockfile`), as every `web/` in the ecosystem (cross-plan M34).
+`@rootxkit/uspace-ui` comes from npmjs only, exact pin, starting on the
+kit's `0.1.0-rc` and bumped to `0.1.0` (M32, M33; §15 Q14).
 
 ---
 
@@ -244,7 +249,8 @@ test of the public map. Lockfile frozen (`npm ci`).
 Conventions (`03` preamble): units in column names, `TIMESTAMPTZ` UTC,
 geometry `SRID 4326`, distance on `geography`; the relational tree and
 the timeseries tree are separate goose trees with separate version
-tables (`goose_db_version` in each database) and are never merged
+tables (`goose_db_version_relational` in `cisp`,
+`goose_db_version_timeseries` in `cisp_ts`; D11) and are never merged
 (LESSONS B-15).
 
 ### 5.1 Relational (PostgreSQL 16 + PostGIS 3.4), `migrations/relational/`
@@ -257,7 +263,7 @@ tables (`goose_db_version` in each database) and are never merged
 | `features` | `publication_id`, `feature_id` (ED-318 `identifier`; `PartIdentifier` for layers), `feature` jsonb (the feature as published, compact), `geom` geometry(Geometry,4326) (polygon as published; a circle stored as `ST_Buffer(geography)` **for bbox and drawing only**, LESSONS Z-11), `centroid` geometry(Point,4326), `lower_m`, `lower_ref`, `upper_m`, `upper_ref`, `applicable_from`, `applicable_to` (nullable; the outer bounds of `limitedApplicability`), `has_events` bool, `op` (`added`, `changed`, `removed`, `unchanged` vs the previous version) | every version's features; `removed` rows carry the last feature for the delta; GiST on `geom`, btree on (`publication_id`, `feature_id`) |
 | `features_current` | `dataset`, `feature_id`, `version`, `feature` jsonb, `geom`, `centroid`, limits, applicability bounds | the materialised current version; replaced in the publication transaction; what every filtered read hits; GiST on `geom`, unique (`dataset`, `feature_id`), and a unique index on `feature_id` **across** `zones`, `uspace_airspace`, `restrictions` (D8) |
 | `snapshots` | `dataset`, `version`, `etag`, `body_gz` bytea (the response body of an unfiltered `GET /v1/{dataset}` at that version, gzip), `cisp_signature` text (compact detached JWS by the CISP's key over the uncompressed body), `built_at` | built in the publication transaction; served verbatim with `Content-Encoding` negotiation |
-| `restrictions` | `id` ULID, `ansp_ref` (unique; idempotency key), `ansp_version` int, `uspace_airspace_id` (the USPACE feature identifier), `feature_id` (the DAR zone identifier, ≤ 7 chars), `state` (`planned`, `active`, `ended`, `cancelled`), `starts_at`, `ends_at`, `ended_by` (`ansp`, `expiry`, null), `created_at`, `updated_at`, `last_publisher_client_id`, `source_stale_since` nullable | the lifecycle head; every change also becomes a `publications` row of dataset `restrictions` (D4) |
+| `restrictions` | `id` ULID, `ansp_ref` (unique; with `ansp_version` the idempotency key, §6.2), `ansp_version` int, `uspace_airspace_id` (the USPACE feature identifier), `feature_id` (the DAR zone identifier, ≤ 7 chars), `state` (`planned`, `active`, `ended`, `cancelled`), `starts_at`, `ends_at`, `ended_by` (`ansp`, `expiry`, null), `created_at`, `updated_at`, `last_publisher_client_id`, `source_stale_since` nullable | the lifecycle head; every change also becomes a `publications` row of dataset `restrictions` (D4) |
 | `restriction_events` | `restriction_id`, `at`, `op`, `ansp_version`, `publication_id`, `actor` | the per-restriction history the console shows |
 | `publishers` | `client_id` PK, `kind` (`authority`, `ansp`), `mtls_subject` nullable, `last_heartbeat_at`, `last_publication_at`, `stale_after_s` (60), `enabled` | seeded from env at start (`CISP_PUBLISHERS`), heartbeat updated by `POST /v1/publishers/heartbeat` (§15 Q3) |
 | `subscriptions` | `id` ULID, `client_id`, `callback_url`, `datasets` text[], `bbox` geometry(Polygon,4326) nullable, `status` (`pending_verification`, `active`, `suspended`, `deleted`), `created_at`, `verified_at`, `suspended_reason`, `consecutive_failures`, `last_success_at` | `03 §2`; at most `CISP_MAX_SUBSCRIPTIONS_PER_CLIENT` (20) per client |
@@ -284,9 +290,12 @@ Written by `deliver` only; read by `api` for the console and for
 
 - One goose SQL file per change, `NNNN_<slug>.sql` with `-- +goose Up` and
   `-- +goose Down`, embedded with `embed.FS`; `cispctl migrate relational`
-  and `cispctl migrate timeseries` apply them; `api` and `deliver` refuse
-  to start when their tree has pending migrations (they print which) and
-  never migrate on their own (zero-downtime rule, predecessor S-31).
+  and `cispctl migrate timeseries` apply them (the one-shot `migrate`
+  compose service runs both); `api` and `deliver` refuse to start when
+  their tree has pending migrations (they print which) and never migrate
+  on their own (zero-downtime rule, predecessor S-31). This is the
+  pattern every system in the ecosystem adopted (M36): a `migrate`
+  subcommand, a one-shot compose service, no `*_MIGRATE_ON_START` flag.
 - A migration touching `features_current` or `snapshots` is written so the
   rebuild runs from `publications.body` through the same Go code
   (`cispctl rebuild-current`), never by hand-written SQL that reinterprets
@@ -305,9 +314,17 @@ and the client types into `internal/httpapi/gen/`; `openapi-typescript`
 generates `web/src/api/types.ts`; both are committed and CI fails when a
 regeneration differs. Conventions (`02 §1`): path version `/v1`; JSON;
 RFC 3339 UTC with `Z`; GeoJSON `[lng, lat]`; unknown request fields
-ignored within a major; errors as `application/problem+json` with `type`,
-`title`, `status`, `detail` and, for refused publications, `problems[]`
-(`{field, reason}` as `ed269.Problems`, capped at 100 with `truncated`).
+ignored within a major; errors as `application/problem+json` (RFC 9457)
+in the shape every backend in the ecosystem shares (M28): `{type, title,
+status, detail, instance, errors: [{field, reason}], truncated?}`, where
+`errors[]` carries the field problems of a refused publication (`field`
+= the JSON path as `core.FieldError`/`ed269.Problems` write it, capped
+at 100 with `truncated: true`) and `type` =
+`https://schemas.uspace.ge/problems/<slug>` (the same domain as the
+schema `$id`s; `slug` = the counter or refusal name: `unauthenticated`,
+`forbidden`, `signature`, `not_a_publisher`, `precondition_failed`,
+`cis_stale`, `ansp_version`, `state`, ...). The schema `problem/v1`
+lives in `uspace-lab/schemas/common/` (M14).
 
 Scopes and roles are in §8.2. Every request carries `X-Request-Id`
 (generated when absent) and every response echoes it.
@@ -316,16 +333,16 @@ Scopes and roles are in §8.2. Every request carries `X-Request-Id`
 
 | Method and path | Spec | Auth | Behaviour |
 |---|---|---|---|
-| `PUT /v1/publications/{dataset}` (`zones`, `uspace_airspace`, `ussp_list`) | `02 F1`, `01` C3 | scope `cis.publish:zones` / `cis.publish:uspace` / `cis.publish:ussp_list`; `sub` must be the configured authority client id | body ≤ `CISP_MAX_PUBLICATION_BYTES` (32 MiB; `02 F1` says < 20 MB); `If-Match: "<dataset>:<current_version>"` required (412 on mismatch, 428 when absent); `X-JWS-Signature` detached JWS over the exact body bytes required (401 `signature`); validation per dataset (WP-3) accepts whole or refuses whole (400 with `problems[]`); a body whose canonical features equal the current version returns 200 with the current version and no new row; otherwise 201 `{dataset, version, etag, received_at, feature_count, added[], changed[], removed[], warnings[]}` |
+| `PUT /v1/publications/{dataset}` (`zones`, `uspace_airspace`, `ussp_list`) | `02 F1`, `01` C3 | scope `cis.publish:zones` / `cis.publish:uspace` / `cis.publish:ussp_list`; `sub` must be the configured authority client id | body ≤ `CISP_MAX_PUBLICATION_BYTES` (32 MiB; `02 F1` says < 20 MB); `If-Match: "<dataset>:<current_version>"` required (412 on mismatch, 428 when absent); `X-JWS-Signature` detached JWS over the exact body bytes required (401 `signature`); validation per dataset (WP-3) accepts whole or refuses whole (400 with `errors[]`); a body whose canonical features equal the current version returns 200 with the current version and no new row; otherwise 201 `{dataset, version, etag, received_at, feature_count, added[], changed[], removed[], warnings[]}` |
 | `GET /v1/publications/{dataset}` | `02 F3` history | `cis.read` or the publisher | versions with publisher, time, counts, reason |
 | `GET /v1/publications/{dataset}/attempts?since=` | Annex III A(5) | the publisher (its own) or console `admin` | refused attempts with their problems |
-| `POST /v1/publishers/heartbeat` | `02 F2` failure rule (undefined there; §15 Q3) | any `cis.publish:*` scope | `{sent_at}`; the CISP records `last_heartbeat_at`; a publisher silent for `stale_after_s` is `source_stale` in `GET /v1/status` and on its datasets' `metadata` |
+| `POST /v1/publishers/heartbeat` | `02 F2` failure rule (undefined there; §15 Q3, decided: M3) | any `cis.publish:*` scope | body `{sent_at, active_refs?: []}`, sent **every 15 s** by every publisher (the ANSP fills `active_refs` with its `ansp_ref`s; the authority sends none); the CISP records `last_heartbeat_at` and, for the ANSP, the declared active set (a declared `ansp_ref` the CISP does not hold as `active` is counted `heartbeat_ref_unknown` and shown in status, never acted on); a publisher silent for `stale_after_s` (60 s = three misses) is `source_stale` in `GET /v1/status` and on its datasets' `metadata` |
 
 ### 6.2 Dynamic restrictions (`02 F2`)
 
 | Method and path | Spec | Auth | Behaviour |
 |---|---|---|---|
-| `POST /v1/restrictions` | `02 F2`, `04 §3.4` | `cis.publish:restrictions`, `sub` = the ANSP client id, mTLS subject = the configured one (§8.3) | body `cis/restriction/v1`: `{ansp_ref, ansp_version, uspace_airspace_id, state (planned|active), starts_at, ends_at, feature (ED-318 Feature, reason DAR)}`; idempotent on `ansp_ref` (same `ansp_version` → 200 with the stored state; lower → 409 `ansp_version`); validation: `ed318.Parse` of a one-feature collection, `reason` contains `DAR`, `limitedApplicability` present and within `[starts_at, ends_at]`, `uspace_airspace_id` is a current `USPACE` feature (§15 Q6 for the no-designation case), identifier ≤ 7 chars and free (D8, §15 Q17), `ends_at - starts_at ≤ 24 h` and `starts_at ≤ now + 56 d` (the F3548 `Cstr*` limits the ANSP mirrors to the DSS, so one restriction fits both channels); creates a `restrictions` version (reason `restriction_created` or `restriction_activated`) and a change |
+| `POST /v1/restrictions` | `02 F2`, `04 §3.4` | `cis.publish:restrictions`, `sub` = the ANSP client id, mTLS subject = the configured one (§8.3) | body `cis/restriction/v1`: `{ansp_ref, ansp_version, uspace_airspace_id, state (planned|active), starts_at, ends_at, feature (ED-318 Feature, reason DAR)}` (the field is `ansp_version`, never `version`; M4); **the idempotency key is the body pair `(ansp_ref, ansp_version)`**: the same pair → 200 with the stored state, a lower `ansp_version` → 409 `ansp_version`; an `Idempotency-Key` header may be sent and is ignored (nothing depends on it); validation: `ed318.Parse` of a one-feature collection, `reason` contains `DAR`, `limitedApplicability` present and within `[starts_at, ends_at]`, `uspace_airspace_id` is a current `USPACE` feature (strict on both sides; the lab publishes a designation for every demo, M9, §15 Q6), identifier ≤ 7 characters and unique across datasets (D8; the CISP enforces length and uniqueness only, never a prefix; the ANSP mints `DAR` + 4 base-36, §15 Q17), `ends_at - starts_at ≤ 24 h` and `starts_at ≤ now + 56 d` (the F3548 `Cstr*` limits the ANSP mirrors to the DSS, so one restriction fits both channels); creates a `restrictions` version (reason `restriction_created` or `restriction_activated`) and a change |
 | `PATCH /v1/restrictions/{id}` | `02 F2` (end, extend) | same | `{op: activate|extend|end|cancel, ansp_version, ends_at? (extend)}`; transitions `planned→active`, `planned→cancelled`, `active→ended`, `active→active (extend)`; anything else 409 `state`; each accepted op is a new version and a change with the matching reason |
 | `GET /v1/restrictions/{id}` | `02 F3` | `cis.read` | the head plus `events[]` |
 | `GET /v1/restrictions?state=&airspace=&at=` | `02 F3` | `cis.read` | list of heads; the dataset read below is the ED-318 view of the same rows |
@@ -340,7 +357,7 @@ leave `features_current` (they are in history by version).
 
 | Method and path | Spec | Auth | Behaviour |
 |---|---|---|---|
-| `GET` / `HEAD /v1/{dataset}` (`zones`, `uspace_airspace`, `ussp_list`, `restrictions`) | `02 F3` | `cis.read` | `ETag: "<dataset>:<version>"`, `Last-Modified`, `Cache-Control: public, max-age=<CISP_READ_MAX_AGE_S>`; `If-None-Match` → 304; without filters the stored snapshot bytes are served (and `X-CIS-Signature` carries the CISP's detached JWS over them); `?bbox=minlng,minlat,maxlng,maxlat` filters by `features_current.geom &&` (circles by their stored buffer; LESSONS Z-11: a prefilter, never a judgement); `?at=<RFC 3339>` keeps the features that apply at that instant through `ed318.Applies` at the feature's centroid with `NOAADaylight`, **and keeps** any feature whose applicability cannot be evaluated, marked `extendedProperties.cis_applicability: "unknown"` (fail visible); `?since_version=<v>` returns `DatasetDelta {dataset, from_version, to_version, added: FeatureCollection, changed: FeatureCollection, removed: [ids]}` (400 when `v` is newer than current, 410 when older than the retained delta window of 1000 versions: pull the full dataset). Every ED-318 response carries `metadata.issued` = the version's `received_at` and the top-level members `cis_dataset`, `cis_version`, `cis_updated_at` (§15 Q1). `ussp_list` is `cis/ussp_list/v1`, not ED-318. |
+| `GET` / `HEAD /v1/{dataset}` (`zones`, `uspace_airspace`, `ussp_list`, `restrictions`) | `02 F3` | `cis.read` | `ETag: "<dataset>:<version>"`, `Last-Modified`, `Cache-Control: public, max-age=<CISP_READ_MAX_AGE_S>`; `If-None-Match` → 304; without filters the stored snapshot bytes are served (and `X-CIS-Signature` carries the CISP's detached JWS over them); `?bbox=minlng,minlat,maxlng,maxlat` filters by `features_current.geom &&` (circles by their stored buffer; LESSONS Z-11: a prefilter, never a judgement); `?at=<RFC 3339>` keeps the features that apply at that instant through `ed318.Applies` at the feature's centroid with `NOAADaylight`, **and keeps** any feature whose applicability cannot be evaluated, marked `extendedProperties.cis_applicability: "unknown"` (fail visible); `?applies_at=<RFC 3339>` **annotates without filtering** (M17): every feature is returned with `extendedProperties.cis_applicability` ∈ `applies` / `not_applicable` / `unknown` evaluated at that instant, so a console can dim "not applicable now" in one fetch without judging (`at=` and `applies_at=` together are 400 `filter_conflict`); `?since_version=<v>` returns `DatasetDelta {dataset, from_version, to_version, added: FeatureCollection, changed: FeatureCollection, removed: [ids]}` (400 when `v` is newer than current, 410 when older than the retained delta window of 1000 versions: pull the full dataset). Every ED-318 response carries `metadata.issued` = the version's `received_at` and the top-level members `cis_dataset`, `cis_version`, `cis_updated_at` (§15 Q1). `ussp_list` is `cis/ussp_list/v1`, not ED-318. |
 | `GET /v1/{dataset}/versions?limit=&before=` | `02 F3` history | `cis.read` | version list with `etag`, `received_at`, counts, reason, `publisher` |
 | `GET /v1/{dataset}/versions/{v}` | `02 F3` history, `06` T4 | `cis.read` | the verbatim published bytes with `X-Publisher-Signature` (the authority's or the ANSP's detached JWS and its `kid`) when the version came from a publisher, and `X-CIS-Signature` always; `?format=ed269` on `zones` and `restrictions` exports through `ed318.ToED269` (406 with the refusing field when the version holds what ED-269 cannot: USPACE, DAR, events) |
 | `GET /v1/changes?since=<cursor>&dataset=&limit=` | `02 F3` | `cis.read` | `{changes: [cis/change/v1...], next: <cursor>}` in cursor order; `since=0` is the beginning; at most 500 |
@@ -371,14 +388,22 @@ map (WP-10) reads only this surface and `WS /v1/stream`.
 | `DELETE /v1/subscriptions/{id}` | owner client or console `admin` | soft delete; queued deliveries expire |
 | `GET /v1/subscriptions/{id}/deliveries?since=` | owner client or console | deliveries with their attempts (from the hypertable) |
 | `POST /v1/subscriptions/{id}/deliveries/{delivery_id}/retry` | owner client or console `publisher_admin` | re-queue now (audited) |
-| `WS /v1/stream?datasets=` | none (public) or console cookie | server → client frames of `cis/change/v1` as they are committed; no history (use `/v1/changes`); heartbeat frame every 20 s; connection cap per instance |
+| `WS /v1/stream?datasets=` | none (public) or the session cookie on a same-origin upgrade with an `Origin` allow-list (M22) | every frame is the common envelope (`schema`, `msg_id`, `producer`, `ts`, `rx_ts`, `captured_at`, `time_source`, `backlog`) + `body` named by `schema`, the one console frame every browser-facing WebSocket in the ecosystem uses (M29; schemas in `uspace-lab/schemas/common/`): `console/status/v1` on connect and every 2 s (`connection_id`, `server_ts`, `policy_version`, `stale_after_s`, `live_max_age_s`, `dropped_frames`, `degraded[]`, `sources[]`, plus the CISP extras `datasets{name: version}`, `cis_age_s`, `nats`, and `resync_since` after a bus reconnect: a client that sees `resync_since` re-pulls by `HEAD`/`since_version`); `cis/change/v1` bodies as changes are committed; no history (use `/v1/changes`); no `console/snapshot/v1` and no `console/subscribe/v1` here (the stream has no picture; `?datasets=` on the upgrade is the subscription); connection cap per instance |
 
 Webhook delivery (`deliver`): `POST <callback_url>`, `Content-Type:
 application/jose`, body = compact JWS (RS256, the CISP's `kid`) whose
 payload is the `cis/change/v1` record plus `iss` (the CISP's issuer URL),
-`aud` (the subscription's `client_id`), `iat`, `jti` (= delivery id),
-`sub` (= subscription id); the subscriber verifies against
-`/.well-known/jwks.json` and answers 2xx within 2 s. Retry on anything
+`aud` (**the host of the subscription's `callback_url`**, M19: the
+audience rule of M18 applied to webhooks; never the client id), `iat`,
+`jti` (= delivery id), `sub` (= subscription id); the subscriber
+verifies against `/.well-known/jwks.json` and answers 2xx within 2 s.
+Every receiver in the ecosystem exposes the same path,
+`POST /v1/cis/notifications` (M1), but the CISP posts to the registered
+`callback_url` and never assumes it. Receivers acknowledge `204` without
+pulling for `reason` ∈ {`subscription_test`, `republished`} and for any
+reason they do not know (M5, M16), and honour `pull_url` only when its
+host is the CISP's configured base host, so `pull_url` is always built
+on `CISP_PUBLIC_BASE_URL`. Retry on anything
 else or a timeout: 1, 2, 4, 8 … s doubling, capped at 300 s, until 24 h
 after the change (`02 F3`), then `expired`. A subscription with 50
 consecutive failures over ≥ 1 h is `suspended` (its client sees why and
@@ -402,10 +427,25 @@ this plan never relies on a delivered webhook for correctness (D7).
 | `GET /v1/console/audit?since=&actor=&type=` | `admin` | the `events` table |
 | `GET /v1/console/status` | `viewer`+ | §6.3 status plus counters |
 
-The Next.js BFF (`web/app/_bff/*`) exchanges the login for an
-`HttpOnly; Secure; SameSite=Strict` cookie and forwards it as a bearer to
-`/v1/console/*` and `WS /v1/stream`; CSRF by double-submit token; no
-credential in browser JavaScript (`06 §3`).
+The Next.js BFF (`web/app/_bff/*`) exchanges the login for the
+`uspace_session` cookie (`HttpOnly; Secure; SameSite=Strict`) and
+forwards it as a bearer to `/v1/console/*`; CSRF by the double-submit
+`uspace_csrf` cookie and `X-CSRF-Token` header (M21: the names every
+console in the ecosystem uses, so the kit's BFF helpers need no
+configuration); no credential in browser JavaScript (`06 §3`). The
+WebSocket is not proxied by the BFF: the browser upgrades `WS
+/v1/stream` same-origin with the cookie and `api` verifies it with the
+shared verifier and an `Origin` allow-list; a `4401` close means
+"re-login" (M22; no ticket route, because a ticket in a query string is
+logged).
+
+The session JWT has one shape across the ecosystem (M20), verified by
+the same `core/auth.Verifier` as machine tokens: `iss` =
+`CISP_CONSOLE_ISSUER`, `aud` = the CISP's own host (one of
+`CISP_AUDIENCES`), `sub` = account id, `scope = "session"`, `roles:
+[<role>]` (one element here), `realm: "console"`, `jti` = session id,
+`exp` ≤ 12 h, `kid`. The role is read from `roles[]`, never from
+`scope`.
 
 ### 6.7 Schemas this repository produces (`schemas/cis/`)
 
@@ -418,7 +458,17 @@ credential in browser JavaScript (`06 §3`).
 
 Each schema has `examples/` that CI validates against the schema and
 round-trips through the Go types; `uspace-lab/schemas/` mirrors them
-(KT-2).
+(KT-2). Ownership follows the cross-plan rule (M14): an HTTP body is
+owned by the repository whose `api/openapi.yaml` carries it, so the four
+`cis/*` schemas are the CISP's even though the authority produces
+`ussp_list` and the `uspace_requirements` block; the authority validates
+its output against a pinned copy of these schemas in its CI (M7). Shapes
+produced by several systems (`envelope/v1`, `console/status/v1`,
+`problem/v1`) are consumed from `uspace-lab/schemas/common/` and never
+redefined here. Until the lab aggregate exists (lab WP-L1), siblings
+copy this repository's `api/openapi.yaml` into their `api/clients/cisp.yaml`
+with a `SOURCE` commit and a CI diff (M11): the WP-0 skeleton is what
+they copy, so it lands first.
 
 ---
 
@@ -455,13 +505,13 @@ at the publish site because the scan covers it.
 
 | Threat | Control here | Test that proves it (E-01 pairs) |
 |---|---|---|
-| T4 impersonation of a publisher | token `aud` = CISP, `sub` ∈ configured publisher ids, scope per dataset, detached JWS by the publisher's key (from the authority's JWKS), `iat` in the JWS protected header within 5 min, body hash bound by the signature; ANSP additionally by mTLS subject | accepted publication beside: wrong `aud`, wrong `sub`, right `sub` wrong scope, valid token no signature, signature by an unknown `kid`, stale `iat`, body altered after signing, mTLS subject mismatch |
+| T4 impersonation of a publisher | token `aud` ∈ `CISP_AUDIENCES` (the CISP's host), `sub` ∈ configured publisher ids, scope per dataset, detached JWS by the publisher's own signing key (the authority's from the authority's JWKS, the ANSP's from the ANSP's JWKS; §15 Q8), `iat` in the JWS protected header within 5 min, body hash bound by the signature; ANSP additionally by mTLS subject | accepted publication beside: wrong `aud`, wrong `sub`, right `sub` wrong scope, valid token no signature, signature by an unknown `kid`, stale `iat`, body altered after signing, mTLS subject mismatch |
 | T4 impersonation of the CISP towards subscribers | compact JWS with `iss`, `aud`, `jti`, `iat`; JWKS with rotation overlap | the lab's subscriber simulator verifies and refuses a token signed by another key |
 | T7 tamper of records | `publications` and `events` are insert-only for the application role; `events` hash-chained monthly; `body_sha256` checked when serving a version | a `cispctl verify-audit` run over a tampered row fails and names it |
 | T8 denial of service | body caps (publications 32 MiB, restrictions and subscriptions 256 KiB, console 64 KiB), `ed269.Limits` (depth, ring vertices 5000, problems 100), per-client and per-IP rate limits, connection caps on the WS hub, Caddy cache on the public surface, a 10 s handler deadline | each cap exceeded by one test (E-10) |
 | T9 malicious or faulty publisher | `ed318.Parse` validates and never repairs; refusal lists every problem; a publication that `ToZones` cannot build is refused for geometry and limit errors (so no USSP can be handed a zone it cannot judge) and warned for the rest; identifier collisions across datasets refused (D8) | the `ed318_roundtrip.json` refusals through `PUT` |
 | SSRF through `callback_url` | scheme, host and resolved-address policy (§6.5), no redirects followed, 2 s timeout, response body discarded after 1 KiB, outbound only from `deliver` | each refused URL class beside an accepted one; a redirecting callback counts as failure |
-| T10 supply chain, public repository | `gitleaks` in CI; `.env.example` only; keys generated at run time into `local/`; `go.sum` and `package-lock.json` frozen; `govulncheck`; images built in CI from pinned bases, SBOM and cosign signature; Dependabot | CI |
+| T10 supply chain, public repository | `gitleaks` in CI; `.env.example` only; keys generated at run time into `local/`; `go.sum` and `pnpm-lock.yaml` frozen; `govulncheck`; images built in CI from pinned bases, SBOM and cosign signature; Dependabot | CI |
 | T12 duplicated safety logic | no zone judgement here; `web/` lint forbids geometry imports and server-side logic beyond the BFF; `internal/applicability` is a thin call into `ed318.Applies` | lint rules in WP-9; code review checklist in `CLAUDE.md` |
 | Insider (Annex III B(5)) | console cannot edit content; every console action is an `events` row with the actor; `admin` needs TOTP | role matrix tests: every mutating console route refuses `viewer`, every content route refuses `admin` |
 
@@ -469,32 +519,52 @@ at the publish site because the scan covers it.
 
 | Caller | Credential | May |
 |---|---|---|
-| authority (machine) | ecosystem JWT, scopes `cis.publish:zones`, `cis.publish:uspace`, `cis.publish:ussp_list`, `cis.read`; `sub` = `CISP_AUTHORITY_CLIENT_ID` | publish the three datasets, read its attempts, read everything, subscribe, heartbeat |
-| ANSP (machine) | ecosystem JWT, scope `cis.publish:restrictions`, `cis.read`; `sub` = `CISP_ANSP_CLIENT_ID`; mTLS subject = `CISP_ANSP_MTLS_SUBJECT` | restrictions lifecycle, read everything, subscribe, heartbeat |
-| USSPs and any other certified consumer | ecosystem JWT, scope `cis.read` | read, history, changes, subscriptions |
+| authority (machine) | ecosystem JWT, scopes `cis.publish:zones`, `cis.publish:uspace`, `cis.publish:ussp_list`, `cis.read`; `sub` = `CISP_AUTHORITY_CLIENT_ID` (`authority-01`) | publish the three datasets, read its attempts, read everything, subscribe, heartbeat |
+| ANSP (machine) | ecosystem JWT, scope `cis.publish:restrictions`, `cis.read`; `sub` = `CISP_ANSP_CLIENT_ID` (`ansp-01`); mTLS subject = `CISP_ANSP_MTLS_SUBJECT` | restrictions lifecycle, read everything, subscribe, heartbeat |
+| USSPs and any other certified consumer | ecosystem JWT, scope `cis.read`; `sub` = `ussp-<code>-01`, `lab-01`, ... | read, history, changes, subscriptions |
 | public | none | `/public/v1/*`, `WS /v1/stream`, JWKS |
-| console `viewer` | session cookie | read console views |
-| console `publisher_admin` | session cookie | plus suspend/resume subscriptions, retry deliveries, republish the current version |
-| console `admin` | session cookie + TOTP | plus accounts, audit |
+| console `viewer` | session cookie (`roles: ["viewer"]`) | read console views |
+| console `publisher_admin` | session cookie (`roles: ["publisher_admin"]`) | plus suspend/resume subscriptions, retry deliveries, republish the current version |
+| console `admin` | session cookie (`roles: ["admin"]`) + TOTP | plus accounts, audit |
+
+Client ids are one per calling system (`<system>-<nn>`, or
+`ussp-<code>-<nn>` with the certificate code), never one per
+caller-target pair (M24); audiences are chosen per token request. The
+scope catalogue is held by the authority (its WP-2): `06 §3` plus
+`ansp.coordination`, `ansp.requests`, `dp.observe` and the reserved
+`cis.publish:ats_data` (M23); a new `cis.*` scope is a PR there first.
 
 Token verification is `uspace-core/auth.Verifier` with
-`Issuers = {CISP_TOKEN_ISSUER: {JWKSURL}}` for ecosystem tokens and
-`{CISP_CONSOLE_ISSUER: {Keys: own JWKS}}` for sessions, `Audience =
-CISP_AUDIENCE` (§15 Q7), `MaxSkew` 30 s, JWKS cached 24 h, refresh on an
-unknown `kid` rate-limited by core (LESSONS E-14). Every refusal is a
-counter and a log line with the claim named; every token issuance
-(console sessions) is an `events` row.
+`Issuers = {CISP_TOKEN_ISSUER: {JWKSURL}}` for ecosystem tokens (the lab
+issuer of lab WP-L2 is a second allow-listed entry until the authority's
+token service exists, so nothing here waits for authority WP-2) and
+`{CISP_CONSOLE_ISSUER: {Keys: own JWKS}}` for sessions, `Audiences =
+CISP_AUDIENCES` (§15 Q7, decided: M18. **`aud` is the host of the
+target's published base URL** for every machine token in the ecosystem,
+`uspace-cisp.chikox.net` for this one; `CISP_AUDIENCES` is the list of
+accepted values: the public host plus a lab alias such as the compose
+service name), `MaxSkew` 30 s, JWKS cached 24 h, refresh on an unknown
+`kid` rate-limited by core (LESSONS E-14). Every refusal is a counter
+and a log line with the claim named; every token issuance (console
+sessions) is an `events` row.
 
 ### 8.3 mTLS for the ANSP
 
-Caddy terminates TLS and, for the `/v1/restrictions*` and
-`/v1/publishers/heartbeat` routes, requires and verifies a client
-certificate against the CA in `CISP_ANSP_CLIENT_CA_FILE`, forwarding the
-subject in `X-Client-Cert-Subject` and stripping that header from every
-other request. `api` accepts a restriction write only when the header
-equals `CISP_ANSP_MTLS_SUBJECT` (mode `header`); in the lab and in tests,
-`CISP_MTLS_MODE=off` disables the check and says so in the status line
-at error level. §15 Q11.
+Caddy terminates TLS with `client_auth { mode verify_if_given,
+trusted_ca_cert_file <the mTLS CA> }` on the CISP host, forwards the
+verified subject in `X-Client-Cert-Subject` and strips that header from
+every request that did not present a certificate and from every other
+route. The Go middleware enforces presence and the subject binding only
+on the mTLS routes (`/v1/restrictions*`, `/v1/publishers/heartbeat` when
+the caller is the ANSP): `api` accepts a restriction write only when the
+header equals `CISP_ANSP_MTLS_SUBJECT`. The flag is
+**`CISP_MTLS_MODE = required | off`**, the one name and the two values
+every repo uses (M25): `required` in production; `off` on the staging
+droplet and in the lab (the lab's simulated ANSP has no certificate),
+where the status line says so at error level every period. The Caddy
+rule lives in the deployment repository (`uspace-deploy`, D1 of the
+reconciliation); `deploy/caddy/` here keeps a reference copy of the
+snippet that WP-13's Caddy profile test runs. §15 Q11.
 
 ### 8.4 Keys
 
@@ -532,7 +602,7 @@ load run is the proof.
 | `GET /v1/zones?bbox=` | consoles at 10 / 30 / 60 concurrent, ≤ 2 rps each | ≤ 100 ms p99 with 5 000 features | GiST on `features_current.geom`; `at=` evaluated only on the bbox hits |
 | `GET /v1/changes?since=` | every subscriber after a webhook; ≤ 10 rps in bursts | ≤ 20 ms p99 | btree on the cursor |
 | `WS /v1/stream` | ≤ 1 000 connections per `api` instance | ≤ 100 ms from commit to frame | one bus subscription per instance fanned out in memory; slow clients dropped with a counted reason |
-| memory | the droplet: 2 vCPU / 3.8 GB shared by five systems | `api` ≤ 256 MiB RSS, `deliver` ≤ 64 MiB, `web` ≤ 256 MiB; PostgreSQL `shared_buffers` 128 MiB | bounded caches (E-10), no per-request allocation of a whole dataset except for the publication path |
+| memory | the droplet: 2 vCPU / 3.8 GB shared by five systems today (the sum of every system's budget already exceeds it; resizing is the owner's, §15 Q26) | `api` ≤ 256 MiB RSS, `deliver` ≤ 64 MiB, `web` ≤ 256 MiB; PostgreSQL `shared_buffers` 128 MiB | bounded caches (E-10), no per-request allocation of a whole dataset except for the publication path |
 | storage | publications indefinite | ≤ 1 GB per year at 50 publications per month of 20 MB (bodies gzip-compressed in `bytea`; `features` rows per version kept, ≈ 5 MB per version) | TOAST compression; `features` of old versions are kept but not indexed by geometry beyond the version's own index |
 
 Every counter named in this plan (`bus_publish_failed`,
@@ -633,8 +703,9 @@ same suite behind the same contract (`00 §7`).
 
 ### 10.7 Web
 
-`npm ci`, `next lint` (kit config + the two project rules), `tsc
---noEmit`, generated types up to date, `vitest` for pure helpers (date
+`pnpm install --frozen-lockfile`, `next lint` (kit config + the two
+project rules), `tsc --noEmit`, generated types up to date (through the
+kit's `uspace-ui-gen-api`), `vitest` for pure helpers (date
 and version formatting, the ka/en catalogue completeness check), one
 Playwright smoke test (the public map loads against a mocked
 `/public/v1/*`, both locales render Georgian glyphs). Playwright runs
@@ -653,27 +724,37 @@ only on `web/**` changes.
   keyless signature, verified by the deploy script (`06 §4`).
 - **Compose** (`deploy/compose.yml`): project `uspace-cisp` on its own
   network; services `postgres` (`timescale/timescaledb-ha:pg16`, two
-  databases `cisp` and `cisp_ts`, a 10 GB volume), `nats` (`-js`, file
+  databases `cisp` and `cisp_ts`, a 10 GB volume: one container per
+  system holding both databases is the droplet layout every system
+  adopted, M37; two hosts only when a system outgrows it), `nats` (`-js`, file
   store, 2 GB), `api` (×1 on the droplet; `--scale api=2` elsewhere),
   `deliver`, `web`, and `migrate` (a one-shot `cispctl migrate` the
   others depend on). Resource limits per §9. Health checks on
   `/readyz`. Daily `pg_dump` of both databases to the droplet's backup
   volume with 14-day rotation and a weekly restore test
   (`cispctl verify-backup`): predecessor S-22, S-23.
-- **Caddy** (shared, outside this project): `uspace-cisp.chikox.net`
+- **Caddy** (shared, composed by the private deployment repository
+  `uspace-deploy` from each system's snippet; D1): `uspace-cisp.chikox.net`
   routes `/v1/*`, `/public/*`, `/.well-known/*`, `/healthz` → `api`;
   `/v1/stream` with WebSocket upgrade; `/_bff/*` and everything else →
   `web`; `/metrics` not routed; public cache on `/public/*`; mTLS
-  `client_auth` on the ANSP routes (§8.3). The snippet in
-  `deploy/Caddyfile.snippet` is copied into the private infra repo;
-  nothing here hardcodes a hostname (`06 §4`): `CISP_PUBLIC_BASE_URL`
-  and `CISP_ISSUER_URL` are environment.
+  `client_auth verify_if_given` with the subject header forwarded on the
+  ANSP routes and stripped elsewhere (§8.3); `/basemap/*` served by
+  `file_server` from the shared read-only basemap volume the lab builds
+  (M38: one copy for five systems; the kit's map loads it from
+  `/basemap/`, and every `web/` sets the kit's CSP so no third-party
+  tile or font request ever leaves the browser). The snippet in
+  `deploy/caddy/Caddyfile.snippet` is the reference copy the deployment
+  repository composes; nothing here hardcodes a hostname (`06 §4`):
+  `CISP_PUBLIC_BASE_URL` and `CISP_ISSUER_URL` are environment.
 - **Configuration** (`deploy/.env.example`, every variable documented,
   validated at start, secrets redacted in logs): `CISP_DATABASE_URL`,
   `CISP_TIMESERIES_URL`, `CISP_NATS_URL` and credentials file,
-  `CISP_TOKEN_ISSUER`, `CISP_TOKEN_JWKS_URL`, `CISP_AUDIENCE`,
-  `CISP_AUTHORITY_CLIENT_ID`, `CISP_ANSP_CLIENT_ID`,
-  `CISP_ANSP_MTLS_SUBJECT`, `CISP_MTLS_MODE`, `CISP_SIGNING_KEY_FILE`,
+  `CISP_TOKEN_ISSUER`, `CISP_TOKEN_JWKS_URL`, `CISP_AUDIENCES`
+  (comma-separated hosts), `CISP_AUTHORITY_CLIENT_ID`,
+  `CISP_ANSP_CLIENT_ID`, `CISP_ANSP_JWKS_URL` (the ANSP's publication
+  key), `CISP_ANSP_MTLS_SUBJECT`, `CISP_MTLS_MODE` (`required|off`),
+  `CISP_SIGNING_KEY_FILE`,
   `CISP_SIGNING_KID`, `CISP_SIGNING_KEY_PREV_FILE`,
   `CISP_SESSION_KEY_FILE`, `CISP_SECRETS_KEY`, `CISP_PUBLIC_BASE_URL`,
   `CISP_ISSUER_URL`, `CISP_READ_MAX_AGE_S` (60), `CISP_PUBLIC_RPM`,
@@ -695,7 +776,7 @@ only on `web/**` changes.
 | **C-M1 Publish and read** (first demo) | the authority-role test client publishes an ED-318 zone set and a U-space airspace with its Art. 3(4) requirements, adjacency and a USSP list with terms; `GET /v1/zones?bbox=` returns them with `ETag` and update time; a second publication yields a diff in `/v1/changes`; a webhook subscriber receives the signed change within 1 s; the public map shows the zones; an ED-269 file round-trips through the import mapping | WP-0, 1, 2, 3, 4, 6, 9, 10, 12 |
 | **C-M2 Restrictions** | ANSP-role client activates a restriction; subscribers notified within 1 s; `ended` and `cancelled` lifecycle; history by version and `at=`; (the same restriction as an F3548 constraint in the lab DSS is the ANSP's and the lab's work, consumed here as an end-to-end check) | WP-5, 7 |
 | **C-M3 Hardening** | 60 s reconciliation pull proven by killing the subscriber during a change; delivery log; rate-limited public API; CISP console (publications, subscriptions, deliveries) | WP-8, 11, 13 |
-| **U-M1 `uspace-ui` first release** (external, with C-M1) | the CISP public map and console are built on the kit and nothing else | WP-9 consumes it; §15 Q14 |
+| **U-M1 `uspace-ui` first release** (external, with C-M1) | the CISP public map and console are built on the kit and nothing else | WP-9 consumes it from npmjs, starting on the kit's `0.1.0-rc` (ui WP-13a) and pinning `0.1.0` at U-M1; §15 Q14 |
 
 Tagging: `v0.1.0` at C-M1, `v0.2.0` at C-M2, `v1.0.0` at C-M3 with the
 OpenAPI `/v1` declared stable (additive changes only thereafter, `00 §7`).
@@ -735,7 +816,7 @@ Waves (what runs in parallel):
 
 ```
 wave 1 (1 agent):          WP-0
-wave 2 (3 agents):         WP-1   WP-2   WP-9 (needs uspace-ui U-M1; may start on a kit pre-release)
+wave 2 (3 agents):         WP-1   WP-2   WP-9 (starts on the kit's 0.1.0-rc from npmjs; pins 0.1.0 at U-M1)
 wave 3 (5 agents):         WP-3   WP-4   WP-5   WP-6   WP-8      (all need 1 and 2)
 wave 4 (4 agents):         WP-7 (6)   WP-10 (9, 4)   WP-11 (9, 8, 6)   WP-12 (3, 4)
 tag v0.1.0 = C-M1 when WP-0..4, 6, 9, 10, 12 are merged and the e2e webhook latency is printed
@@ -815,35 +896,63 @@ of any kind**; never force-push a shared branch; the owner merges.
 
 ---
 
-## 15. Open questions and proposed answers
+## 15. Open questions and decisions
 
 Where the spec is silent or disagrees with the code that exists, the
-plan proceeds on the proposed answer and marks it; the owner (or the
-named sibling planner) decides.
+plan proceeds on the answer below and marks it. The cross-plan
+reconciliation of 2026-10-02 (its §1 mismatches M1-M38 and §2
+decisions) settled every question a coordinator could settle; those
+rows are **decided** and the plan body already applies them. The rows
+marked **open** need a human (GCAA, the DPO, the owner's money) and
+stay open: the plan builds on the stated demo default, which is a
+placeholder, never the policy answer.
 
-| # | Gap | Proposed answer in this plan | Needs |
+### 15.1 Decided
+
+| # | Gap | Decision | Reason |
 |---|---|---|---|
-| Q1 | `02 F1`/`04 §3.4` name ED-318 collection metadata `{creationDateTime, updateDateTime, originator}`; `uspace-core/ed318.Metadata` (from the UASGeoZones schema, the owner's decision on core PR #16) has `validFrom, validTo, issued, provider, description`. Where do "time of update" and "version number" (Art. 9(2), `02 F3`) travel? | Follow core. Every served collection sets `metadata.issued` = the version's `received_at` and `metadata.provider` = the publisher; and carries top-level `cis_dataset`, `cis_version`, `cis_updated_at` (ED-318 allows extra top-level members; core keeps them in `Extra`). The `ETag` and `X-CIS-Version` headers say the same. Spec `02`/`04` to be corrected. | owner; lab (spec) |
-| Q2 | `02 F2` lists restriction states but not who flips them. | D5: the ANSP declares; the CISP only expires an `active` one at `ends_at` (`ended_by: expiry`) and emits `restriction_expired`. A `planned` restriction whose `starts_at` passes without an `activate` stays `planned` (consumers judge `limitedApplicability` themselves) and the console flags it. | owner; ANSP planner |
-| Q3 | `02 F2` failure rule says the CISP flags "source stale" after 60 s of missed ANSP heartbeat, but no heartbeat endpoint is specified. | `POST /v1/publishers/heartbeat` every 10 s by any publisher (authority too); staleness per publisher in `/v1/status` and in the dataset metadata (`cis_publisher_stale_since`). | owner; ANSP and authority planners |
-| Q4 | ATS.OR.127 operational data items (`02 F2`, `01` C2) have no format or scope. | A fifth dataset `ats_operational_data` published by `PUT /v1/publications/ats_operational_data` under a new scope `cis.publish:ats_data`, as a JSON document whose schema is agreed in the Annex V SLA and bounded at 1 MiB; deferred to a WP after C-M2, so no code assumes it. | owner; GCAA/ANSP (SLA); authority planner (scope in the token service) |
-| Q5 | The USSP list is produced by the authority but its shape is defined nowhere; `04 §1` says schemas live in the producing repo. | The CISP's `api/openapi.yaml` and `schemas/cis/ussp_list/v1.json` define it (the CISP serves it to everyone and the F1 endpoint is the CISP's); the authority's client is generated from this file. | authority planner |
-| Q6 | The Art. 3(4) requirements block inside `USPACE` `extendedProperties` (`02 F1`, `03 §1`) has no schema. Also: a restriction must name the U-space airspace it modifies, but no airspace may be designated (Q2 of `08`). | `schemas/cis/uspace_requirements/v1.json` as in §6.7; the CISP validates presence and shape of the four blocks plus `services_required` and `adjacent` (identifiers that must exist in the same publication). A restriction whose `uspace_airspace_id` matches no current `USPACE` feature is refused (ATS.TR.237 applies inside U-space airspace); the lab designates one for C-M2. | authority planner; owner |
-| Q7 | The exact `aud` string for the CISP and the client id values. | `CISP_AUDIENCE` default `cisp`; client ids per `03 §6` (`sys-name-nn`), e.g. `authority-cisp-01`, `ansp-cisp-01`, configured by env. | authority planner (token service) |
-| Q8 | Detached JWS for F1: header name, encoding, which key. | `X-JWS-Signature: <protected>..<signature>` per RFC 7515 Appendix F with RFC 7797 `b64:false` over the exact body bytes; protected header `alg RS256`, `kid`, `iat` (≤ 5 min skew), `crit: ["b64"]`; key from the authority's `/.well-known/jwks.json` (the token-service JWKS; a dedicated publication key is distinguished by `kid` and `use: sig`). The same scheme signs the ANSP's restriction bodies. Proposed upstream to `uspace-core/auth` as `VerifyDetached` (§15 Q20). | authority and ANSP planners; owner |
-| Q9 | Webhook JWS claims (`02 F3`: "receivers verify `iss` and `aud`"). | As §6.5: compact JWS, payload = change record + `iss`, `aud` (subscriber client id), `sub` (subscription id), `iat`, `jti`; `Content-Type: application/jose`. | USSP, authority, ANSP planners |
-| Q10 | What the public subset excludes (`01` C1). | Full `zones`, `uspace_airspace`, `restrictions` (the point of a geo-zone is to be known); `ussp_list` without `base_url` and `certificate_id`; no history, no changes cursor, no subscriptions. | owner (GCAA) |
-| Q11 | mTLS for the ANSP: at Caddy or in Go. | At Caddy with the subject forwarded in a stripped header (§8.3); Go checks the binding. In Go directly would require `api` to terminate TLS, against the shared-Caddy deployment. | owner |
-| Q12 | TimescaleDB at the CISP: the stack mandates it, the CISP has one time series. | Keep the database pair for layout and deploy uniformity with one hypertable (`delivery_attempts`, D9). Alternative: drop the timeseries database here and keep attempts in PostgreSQL with a cron delete. | owner |
-| Q13 | `01 §2` console roles: `publisher_admin` "cannot edit content, only manage subscriptions and re-publish". What does re-publish mean? | Emit a new change record for the current version (`republished`) so subscribers re-pull; never a content change. | owner |
-| Q14 | `uspace-ui` is not released; WP-9 is its first consumer. How is it distributed? | Pin a git tag dependency (`github:rootxkit/uspace-ui#v0.1.0`) built at install until the kit publishes to a registry (GitHub Packages, free for a public repo); WP-9 may start on a pre-release tag and bump. | owner; ui planner |
-| Q15 | Retention of the delivery log and of refused attempts. | 90 days for `delivery_attempts` (Timescale retention policy), 1 year for `publication_attempts`; publications and audit indefinite (`05 §4`). | owner (DPO, `08` Q8) |
-| Q16 | Signing-key custody (`06` T4: HSM/KMS, 90-day rotation). | File-mounted PEM on the droplet with `cispctl rotate-key` and a two-key JWKS overlap; production custody is the state's; the code reads a PEM path and nothing else. | owner |
-| Q17 | `03 §6` says DAR identifiers are prefixed `DAR-`, but ED-318 caps `identifier` at 7 characters (core enforces), leaving 3. | Identifier scheme for restrictions: `D` + 6 base-36 characters minted by the ANSP, unique across all datasets (D8); the CISP refuses a collision and a longer identifier. `03 §6` to be corrected. | owner; ANSP planner; lab (spec) |
-| Q18 | `alert_lifecycle.json` lists `cisp` among its owners; the CISP has no monitor. | Run those cases through core only; ask the lab to drop `cisp` from that file's owners (and keep `cisp` on `ed269_parse`, `zones_applicability`, `geodesy`, `jwt_verify`, `ed318_roundtrip`). | lab |
-| Q19 | `00 §6.1` lists a CISP package `ed318`. | D1: no such package here; `uspace-core/ed318` is used and the dataset rules live in `internal/dataset`. Spec table to be updated. | lab (spec) |
-| Q20 | Detached-JWS verification and compact-JWS signing are not in `uspace-core/auth`. | Implemented in `internal/jws` on `jwx/v3` (WP-2) and proposed upstream as `auth.VerifyDetached` / `auth.SignCompact` so the authority, ANSP and USSPs share one implementation; the CISP switches to core's when it lands. | core owner |
-| Q21 | `03` preamble says `golang-migrate`; the owner's stack says goose. | goose (D11). Spec to be corrected. | lab (spec) |
-| Q22 | Response signing of filtered reads (`bbox`, `at`, `since_version`) by the CISP's key. | Unfiltered responses are signed (the stored snapshot); filtered ones carry `ETag` and version and are not signed in C-M1; WP-13 adds on-the-fly signing if the owner wants Annex III A(4) to cover every byte. | owner |
-| Q23 | Spec `02 §3 cisp` lists `/v1/stream` under `api`; `05 §2` lists only `deliver` as the CISP's hot path. The WS hub in `api` holds connection state. | Keep the hub in `api` (the rate is low, `02 F3`); per-instance state is acceptable because the stream has no history. | none (recorded) |
-| Q24 | Spec `01` C1 "same quality, latency and protection for authorities, ATS providers, USSPs and operators": operators read the CIS directly or through their USSP? | Operators read `/public/v1/*` or their USSP's geo-awareness; no operator client id exists at the CISP. | owner |
+| Q1 | `02 F1`/`04 §3.4` name ED-318 collection metadata `{creationDateTime, updateDateTime, originator}`; `uspace-core/ed318.Metadata` has `validFrom, validTo, issued, provider, description`. Where do "time of update" and "version number" (Art. 9(2), `02 F3`) travel? | **Follow core** (M15). Every served collection sets `metadata.issued` = the version's `received_at` and `metadata.provider` = the publisher, and carries top-level `cis_dataset`, `cis_version`, `cis_updated_at` (core keeps them in `Extra`); `ETag` and `X-CIS-Version` say the same. The authority's export uses the same names. Spec erratum for `02`/`04` (lab WP-L4). | Core is the parser everyone runs; the spec names are ED-269-era text. |
+| Q2 | `02 F2` lists restriction states but not who flips them. | The ANSP declares states; the CISP only expires `active → ended (ended_by: expiry)` at `ends_at` and emits `restriction_expired`. A `planned` restriction past `starts_at` without an `activate` stays `planned` (consumers judge `limitedApplicability` themselves) and the console flags it (D5). | The ANSP is the master (`03 §4`); the CISP never edits content. |
+| Q3 | `02 F2` failure rule flags "source stale" after 60 s of missed ANSP heartbeat, but no heartbeat endpoint is specified. | `POST /v1/publishers/heartbeat` `{sent_at, active_refs?: []}` **every 15 s** by every publisher, stale after 60 s (three misses); staleness per publisher in `/v1/status` and in the dataset metadata (`cis_publisher_stale_since`). The authority adds the job to its WP-6; the ANSP sends `active_refs` (M3). | One endpoint for both publishers; three misses = the spec's 60 s. |
+| Q5 | The USSP list is produced by the authority but its shape is defined nowhere. | The CISP owns `cis/ussp_list/v1` (`api/openapi.yaml` + `schemas/cis/ussp_list/v1.json`); the authority validates its output against a pinned copy in CI (M7, M14). `ussp_id` is the authority's `certificates.code` (≤ 8 upper-case alphanumerics, unique, assigned at issue; `USSP-DEV` in the lab), which is also the USSP's `USSP_SYSTEM_ID` (M8). | API-owner rule: the body belongs to the repo whose OpenAPI carries it. |
+| Q6 | The Art. 3(4) requirements block inside `USPACE` `extendedProperties` has no schema; and a restriction must name a U-space airspace that may not be designated. | The CISP owns `cis/uspace_requirements/v1` and validates the four blocks plus `services_required` and `adjacent`. A restriction whose `uspace_airspace_id` matches no current `USPACE` feature is refused; the ANSP's `require_uspace_airspace=false` option is dropped and **the lab publishes a designation for every demo** (C-M2, N-M1) (M9). | API-owner rule; ATS.TR.237 applies inside U-space airspace; strict on both sides. |
+| Q7 | The exact `aud` string for the CISP and the client id values. | **`aud` = the host of the target's published base URL** for every machine token in the ecosystem (`uspace-cisp.chikox.net` here); the verifier accepts the list `CISP_AUDIENCES` (public host + a lab alias). Client ids are one per calling system: `authority-01`, `ansp-01`, `ussp-<code>-01`, `lab-01`; the CISP binds publishers by `sub` ∈ configured ids as planned (M18, M24). | InterUSS convention (F3411/F3548 discovery yields only a `uss_base_url`; DSS `accepted_jwt_audiences` are hosts); one client per calling system. |
+| Q8 | Detached JWS for F1: header name, encoding, which key. | `X-JWS-Signature: <protected>..<signature>` per RFC 7515 Appendix F with RFC 7797 `b64:false` over the exact body bytes; protected header `alg RS256`, `kid`, `iat` (≤ 5 min skew), `crit: ["b64"]`. **Key = the publisher's own signing key from that system's `/.well-known/jwks.json`**: the authority's token-service JWKS for the authority (`use: sig`, distinguished by `kid`), **the ANSP's own JWKS for the ANSP's restriction bodies** (`CISP_ANSP_JWKS_URL`). Adopted by the authority and the ANSP (M26). | Standard detached JWS; provenance survives the CISP. |
+| Q9 | Webhook JWS claims (`02 F3`: "receivers verify `iss` and `aud`"). | Compact JWS, `Content-Type: application/jose`, payload = `cis/change/v1` + `iss` (the CISP's issuer URL), **`aud` = the host of the `callback_url`**, `sub` = subscription id, `iat`, `jti` = delivery id (M19). Receivers (all at `POST /v1/cis/notifications`, M1) allow-list the CISP and the ANSP as issuers, honour `pull_url` only on the issuer's host, and acknowledge `subscription_test`, `republished` and unknown reasons with `204` without pulling (M5, M16). | RFC 7515; one verifier; the audience rule of Q7 applied to webhooks. |
+| Q11 | mTLS for the ANSP: at Caddy or in Go. | At Caddy (`client_auth verify_if_given` + the mTLS CA) with the subject forwarded in a stripped header; Go binds it on the mTLS routes. `CISP_MTLS_MODE = required | off`, the one flag name every repo uses; `off` on the staging droplet and in the lab, printed at error level every period. The Caddy rule is composed by `uspace-deploy`; `deploy/caddy/` keeps a reference copy (M25). | Shared Caddy terminates TLS; `api` must not. |
+| Q12 | TimescaleDB at the CISP: the stack mandates it, the CISP has one time series. | Keep the database pair (D9); on the droplet one `timescale/timescaledb-ha:pg16` container holds both databases, the layout every system adopted (M37). | Uniform layout and tooling; `delivery_attempts` is a true time series. |
+| Q13 | `01 §2`: `publisher_admin` "cannot edit content, only manage subscriptions and re-publish". What does re-publish mean? | A new change record `reason: republished` for the **current** version so subscribers re-pull; never a content change. Receivers acknowledge it without pulling (M16). | `01 §2` role text. |
+| Q14 | `uspace-ui` is not released; WP-9 is its first consumer. How is it distributed? | **npmjs only**, exact pins, no git-tag installs. The kit publishes `0.1.0-rc.N` as soon as its WP-0..WP-5 merge (ui WP-13a); WP-9 starts on the rc and bumps to `0.1.0` at U-M1. `RestrictionLayer` ships in the kit's `0.1.0`, so the CISP pins ≥ 0.1 throughout (M32, M33). | A git-tag dependency needs a `prepare` build with full devDependencies inside every Docker image. |
+| Q17 | `03 §6` says DAR identifiers are prefixed `DAR-`, but ED-318 caps `identifier` at 7 characters (core enforces). | The ANSP mints **`DAR` + 4 base-36** (no hyphen; 1.6 M ids; the prefix stays readable). **The CISP enforces only `≤ 7` and uniqueness across datasets (D8), never a prefix.** Spec erratum for `03 §6` (M10). The `D` + 6 scheme proposed earlier is withdrawn. | 7-char cap in ED-318; one scheme across the ANSP and the CISP. |
+| Q18 | `alert_lifecycle.json` lists `cisp` among its owners; the CISP has no monitor. | The lab drops `cisp` from that file's owners (lab WP-L4; an editorial vector change, no behaviour change) and keeps `cisp` on `ed269_parse`, `zones_applicability`, `geodesy`, `jwt_verify`, `ed318_roundtrip`. | The CISP raises no alert. |
+| Q19 | `00 §6.1` lists a CISP package `ed318`. | D1: no such package here; `uspace-core/ed318` is used and the dataset rules live in `internal/dataset`. Spec table updated by lab WP-L4. | Judgement once, in core. |
+| Q20 | Detached-JWS verification and compact-JWS signing are not in `uspace-core/auth`. | Core `v1.1.0` (core WP-14, additive) ships `auth.KeyRing`, `SignDetached`, `VerifyDetached`, `SignCompact`, `VerifyCompact`. **WP-2 may land first on `internal/jws`** (it is on the critical path) and a follow-up switches to core and removes the direct `jwx` import; the ANSP and the authority wait for core (M27). | One JOSE implementation; the CISP's first demo does not wait. |
+| Q21 | `03` preamble says `golang-migrate`; the owner's stack says goose. | goose (D11); version tables `goose_db_version_relational` / `goose_db_version_timeseries` in every repo; a `migrate` subcommand plus a one-shot compose service; long-running processes never migrate (M36). Spec erratum for `03`. | Owner's stack; the table name is the wrong-database guard. |
+| Q22 | Response signing of filtered reads (`bbox`, `at`, `since_version`) by the CISP's key. | Unfiltered responses are signed (the stored snapshot); filtered ones carry `ETag` and version and are unsigned in C-M1; WP-13 adds on-the-fly signing **only if the owner asks**. | Annex III A(4) is met by the signed full dataset the consumer can always fetch. |
+| Q23 | `02 §3 cisp` lists `/v1/stream` under `api`; `05 §2` lists only `deliver` as the hot path. | The WS hub stays in `api`; per-instance state is acceptable because the stream has no history. | Low rate, no history. |
+| Q24 | `01` C1: operators read the CIS directly or through their USSP? | Operators read `/public/v1/*` or their USSP's geo-awareness; no operator client id exists at the CISP. | `01 §2` users table. |
+| Q25 (from ui Q3) | A console wants to dim a zone that does not apply now; `?at=` filters, so that needs two fetches. | `?applies_at=<RFC 3339>` annotates `extendedProperties.cis_applicability` ∈ `applies` / `not_applicable` / `unknown` without filtering, beside the filtering `?at=`; additive; the authority adds the same to `GET /v1/zones/export` (M17). | A console must show "not applicable now" without judging. |
+
+Cross-cutting decisions applied in this plan that no CISP question
+asked: the problem body `{type, title, status, detail, instance,
+errors: [{field, reason}], truncated?}` with `type` slug URIs (M28,
+§6); the common envelope and `console/status/v1` on every browser-facing
+WebSocket frame (M29, §6.5); the session JWT shape `scope = "session"`,
+`roles[]`, `realm`, `aud` = own host (M20) and the cookie names
+`uspace_session` / `uspace_csrf` (M21, §6.6); cookie on the same-origin
+WS upgrade, no ticket (M22); the scope catalogue held by the authority
+(M23, §8.2); `pnpm` (M34, §4); schema ownership and the lab's
+`schemas/common/` (M14, §6.7); the sibling-copy mechanism `api/clients/cisp.yaml`
++ `SOURCE` until the lab aggregate (M11, M31); the shared basemap volume
+and the kit's CSP (M38, §11).
+
+### 15.2 Open (owner-only; the plan builds on the demo default)
+
+| # | Gap | Demo default until answered | Who answers, and why only they can |
+|---|---|---|---|
+| Q4 | ATS.OR.127 operational data items (`02 F2`, `01` C2) have no format or scope. | Reserve the dataset name `ats_operational_data` and the scope `cis.publish:ats_data` (in the authority's catalogue, M23); **no code** until the SLA names the items; a later WP after C-M2, so nothing assumes it. | GCAA and Sakaeronavigatsia: the Annex V SLA. |
+| Q10 | What the public subset excludes (`01` C1). | Full `zones`, `uspace_airspace`, `restrictions`; `ussp_list` without `base_url` and `certificate_id`; no history, no change cursor, no subscriptions (§6.4). | GCAA decides what is public. |
+| Q15 | Retention of the delivery log and of refused attempts. | 90 days `delivery_attempts` (Timescale retention policy), 1 year `publication_attempts`; publications and audit indefinite (`05 §4`); every figure a configuration value. | The DPO (`08` Q8): legal retention. |
+| Q16 | Signing-key custody (`06` T4: HSM/KMS, 90-day rotation). | File-mounted PEM on the droplet with `cispctl rotate-key` and a two-key JWKS overlap; the code reads a PEM path and nothing else. | The state: production custody. |
+| Q26 (cross-plan, new) | Droplet sizing: five systems, the InterUSS DSS with its datastore and a lab stack on 2 vCPU / 3.8 GB; the per-system budgets (CISP ≤ 0.6 GB among them) already exceed it. | The CISP keeps its §9 budget; the lab's L-M1 waits for a resize to ≥ 4 vCPU / 8 GB or a second droplet for the DSS and the lab. | The owner: money. |
+| Q27 (spec Q16) | When production domains and state hosting take over from `*.chikox.net`. | Staging on the droplet until A-M5; `CISP_PUBLIC_BASE_URL` and `CISP_ISSUER_URL` are the only places a hostname lives. | GCAA. |

@@ -78,10 +78,36 @@ knowledge base is `uspace-lab/knowledge/`.
   `uspace-ussp` or `uspace-authority`; any client with `cis.read` is a
   subscriber.
 - Schemas this repository produces live in `schemas/cis/` and are
-  mirrored read-only in `uspace-lab/schemas/`.
-- Where the spec is silent, `docs/PLAN.md §15` holds the proposed
-  answer. Do not invent a contract silently: add a row there and say so
-  in the PR.
+  mirrored read-only in `uspace-lab/schemas/`. Shapes several systems
+  produce (`envelope/v1`, `console/status/v1`, `problem/v1`) come from
+  `uspace-lab/schemas/common/` and are never redefined here.
+- **Audience rule**: the `aud` of every machine token is the host of
+  the target's published base URL (`uspace-cisp.chikox.net` for tokens
+  sent here); the verifier accepts the list `CISP_AUDIENCES`. A webhook
+  JWS carries `aud` = the host of the `callback_url`. A console session
+  carries `aud` = this host, `scope = "session"`, `roles[]`, `realm`;
+  the role is never read from `scope`.
+- **Error body**: every error is `application/problem+json` as
+  `{type, title, status, detail, instance, errors: [{field, reason}],
+  truncated?}` with `type` = `https://schemas.uspace.ge/problems/<slug>`.
+  Never `problems[]`, never a bare string.
+- **Every WebSocket frame** on `WS /v1/stream` is the common envelope
+  (`schema`, `msg_id`, `producer`, `ts`, `rx_ts`, `captured_at`,
+  `time_source`, `backlog`) plus a `body` named by `schema`:
+  `console/status/v1` every 2 s and on connect, `cis/change/v1` for
+  changes. No other frame shape exists.
+- **Publisher heartbeat**: `POST /v1/publishers/heartbeat` `{sent_at,
+  active_refs?}` every 15 s; a publisher is stale after 60 s. The
+  heartbeat never changes a restriction's state.
+- **Restriction idempotency** is the body pair `(ansp_ref,
+  ansp_version)`; an `Idempotency-Key` header is ignored. The CISP
+  checks a restriction identifier for length (≤ 7) and uniqueness
+  only, never a prefix.
+- Where the spec is silent, `docs/PLAN.md §15` holds the decision or,
+  for the owner-only rows, the demo default. Do not invent a contract
+  silently: add a row there and say so in the PR; a contract shared
+  with another system goes through the cross-plan reconciliation
+  first.
 
 ## Testing rules (from utm, LESSONS E-01 to E-04, E-10, E-11)
 
@@ -131,7 +157,7 @@ make vectors          # core's vector tests from this module + RunOwned("cisp") 
 make generate-check   # oapi-codegen, sqlc, openapi-typescript reproduce the committed output
 make secrets vulncheck
 make ci               # what CI runs
-cd web && npm ci && npm run lint && npm run typecheck && npm test && npm run build
+cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
 Run `make lint` locally before every push, not only at the end; CI
@@ -170,7 +196,7 @@ make vectors
 make generate-check
 ```
 
-and for `web/` the npm sequence above. Then check the brief's done-when
+and for `web/` the pnpm sequence above. Then check the brief's done-when
 list item by item. If the brief needs a contract the spec does not
 define, stop, add the question to `docs/PLAN.md §15` with a proposed
 answer, and say so in the PR; do not invent it silently.

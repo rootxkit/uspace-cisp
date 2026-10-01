@@ -15,7 +15,8 @@ export) build on this: open the PR early.
 ## Read first
 
 1. `CLAUDE.md`, `docs/PLAN.md §1.3` (D2, D7), `§6.3`, `§6.4`, `§9`,
-   `§15` Q1, Q10, Q22.
+   `§15` Q1, Q22, Q25 (decided) and Q10 (open; build the demo
+   default).
 2. Spec `01 §2` C1 (same quality for everyone; a public subset), `02 §1`
    (Versioning, Failure rule), `02 F3` (pull API, `ETag`, `since_version`,
    60 s reconciliation `HEAD`), `05 §5` (webhooks and the public map
@@ -60,6 +61,14 @@ dropped (fail visible).
 - `at=` (RFC 3339 with an offset; a naive time is 400): on the rows
   after the bbox prefilter (or all), keep `Applies` and `Unknown`
   (marked), drop `DoesNotApply`; `X-CIS-Filtered: at`.
+- `applies_at=` (same parsing): **annotate, never filter** (M17,
+  `docs/PLAN.md §6.3`): every row after the bbox prefilter is returned
+  with `extendedProperties.cis_applicability` ∈ `applies` /
+  `not_applicable` / `unknown` evaluated at that instant on the
+  feature's copy; `X-CIS-Filtered: applies_at`; `at=` and `applies_at=`
+  together → 400 `filter_conflict`. This is what a console uses to dim
+  a zone that does not apply now without a second fetch and without
+  judging.
 - `since_version=v`: `publication.Delta` between `v` and current from
   the `features` rows (`op` per version, walked forward; at most 1 000
   versions back, else 410 `delta_unavailable` telling the client to pull
@@ -90,8 +99,13 @@ until WP-6 merges, this WP writes the schema file with the fields of
 per publisher `{client_id, kind, last_heartbeat_at, last_publication_at,
 stale: bool, stale_since}` (from `publishers`, which WP-3 writes; WP-5
 defines the staleness rule, so here `stale` = `now - last_heartbeat_at >
-stale_after_s`); `degraded: [{component, since}]` from the status
-registry; `now`.
+stale_after_s`, 60 s = three missed 15 s heartbeats); `degraded:
+[{component, since}]` from the status registry; `mtls_mode`; `now`.
+
+Problem bodies everywhere in this WP use the ecosystem shape
+(`docs/PLAN.md §6`): `errors: [{field, reason}]`, `type` slug URIs
+(`filter_not_applicable`, `filter_conflict`, `delta_unavailable`,
+`cis_stale`, `integrity`, `rate_limited`).
 
 ### Public subset (`internal/httpapi/public.go`)
 
@@ -120,7 +134,10 @@ do not exist (404).
 - E-01 pairs: `If-None-Match` hit/miss; `bbox` inside/outside;
   `at` inside/outside window plus the `Unknown` case (a daylight
   schedule at a polar latitude gives `cis_applicability: unknown` and
-  the feature is present); `since_version` with 0, 1, N changes, `v` >
+  the feature is present); `applies_at` returns the same three
+  features as no filter with `applies`, `not_applicable` and `unknown`
+  on the right ones (count equal to the unfiltered count asserted), and
+  `at` + `applies_at` → 400; `since_version` with 0, 1, N changes, `v` >
   current (400), too old (410); unknown dataset (404); `ussp_list` with
   a filter (400).
 - Degraded (E-02): pool closed → unfiltered 200 with `X-CIS-Stale`,
@@ -159,7 +176,7 @@ honestly when the rows may be newer than the snapshot.
 ## Commits
 
 `feat(applicability): evaluate ED-318 applicability at an instant, unknown kept [WP-4 C-M1]`,
-`feat(api): read datasets with ETag, bbox, at and since_version [WP-4 C-M1]`,
+`feat(api): read datasets with ETag, bbox, at, applies_at and since_version [WP-4 C-M1]`,
 `feat(api): version history with publisher signatures, the change cursor and status [WP-4 C-M1]`,
 `feat(api): the public read subset with per-IP rate limits [WP-4 C-M1]`,
 `test(api): run the applicability and geodesy vectors through the read API [WP-4 C-M1]`.

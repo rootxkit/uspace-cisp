@@ -12,7 +12,7 @@ adapter test passes.
 ## Read first
 
 1. `CLAUDE.md`, `docs/PLAN.md §8` (all), `§15` Q7, Q8, Q9, Q11, Q16,
-   Q20.
+   Q20 (all decided; the plan body applies them).
 2. Spec `00 §6.2` (JWT), `02 §1` Auth, `02 F1` (detached JWS), `02 F2`
    (mTLS), `02 F3` (webhook JWS, JWKS), `06 §2` T4, T5, T10, `06 §3`,
    `06 §4` (no test keys committed).
@@ -35,32 +35,43 @@ adapter test passes.
 ### Token verification middleware (`internal/auth`)
 
 - `NewMachineVerifier(ctx, cfg)`: `core/auth.Config{Issuers:
-  {cfg.TokenIssuer: {JWKSURL: cfg.TokenJWKSURL}}, Audience: cfg.Audience,
-  MaxSkew: 30 s, JWKSCacheTTL: 24 h}`. One instance per process, created
+  {cfg.TokenIssuer: {JWKSURL: cfg.TokenJWKSURL}, cfg.LabIssuer (optional):
+  {JWKSURL}}, Audiences: cfg.Audiences, MaxSkew: 30 s, JWKSCacheTTL:
+  24 h}`. `Audiences` is the list `CISP_AUDIENCES` (the CISP's public
+  host plus a lab alias; `aud` is a host everywhere in the ecosystem,
+  `docs/PLAN.md §8.2`, M18); if core's `Config` takes a single
+  `Audience`, wrap it so a token is accepted when its `aud` matches any
+  configured value, and say so in `doc.go`. The optional second issuer
+  is the lab's token issuer (lab WP-L2), so the CISP never waits for
+  the authority's token service. One instance per process, created
   at start; a JWKS fetch failure at start is **not** fatal when a cached
   copy exists on disk (`local/jwks-cache.json`, written on every
   successful refresh) and is fatal otherwise — both branches tested and
   the degraded one reported in the status line (`jwks: stale since T`).
 - `RequireScopes(scopes ...string) Middleware` and
   `RequireAnyScope(...)`: 401 `problem+json` with `type:
-  .../unauthenticated` and the claim core named (`exp`, `aud`, `kid`,
-  `alg`, `iss`, `signature`, `jti`), 403 `.../forbidden` with the
-  missing scope; counters per refusal reason mirror core's.
+  https://schemas.uspace.ge/problems/unauthenticated` and the claim
+  core named (`exp`, `aud`, `kid`, `alg`, `iss`, `signature`, `jti`) in
+  `errors[0].field`, 403 `.../forbidden` with the missing scope;
+  counters per refusal reason mirror core's.
 - `Caller` in the request context: `{Kind: machine|console, ClientID,
   Scopes, Claims}`; `CallerFrom(ctx)`.
 - Publisher binding: `RequirePublisher(kind)`: the `sub` must equal
-  `cfg.AuthorityClientID` (kind authority) or `cfg.ANSPClientID` (kind
-  ansp); 403 `.../not_a_publisher` otherwise, counted
-  `rejected_publisher_binding`.
-- mTLS binding: `RequireMTLSSubject()`: in mode `header`, the request
+  `cfg.AuthorityClientID` (kind authority; `authority-01`) or
+  `cfg.ANSPClientID` (kind ansp; `ansp-01`); 403 `.../not_a_publisher`
+  otherwise, counted `rejected_publisher_binding`. Client ids are one
+  per calling system (M24); the values are configuration.
+- mTLS binding: `RequireMTLSSubject()`: in mode `required`, the request
   must carry `X-Client-Cert-Subject` equal to `cfg.ANSPMTLSSubject`
-  (constant-time compare); in mode `off` the middleware passes and the
-  status line prints `mtls: off` at **error** level every period
-  (LESSONS Z-09 style: a disabled safeguard is never quiet). Caddy
-  strips the header on every other route (`deploy/Caddyfile.snippet`,
-  WP-0; this WP adds the test that a forged header on a non-ANSP route
-  is ignored by `api` too: the middleware runs only on restriction
-  routes).
+  (constant-time compare; absent → 403 `.../mtls_required`); in mode
+  `off` the middleware passes and the status line prints `mtls: off` at
+  **error** level every period (LESSONS Z-09 style: a disabled
+  safeguard is never quiet). Caddy runs `client_auth verify_if_given`
+  and strips the header on every other route and on every request that
+  presented no certificate (`deploy/caddy/Caddyfile.snippet`, WP-0;
+  this WP adds the test that a forged header on a non-ANSP route is
+  ignored by `api` too: the middleware runs only on the mTLS routes,
+  `/v1/restrictions*` and the ANSP's `/v1/publishers/heartbeat`).
 
 ### Signatures (`internal/jws`)
 
@@ -71,18 +82,26 @@ func (k *KeyRing) JWKS() []byte                                        // the pu
 func (k *KeyRing) SignDetached(body []byte, now time.Time) (string, error)   // "<protected>..<sig>", RS256, b64:false, crit:["b64"], kid, iat
 func (k *KeyRing) SignCompact(payload []byte, now time.Time) (string, error) // compact JWS for webhooks (WP-6 adds the claims)
 type DetachedVerifier struct{...}
-func NewDetachedVerifier(keys KeySource, maxSkew time.Duration) *DetachedVerifier   // KeySource: the authority's JWKS through core's cached fetch, or a static set for tests
+func NewDetachedVerifier(keys KeySource, maxSkew time.Duration) *DetachedVerifier   // KeySource: a publisher's JWKS through core's cached fetch (one verifier per publisher: the authority's JWKS, the ANSP's JWKS), or a static set for tests
 func (v *DetachedVerifier) Verify(header string, body []byte, now time.Time) (kid string, err error)   // refuses: malformed, alg != RS256, b64 != false or crit missing it, unknown kid, bad signature, iat outside skew, empty body
 func (v *DetachedVerifier) Counters() *core.Counters
 ```
 
-The JWKS source for inbound signatures is the authority's
-`/.well-known/jwks.json` (Q8): reuse core's `jwk.Cache`-backed fetch by
-asking the core verifier for its key set if it exposes one; if not,
-hold a second `jwk.Cache` in `internal/jws` with the same 24 h TTL and
-rate-limited refresh on an unknown `kid`, on a context of its own
-(E-14). Say in `doc.go` which it is, and propose `auth.VerifyDetached`
-upstream (Q20) in the PR body.
+The JWKS source for inbound signatures is **the publisher's own**
+`/.well-known/jwks.json` (Q8, M26): the authority's token-service JWKS
+(`CISP_TOKEN_JWKS_URL`; the publication key is distinguished by `kid`
+and `use: sig`) for F1 bodies, and the ANSP's JWKS (`CISP_ANSP_JWKS_URL`)
+for F2 bodies. Reuse core's `jwk.Cache`-backed fetch by asking the core
+verifier for its key set if it exposes one; if not, hold a `jwk.Cache`
+per publisher in `internal/jws` with the same 24 h TTL and rate-limited
+refresh on an unknown `kid`, on a context of its own (E-14). Say in
+`doc.go` which it is. Core `v1.1.0` (core WP-14) ships `auth.KeyRing`,
+`SignDetached`, `VerifyDetached`, `SignCompact`, `VerifyCompact` with
+these semantics (Q20, M27): this WP may land first on `internal/jws`
+because it is on the C-M1 critical path; the PR body names the
+follow-up that switches to core and removes the direct `jwx` import,
+and the `internal/jws` API above is kept close to core's names so the
+switch is mechanical.
 
 `GET /.well-known/jwks.json`: the `KeyRing.JWKS()` bytes with
 `Cache-Control: public, max-age=3600` and `ETag`; no auth.
@@ -95,9 +114,13 @@ k < body`: prints the detached header for a body (lab and tests).
 ### Configuration (`deploy/.env.example` block)
 
 `CISP_TOKEN_ISSUER`, `CISP_TOKEN_JWKS_URL` (https only, except
-`localhost`), `CISP_AUDIENCE` (default `cisp`), `CISP_AUTHORITY_CLIENT_ID`,
-`CISP_ANSP_CLIENT_ID`, `CISP_ANSP_MTLS_SUBJECT`, `CISP_MTLS_MODE`
-(`header|off`; default `header`), `CISP_SIGNING_KEY_FILE`,
+`localhost`), `CISP_LAB_ISSUER`, `CISP_LAB_JWKS_URL` (optional; the lab
+issuer), `CISP_AUDIENCES` (comma-separated hosts; no default: the
+public host is deployment configuration, the lab alias is the compose
+service name; refused empty), `CISP_AUTHORITY_CLIENT_ID` (`authority-01`
+in the lab), `CISP_ANSP_CLIENT_ID` (`ansp-01`), `CISP_ANSP_JWKS_URL`,
+`CISP_ANSP_MTLS_SUBJECT`, `CISP_MTLS_MODE` (`required|off`; default
+`required`), `CISP_SIGNING_KEY_FILE`,
 `CISP_SIGNING_KID`, `CISP_SIGNING_KEY_PREV_FILE`, `CISP_SIGNING_KID_PREV`,
 `CISP_PUBLISHER_SIGNATURE_MAX_SKEW` (5 m).
 
@@ -111,9 +134,12 @@ k < body`: prints the detached header for a body (lab and tests).
   the fixture JWKS as a static `IssuerConfig.Keys`.
 - E-01 pairs for every refusal of §8.1 T4 row one (wrong `aud`, wrong
   `sub`, right `sub` wrong scope, no signature, unknown `kid`, stale
-  `iat`, altered body, mTLS subject mismatch) beside the accepted
-  request; keys generated with `rsa.GenerateKey` at test time, never
-  committed (`06 §4`; `gitleaks` would catch a PEM anyway).
+  `iat`, altered body, mTLS subject mismatch, a body signed with the
+  authority's key on the ANSP route and vice versa) beside the accepted
+  request; `aud` accepted for each value of a two-entry `CISP_AUDIENCES`
+  and refused for a third; keys generated with `rsa.GenerateKey` at
+  test time, never committed (`06 §4`; `gitleaks` would catch a PEM
+  anyway).
 - `DetachedVerifier` refuses `b64:true`, a missing `crit`, `alg none`,
   HS256 with the public key as secret (the confusion attack), an `iat`
   31 s... no: `maxSkew` is 5 min here; test at ±(5 min ± 1 s).
@@ -132,11 +158,12 @@ k < body`: prints the detached header for a body (lab and tests).
 - [ ] 16/16 `jwt_verify` cases pass through the middleware; lint, race
   green; coverage ≥ 90 % in `internal/jws`, ≥ 85 % in `internal/auth`.
 - [ ] `mtls: off` appears at error level in the status line when set
-  (paste one line); `header` mode refuses a wrong subject (paste the
-  problem body).
+  (paste one line); `required` mode refuses a wrong subject and a
+  missing header (paste the problem bodies).
 - [ ] `cispctl rotate-key` output used by `cispctl sign` verifies through
   `DetachedVerifier` in an end-to-end shell test (`tools/jws-smoke.sh`).
-- [ ] `docs/PLAN.md §15` Q20 proposal text in the PR body.
+- [ ] The PR body names the follow-up that switches `internal/jws` to
+  core `v1.1.0`'s helpers (`docs/PLAN.md §15` Q20).
 - [ ] CHANGELOG line; outputs pasted (E-04).
 
 ## Safety notes

@@ -74,12 +74,19 @@ OpenAPI 3.1, `info.version: 0.1.0`, servers `/`, tags `health`,
 `publications`, `restrictions`, `datasets`, `subscriptions`, `stream`,
 `console`, `status`; `components.securitySchemes`: `ecosystemToken`
 (http bearer, JWT) and `consoleSession` (http bearer); the `Problem`
-schema (`application/problem+json`: `type`, `title`, `status`,
-`detail`, `instance`, `problems[] {field, reason}`, `truncated`);
+schema (`application/problem+json`, the ecosystem-wide shape of
+`docs/PLAN.md §6`: `type` (`https://schemas.uspace.ge/problems/<slug>`),
+`title`, `status`, `detail`, `instance`, `errors[] {field, reason}`,
+`truncated?`; the same shape as `uspace-lab/schemas/common/problem/v1`
+once it exists, and `WriteProblem` takes `errors` not `problems`);
 `GET /healthz`, `GET /readyz` (`{status, checks: {database, migrations,
 nats}}`), `GET /v1/status` (stub of `docs/PLAN.md §6.3`). Other WPs add
 their paths under their tags; `api/README.md` says how (edit the YAML,
-`make generate`, commit the output, never edit `gen/`).
+`make generate`, commit the output, never edit `gen/`). This skeleton
+is what the authority and the ANSP copy into their `api/clients/cisp.yaml`
+with a `SOURCE` commit and a CI diff until the lab aggregate exists
+(`docs/PLAN.md §6.7`, M11): merge it first, and keep every later
+change to the file additive.
 
 ### Makefile and tooling
 
@@ -104,7 +111,7 @@ Jobs on `push` to `main`, tags `v*`, and `pull_request`, with
 1. `build-vet-lint` (gofmt, build, vet, tidy clean, staticcheck,
    golangci-lint pinned).
 2. `generate-check` (`make generate-check`; tools from the module
-   cache and `npm ci` only when `web/` exists).
+   cache and `pnpm install --frozen-lockfile` only when `web/` exists).
 3. `test-race` (`go test -race -count=1 -shuffle=on -coverprofile`;
    coverage summary in the step summary).
 4. `integration` with `services:` `timescale/timescaledb-ha:pg16` (two
@@ -137,8 +144,12 @@ No scheduled job. Branch protection (owner): jobs 1-6 required.
   `cisp_api` (relational read/write; timeseries read-only) and
   `cisp_deliver` (timeseries read/write; relational read/write on
   `deliveries` and `subscriptions` only) roles.
-- `deploy/Caddyfile.snippet`: the routes of `docs/PLAN.md §11`, with
-  placeholders, never a real hostname.
+- `deploy/caddy/Caddyfile.snippet`: the routes of `docs/PLAN.md §11`
+  (including `client_auth verify_if_given` with the subject header
+  forwarded on the mTLS routes and stripped elsewhere, and `/basemap/*`
+  from the shared volume), with placeholders, never a real hostname. It
+  is a reference copy: the deployment repository `uspace-deploy`
+  composes the real Caddyfile from every system's snippet (M25, D1).
 - `deploy/.env.example`: every variable, its default, one line of
   meaning, grouped by process.
 
@@ -147,7 +158,9 @@ No scheduled job. Branch protection (owner): jobs 1-6 required.
 `migrations/relational/0001_init.sql` (`CREATE EXTENSION IF NOT EXISTS
 postgis;` and the `datasets` table seeded with the four rows) and
 `migrations/timeseries/0001_init.sql` (`CREATE EXTENSION IF NOT EXISTS
-timescaledb;`), each with `-- +goose Down`. `internal/store/migrate.go`
+timescaledb;`), each with `-- +goose Down`; goose is configured with
+the version table `goose_db_version_relational` for the first tree and
+`goose_db_version_timeseries` for the second (D11). `internal/store/migrate.go`
 with `embed.FS` per tree and `Pending(ctx, db, tree)` for `/readyz` is
 WP-1's; WP-0 ships only the files and the `cispctl migrate` stub that
 says "WP-1".

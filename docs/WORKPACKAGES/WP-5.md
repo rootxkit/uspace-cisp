@@ -14,7 +14,7 @@ through the store until it merges). Peers: WP-3, WP-4, WP-6, WP-8.
 ## Read first
 
 1. `CLAUDE.md`, `docs/PLAN.md §1.3` (D4, D5, D8), `§6.2`, `§8.3`, `§15`
-   Q2, Q3, Q6, Q11, Q17.
+   Q2, Q3, Q6, Q11, Q17 (all decided; the plan body applies them).
 2. Spec `01 §2` C2, C5 (1 s target), `01 §4` N1 (ATS.TR.237:
    activation, deactivation, temporary limitation), `02 F2` (payload,
    states, idempotency key, ANSP-side version, the degraded path,
@@ -69,7 +69,9 @@ that opens airspace is not a restriction: refuse `NO_RESTRICTION` and
 whose `startDateTime`/`endDateTime` equal `starts_at`/`ends_at` (a
 restriction's time is one truth, carried twice for ED-318 consumers);
 no daylight events; identifier ≤ 7 characters and not reserved by any
-dataset (D8, Q17); outline ≤ `CstrMaxVertices` and area ≤
+dataset (D8, Q17: the CISP checks length and uniqueness only and never
+a prefix; the ANSP mints `DAR` + 4 base-36, and a test publishes such
+an id beside one of 8 characters); outline ≤ `CstrMaxVertices` and area ≤
 `CstrMaxAreaKm2` (`ST_Area(geography)` in the handler's store lookup);
 `uspace_airspace_id` must be a current `uspace_airspace` feature and the
 restriction's geometry must intersect it (PostGIS `ST_Intersects` on
@@ -85,7 +87,15 @@ in the OpenAPI and `schemas/cis/restriction/v1.json`).
 Middleware: `RequireScopes(cis.publish:restrictions)`,
 `RequirePublisher(ansp)`, `RequireMTLSSubject()`, body cap 256 KiB,
 `X-JWS-Signature` detached verification over the body (the same scheme as
-F1; the ANSP's key from the authority's JWKS — Q8).
+F1; **the ANSP's key from the ANSP's own JWKS**, `CISP_ANSP_JWKS_URL` —
+Q8, M26).
+
+The body is `cis/restriction/v1` with the field `ansp_version` (never
+`version`; M4). **The idempotency key is the body pair `(ansp_ref,
+ansp_version)`**: the same pair replays to 200 with the stored head and
+no new version; an `Idempotency-Key` header, if the ANSP sends one, is
+ignored and nothing depends on it (document that in the OpenAPI
+description so the ANSP's planner reads it there).
 
 `POST /v1/restrictions`: validate; `ansp_ref` lookup; `Transition`;
 `store.PublishTx` on dataset `restrictions` with the new current set
@@ -116,7 +126,13 @@ run time is in `/v1/status` and the status line flags a job older than
 30 s at error level (E-02: a dead ticker must be visible).
 
 Staleness: a publisher of kind `ansp` with `now - last_heartbeat_at >
-stale_after_s` (60) or never heard is `stale`; `GET /v1/restrictions`
+stale_after_s` (60 s = three missed 15 s heartbeats, M3) or never heard
+is `stale`; the heartbeat's `active_refs` (WP-3 stores them) are
+compared with the `active` heads on every heartbeat: a declared ref the
+CISP does not hold as `active`, or an `active` head the ANSP did not
+declare, is counted (`heartbeat_ref_unknown`, `heartbeat_ref_missing`)
+and listed in `/v1/status`, **never acted on** (the ANSP's
+`POST`/`PATCH` is the only path that changes state); `GET /v1/restrictions`
 and the `restrictions` dataset responses carry
 `cis_publisher_stale_since` at the top level, `/v1/status` lists it, the
 status line prints it at **warning** level (not error: active restrictions
@@ -136,7 +152,9 @@ ANSP's alarm). Nothing is ended or hidden because the ANSP is silent
   zone, 1 001 vertices, > 10 000 km², outside its airspace, unknown
   airspace).
 - Handlers (integration): create planned → activate → extend → end; a
-  replay of each op returns 200 with the same head and **no new
+  replay of each op (same `(ansp_ref, ansp_version)` pair, with and
+  without an `Idempotency-Key` header, and with a different header
+  value on the same pair) returns 200 with the same head and **no new
   version** (assert `datasets.current_version`); each accepted op is a
   new version with the right `reason` in `changes`; `GET /v1/restrictions`
   (WP-4 path) shows the feature with `cis_restriction`; an ended
@@ -148,9 +166,12 @@ ANSP's alarm). Nothing is ended or hidden because the ANSP is silent
   stopped for 31 s the status line goes to error (read it back).
 - Staleness: heartbeat present → not stale; 61 s without → stale in
   `/v1/status` and on the dataset; heartbeat returns → clear. Nothing
-  else changes (assert versions unchanged).
-- mTLS: `header` mode with the wrong subject → 403; `off` mode passes
-  and the error-level line appears.
+  else changes (assert versions unchanged). `active_refs` naming an
+  unknown ref, and omitting an active head, each count and show in
+  status; versions unchanged (E-01 beside a matching declaration that
+  counts nothing).
+- mTLS: `required` mode with the wrong subject → 403 and with no header
+  → 403; `off` mode passes and the error-level line appears.
 - e2e (`test/e2e/restriction_latency_test.go`, with WP-6's subscriber
   container): `POST` active → the subscriber's receipt time minus
   `changes.at` printed; assert < 2 s on CI (the 1 s target is reported

@@ -14,7 +14,7 @@ Peers: WP-3, WP-4, WP-5, WP-8.
 
 1. `CLAUDE.md`, `docs/PLAN.md §1.3` (D6, D7), `§6.5`, `§6.7`, `§7`,
    `§8.1` (SSRF row, T4 towards subscribers), `§9` (the 1 s / 2 s
-   budget), `§10.5`, `§15` Q9.
+   budget), `§10.5`, `§15` Q9, Q13 (decided).
 2. Spec `01 §2` C5, `02 F3` (push: registration, signed notification,
    retry 24 h, delivery log, the subscriber's mandatory 60 s pull), `04
    §3.4` (`cis/change/v1`), `05 §5` (bounded retry queue per
@@ -77,10 +77,14 @@ attempt's error.
   `cis/change/v1` record (`schema`, `msg_id` = change id, `producer` =
   `cisp/deliver-<instance>`, `dataset`, `version`, `etag`,
   `feature_ids`, `removed_ids`, `reason`, `at`, `pull_url` =
-  `CISP_PUBLIC_BASE_URL + /v1/{dataset}?since_version=<prev>`,
-  `bbox?`) plus `iss` (`CISP_ISSUER_URL`), `aud` (the subscription's
-  client id), `sub` (subscription id), `iat`, `jti` (delivery id), `exp`
-  (`iat` + 5 min), signed `SignCompact`; `POST` with `Content-Type:
+  `CISP_PUBLIC_BASE_URL + /v1/{dataset}?since_version=<prev>` — always
+  on the CISP's configured base host, because receivers honour a
+  `pull_url` only when its host is the issuer's, M5), `bbox?`) plus
+  `iss` (`CISP_ISSUER_URL`), **`aud` = the host of the subscription's
+  `callback_url`** (M19; the audience rule of `docs/PLAN.md §8.2`
+  applied to webhooks, never the client id), `sub` (subscription id),
+  `iat`, `jti` (delivery id), `exp` (`iat` + 5 min), signed
+  `SignCompact`; `POST` with `Content-Type:
   application/jose`, `User-Agent: uspace-cisp/<version>`,
   `X-CIS-Delivery-Id`, `X-CIS-Attempt`; the client: 2 s total timeout,
   no redirects (a 3xx is a failure), response body read to 1 KiB then
@@ -102,14 +106,28 @@ attempt's error.
   `Nak`s unacked intake, exits 0; two instances share the work (SKIP
   LOCKED + durable consumer) — tested.
 
+Delivery reasons and the receivers (M5, M16): the `reason` enumeration
+of `cis/change/v1` includes `subscription_test` and `republished`.
+Every receiver in the ecosystem acknowledges these two, and any reason
+it does not know, with `204` **without pulling** (the additive-enum
+rule of `04 §4`); only the publication and restriction reasons trigger
+a pull. Say so in the schema's description and in `api/README.md`, so a
+subscriber author reads it where the contract is. The receivers' path
+is `POST /v1/cis/notifications` everywhere (M1), but `deliver` posts to
+the registered `callback_url` and never assumes a path.
+
 ### Subscriber container (`test/e2e/subscriber/`)
 
-A 150-line Go program: listens on `:8080`, verifies each JWS against
-`CISP_JWKS_URL` (through `uspace-core/auth`-style `jwk.Cache`),
-records `{received_at, delivery_id, change_id, verified}` to stdout as
-JSON lines and to `GET /received`, answers 2xx; `FAIL_FIRST=n` makes
-it fail the first n attempts with 500; `SLOW_MS` delays. Built into an
-image by the e2e compose. The lab may reuse it.
+A 150-line Go program: listens on `:8080` at `/v1/cis/notifications`
+(the ecosystem path, M1), verifies each JWS against `CISP_JWKS_URL`
+(through `uspace-core/auth`-style `jwk.Cache`) with `aud` = its own
+host, records `{received_at, delivery_id, change_id, reason, verified,
+pulled}` to stdout as JSON lines and to `GET /received`, answers 2xx,
+and pulls `pull_url` only for a publication or restriction reason and
+only when its host equals `CISP_PUBLIC_BASE_URL`'s (the reference
+reading of M5 for every sibling); `FAIL_FIRST=n` makes it fail the
+first n attempts with 500; `SLOW_MS` delays. Built into an image by the
+e2e compose. The lab may reuse it.
 
 ## Tests
 
@@ -124,9 +142,12 @@ image by the e2e compose. The lab may reuse it.
   schedule honoured, attempts logged), 301 (failure), a 3 s handler
   (timeout at 2 s), a server on a private address refused at dial
   (counted `ssrf_refused`), a 1 MiB response body (only 1 KiB read).
-  JWS verified by the test with the key ring's JWKS: `iss`, `aud`,
-  `sub`, `jti`, `exp` present; a signature by another key is refused by
-  the subscriber helper (T4 pair).
+  JWS verified by the test with the key ring's JWKS: `iss`, `aud` (=
+  the callback host, asserted against a `callback_url` with a port and
+  one without), `sub`, `jti`, `exp` present; a signature by another key
+  is refused by the subscriber helper (T4 pair); the helper does not
+  pull on `subscription_test` and `republished` and does pull on
+  `publication` (E-01 pair), and refuses a `pull_url` on another host.
 - Integration: intake creates one row per matching subscription and is
   idempotent on redelivery (publish the same `Nats-Msg-Id` twice; the
   change twice through the consumer); the scan creates rows for a

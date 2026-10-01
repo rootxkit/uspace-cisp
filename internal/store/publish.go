@@ -40,6 +40,10 @@ var (
 	ErrUnchanged = errors.New("publication: identical to the current version")
 	// ErrNoopSigner is returned for a NoopSigner outside tests.
 	ErrNoopSigner = errors.New("publication: the no-op signer is refused outside tests")
+	// ErrVersionMismatch is returned when PublishInput.ExpectedVersion is
+	// not the current version once the dataset is locked (If-Match, WP-3);
+	// nothing was written and PublishResult carries the current version.
+	ErrVersionMismatch = errors.New("publication: the dataset is not at the expected version")
 )
 
 // PublishInput is one accepted publication.
@@ -64,6 +68,10 @@ type PublishInput struct {
 	// ActorType and ActorID name the actor in the audit row; empty is
 	// the client PublisherClientID.
 	ActorType, ActorID string
+	// ExpectedVersion, when set, is the version the publisher read
+	// (If-Match): checked under the dataset lock, so two publishers
+	// racing on one version cannot both win (ErrVersionMismatch).
+	ExpectedVersion *int64
 }
 
 // PublishResult is what PublishTx committed (or, with ErrUnchanged, the
@@ -143,6 +151,17 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 		received = now
 	}
 	bodySHA := sha256.Sum256(in.Body)
+	// The USSP list is compared by its canonical content (D3), so a
+	// re-publication that differs only in whitespace or member order is
+	// unchanged.
+	var canonicalList []byte
+	if in.Dataset.Kind() == publication.KindUsspList {
+		c, err := publication.UsspListCanonical(in.Body)
+		if err != nil {
+			return PublishResult{}, err
+		}
+		canonicalList = c
+	}
 
 	var res PublishResult
 	err := s.tx(ctx, func(tx pgx.Tx, q *relational.Queries) error {
@@ -158,6 +177,10 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 			return err
 		}
 		current := d.CurrentVersion
+		if in.ExpectedVersion != nil && *in.ExpectedVersion != current {
+			res = PublishResult{Version: current, ETag: publication.ETag(in.Dataset, current)}
+			return ErrVersionMismatch
+		}
 
 		var prev []publication.FeatureRow
 		if in.Collection != nil {
@@ -180,6 +203,9 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 					return fmt.Errorf("current publication: %w", err)
 				}
 				unchanged = bytes.Equal(p.BodySha256, bodySHA[:])
+				if prev, err := publication.UsspListCanonical(p.Body); err == nil && canonicalList != nil {
+					unchanged = bytes.Equal(prev, canonicalList)
+				}
 			}
 			if unchanged {
 				res = PublishResult{Version: current, ETag: publication.ETag(in.Dataset, current), Diff: diff}
@@ -249,11 +275,14 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 		}
 
 		// 5. the signed snapshot.
-		body := in.Body
+		var body []byte
 		if in.Collection != nil {
-			if body, err = publication.Snapshot(in.Dataset, version, received, in.PublisherClientID, in.Collection); err != nil {
-				return fmt.Errorf("snapshot: %w", err)
-			}
+			body, err = publication.Snapshot(in.Dataset, version, received, in.PublisherClientID, in.Collection)
+		} else {
+			body, err = publication.UsspListSnapshot(version, received, in.Body)
+		}
+		if err != nil {
+			return fmt.Errorf("snapshot: %w", err)
 		}
 		if err := s.insertSnapshot(ctx, q, in.Dataset, version, body, signer, now); err != nil {
 			return err
@@ -305,8 +334,8 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 		res = PublishResult{PublicationID: pubID, Version: version, ETag: publication.ETag(in.Dataset, version), Diff: diff, Change: change}
 		return nil
 	})
-	if errors.Is(err, ErrUnchanged) {
-		return res, ErrUnchanged
+	if errors.Is(err, ErrUnchanged) || errors.Is(err, ErrVersionMismatch) {
+		return res, err
 	}
 	if err != nil {
 		return PublishResult{}, err

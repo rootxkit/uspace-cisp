@@ -92,7 +92,10 @@ func (s *Store) RebuildCurrent(ctx context.Context, ds publication.Dataset, sign
 		if err != nil {
 			return fmt.Errorf("publication: %w", err)
 		}
-		body := pub.Body
+		body, err := publication.UsspListSnapshot(d.CurrentVersion, pub.ReceivedAt, pub.Body)
+		if ds.Kind() == publication.KindUsspList && err != nil {
+			return fmt.Errorf("snapshot: %w", err)
+		}
 		if ds.Kind() == publication.KindED318 {
 			fc, probs := ed318.Parse(pub.Body, ed318.Limits{MaxBytes: len(pub.Body) + 1})
 			if probs != nil {

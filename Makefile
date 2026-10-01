@@ -1,6 +1,9 @@
 # uspace-cisp developer targets. CI (.github/workflows/ci.yml) runs the
 # same commands, one target per job step. On Windows set GOROOT and GO,
 # for example: make test GO=/c/Users/<you>/AppData/Local/anaconda3/bin/go
+#
+# bash, not /bin/sh: the recipes use pipefail, which ubuntu's dash lacks.
+SHELL   := bash
 GO      ?= go
 PKGS    ?= ./...
 

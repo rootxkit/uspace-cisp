@@ -34,3 +34,21 @@ additively within `/v1`.
   `cispctl migrate`, `migrate status`, `rebuild-current` and
   `set-retention`; `api` and `deliver` refuse to start with pending
   migrations; `CISP_DATABASE_MAX_CONNS` and `CISP_TIMESERIES_MAX_CONNS`.
+- WP-2 machine authentication and signatures, on `uspace-core` v1.1.0:
+  `internal/auth` (one core token verifier per process with
+  `CISP_AUDIENCES`, the optional lab issuer and `StrictSessionClaims`;
+  a JWKS disk copy, `CISP_JWKS_CACHE_FILE`, that lets the api start on
+  the last good keys while an issuer is down and says
+  `jwks: stale since T` until it answers; `RequireScopes`,
+  `RequireAnyScope`, `RequirePublisher`, `RequireMTLSSubject` refusing
+  with `unauthenticated`, `forbidden`, `not_a_publisher` and
+  `mtls_required` problems, counted per reason); `internal/jws` (the
+  CISP's RSA-3072 key ring and its JWKS, one detached-signature verifier
+  per publisher, and the middleware that verifies a body before it is
+  parsed); `GET /.well-known/jwks.json`; `GET /v1/status` now needs a
+  `cis.read` token; `cispctl rotate-key`, `sign` and `verify-signature`;
+  `tools/jws-smoke.sh`; the configuration `CISP_LAB_ISSUER`,
+  `CISP_LAB_JWKS_URL`, `CISP_SIGNING_KID_PREV`,
+  `CISP_PUBLISHER_SIGNATURE_MAX_SKEW_S`. `CISP_TOKEN_ISSUER`,
+  `CISP_TOKEN_JWKS_URL`, `CISP_AUDIENCES` and (in mTLS mode `required`)
+  `CISP_ANSP_MTLS_SUBJECT` are now required.

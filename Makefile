@@ -26,7 +26,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: all build vet fmt fmt-check lint tools staticcheck tidy test race cover \
         generate generate-check integration vectors secrets vulncheck \
-        dev-deps dev-deps-down image ci clean
+        dev-deps dev-deps-down image ci clean jws-smoke
 
 all: ci
 
@@ -111,6 +111,11 @@ vectors:
 	GO=$(GO) tools/core-vectors.sh
 	$(GO) test -count=1 -run 'Vectors' -v $(PKGS)
 
+# rotate-key, sign and verify-signature end to end in a scratch
+# directory (WP-2): a signed body verifies, an altered one is refused.
+jws-smoke:
+	GO=$(GO) tools/jws-smoke.sh
+
 # Secret scan of the history and of every file that could be committed
 # (tracked or untracked, not git-ignored), with .gitleaks.toml. Ignored
 # files such as local/dev.env hold local secrets on purpose and cannot
@@ -143,7 +148,7 @@ $(DEV_ENV):
 image:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) .
 
-ci: build vet lint race generate-check vectors vulncheck secrets integration
+ci: build vet lint race jws-smoke generate-check vectors vulncheck secrets integration
 
 clean:
 	rm -f coverage.out integration.log

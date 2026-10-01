@@ -139,6 +139,8 @@ jobs:
           cache: true
       - name: go test -race
         run: go test -race -count=1 -shuffle=on -coverprofile=coverage.out -covermode=atomic ./...
+      - name: signing tools end to end (tools/jws-smoke.sh)
+        run: make jws-smoke
       - name: coverage summary
         run: |
           {

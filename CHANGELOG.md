@@ -52,3 +52,23 @@ additively within `/v1`.
   `CISP_PUBLISHER_SIGNATURE_MAX_SKEW_S`. `CISP_TOKEN_ISSUER`,
   `CISP_TOKEN_JWKS_URL`, `CISP_AUDIENCES` and (in mTLS mode `required`)
   `CISP_ANSP_MTLS_SUBJECT` are now required.
+- WP-3 publication intake (F1): `PUT /v1/publications/{dataset}` for
+  `zones`, `uspace_airspace` and `ussp_list` (the dataset's publish
+  scope, the authority binding, `application/geo+json` or
+  `application/json`, the authority's detached signature before the body
+  is read, `If-Match` checked again under the dataset lock, accepted
+  whole or refused whole with every problem by path, a refused attempt
+  row and `publications_refused{dataset}`, `200 unchanged` for an equal
+  body, `201` with the capped `added`/`changed`/`removed` and
+  `warnings`); `GET /v1/publications/{dataset}` (history),
+  `GET /v1/publications/{dataset}/attempts` (the publisher's refusals)
+  and `POST /v1/publishers/heartbeat` (`active_refs` at most 1000, the
+  ANSP bound to its certificate subject); `internal/dataset` (no USPACE
+  in zones, only USPACE in `uspace_airspace`, no `DAR`, every zone
+  buildable by `ed318.ToZones`, open-ended daylight schedules as
+  warnings, the `cis/uspace_requirements/v1` block, the closed
+  `cis/ussp_list/v1` validator); `schemas/cis/ussp_list/v1.json` and
+  `schemas/cis/uspace_requirements/v1.json` exported from the OpenAPI
+  components with examples; migration `0007_publisher_heartbeat`; the
+  USSP list snapshot is its canonical form with the `cis_*` members; the
+  api publishes committed changes through `internal/bus`.

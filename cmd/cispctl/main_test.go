@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -13,7 +14,7 @@ import (
 
 func runCtl(args, env []string) (int, string, string) {
 	var stdout, stderr bytes.Buffer
-	code := run(args, env, &stdout, &stderr)
+	code := run(context.Background(), args, env, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
 }
 
@@ -63,10 +64,44 @@ func TestConfigCheckRefuses(t *testing.T) {
 	}
 }
 
-func TestMigrateIsNotImplementedYet(t *testing.T) {
-	code, _, errOut := runCtl([]string{"migrate", "relational"}, nil)
-	if code != exitNotImplemented || !strings.Contains(errOut, "WP-1") || !strings.Contains(errOut, "nothing was applied") {
-		t.Errorf("migrate = %d %q", code, errOut)
+// Without a database: every refusal names what is wrong and exits with
+// its code, before anything connects.
+func TestDatabaseCommandsRefuseWithoutADatabase(t *testing.T) {
+	unreachable := []string{"CISP_DATABASE_URL=postgres://u:p@127.0.0.1:1/cisp?connect_timeout=1", "CISP_TIMESERIES_URL=postgres://u:p@127.0.0.1:1/cisp_ts?connect_timeout=1"}
+	cases := []struct {
+		args []string
+		env  []string
+		code int
+		want string
+	}{
+		{[]string{"migrate", "both"}, nil, exitUsage, "unknown migration tree"},
+		{[]string{"migrate", "relational", "--down-to"}, nil, exitUsage, "usage"},
+		{[]string{"migrate", "relational", "extra"}, nil, exitUsage, "usage"},
+		{[]string{"migrate", "status", "both"}, nil, exitUsage, "unknown migration tree"},
+		{[]string{"migrate", "relational"}, nil, exitConfig, "CISP_DATABASE_URL is not set"},
+		{[]string{"migrate", "timeseries"}, nil, exitConfig, "CISP_TIMESERIES_URL is not set"},
+		{[]string{"migrate", "status", "relational"}, nil, exitConfig, "CISP_DATABASE_URL is not set"},
+		{[]string{"migrate", "relational"}, []string{"CISP_DATABASE_URL=postgres://db/cisp?pool_max_conns=many"}, exitConfig, "does not parse"},
+		{[]string{"migrate", "relational"}, []string{"CISP_LOG_LEVEL=loud"}, exitConfig, "CISP_LOG_LEVEL"},
+		{[]string{"migrate", "relational"}, unreachable, exitFailed, "migrate relational"},
+		{[]string{"migrate", "status", "timeseries"}, unreachable, exitFailed, "migrate timeseries"},
+		{[]string{"rebuild-current"}, nil, exitUsage, "usage"},
+		{[]string{"rebuild-current", "--dataset", "geo_zones"}, nil, exitUsage, "not a dataset"},
+		{[]string{"rebuild-current", "--dataset", "zones"}, nil, exitConfig, "CISP_DATABASE_URL is not set"},
+		{[]string{"rebuild-current", "--dataset", "zones"}, unreachable, exitFailed, "nothing was changed"},
+		{[]string{"set-retention", "--days", "0"}, nil, exitUsage, "outside 1..3650"},
+		{[]string{"set-retention", "--days", "x"}, nil, exitUsage, "usage"},
+		{[]string{"set-retention"}, nil, exitConfig, "CISP_TIMESERIES_URL is not set"},
+		{[]string{"set-retention", "--days", "30"}, unreachable, exitFailed, "set retention"},
+	}
+	for _, c := range cases {
+		code, out, errOut := runCtl(c.args, c.env)
+		if code != c.code || !strings.Contains(errOut, c.want) {
+			t.Errorf("%q = %d, want %d with %q; stdout %q stderr %q", c.args, code, c.code, c.want, out, errOut)
+		}
+		if strings.Contains(errOut, ":p@") {
+			t.Errorf("%q printed a database password: %s", c.args, errOut)
+		}
 	}
 }
 
@@ -114,7 +149,8 @@ func TestBinary(t *testing.T) {
 	}{
 		{[]string{"version"}, exitOK},
 		{[]string{"config", "check"}, exitOK},
-		{[]string{"migrate"}, exitNotImplemented},
+		{[]string{"migrate"}, exitUsage},
+		{[]string{"migrate", "relational"}, exitConfig},
 		{nil, exitUsage},
 	} {
 		cmd := exec.Command(bin, c.args...)

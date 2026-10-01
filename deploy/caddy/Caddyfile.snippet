@@ -1,0 +1,73 @@
+# uspace-cisp routes for the shared Caddy (docs/PLAN.md sections 8.3, 11).
+# A REFERENCE COPY: the deployment repository (uspace-deploy) composes the
+# real Caddyfile from every system's snippet. Placeholders only, never a
+# real hostname (spec 06 section 4):
+#   {$CISP_HOST}             the CISP's public host
+#   {$CISP_ANSP_MTLS_CA}     PEM file of the CA that issues the ANSP's client certificate
+#   {$CISP_API_UPSTREAM}     api, e.g. uspace-cisp-api-1:8080
+#   {$CISP_WEB_UPSTREAM}     web (WP-9)
+#   {$USPACE_BASEMAP_DIR}    the shared read-only basemap volume (M38)
+# /metrics is never routed: Prometheus scrapes it inside the network.
+
+{$CISP_HOST} {
+	encode zstd gzip
+
+	tls {
+		client_auth {
+			mode verify_if_given
+			trust_pool file {$CISP_ANSP_MTLS_CA}
+		}
+	}
+
+	# Nobody chooses their own certificate subject: the header is removed
+	# from every request, and set again below only from the verified
+	# client certificate on the mTLS routes.
+	request_header -X-Client-Cert-Subject
+
+	@mtls {
+		path /v1/restrictions /v1/restrictions/* /v1/publishers/heartbeat
+		expression {http.request.tls.client.subject} != ""
+	}
+	handle @mtls {
+		reverse_proxy {$CISP_API_UPSTREAM} {
+			header_up X-Client-Cert-Subject {http.request.tls.client.subject}
+		}
+	}
+
+	# WebSocket change stream (upgrade passes through reverse_proxy).
+	handle /v1/stream {
+		reverse_proxy {$CISP_API_UPSTREAM}
+	}
+
+	handle /v1/* {
+		reverse_proxy {$CISP_API_UPSTREAM}
+	}
+
+	# The public read subset, cached by Caddy on the full URL; api sets
+	# Cache-Control.
+	handle /public/* {
+		reverse_proxy {$CISP_API_UPSTREAM}
+	}
+
+	handle /.well-known/* {
+		reverse_proxy {$CISP_API_UPSTREAM}
+	}
+
+	handle /healthz {
+		reverse_proxy {$CISP_API_UPSTREAM}
+	}
+
+	handle /metrics {
+		respond 404
+	}
+
+	handle_path /basemap/* {
+		root * {$USPACE_BASEMAP_DIR}
+		file_server
+	}
+
+	# /_bff/* and every page: the Next.js web (WP-9).
+	handle {
+		reverse_proxy {$CISP_WEB_UPSTREAM}
+	}
+}

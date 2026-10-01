@@ -1,0 +1,128 @@
+# uspace-cisp demo deployment (docs/PLAN.md section 11): one compose
+# project on its own network. Images are built in CI and pulled by tag;
+# `latest` is never deployed. Secrets and addresses come from deploy/.env
+# (copy deploy/.env.example; git-ignored).
+#
+#   CISP_IMAGE_TAG=<short sha or tag> docker compose -f deploy/compose.yml up -d
+#
+# Caddy is shared and lives in the deployment repository (uspace-deploy),
+# which attaches api and web to its edge network and composes
+# deploy/caddy/Caddyfile.snippet into the real Caddyfile.
+#
+# Until WP-1, `cispctl migrate` answers "not implemented" and exits 4, so
+# api and deliver (which wait for migrate to succeed) do not start: the
+# stack refuses to run unmigrated rather than pretending.
+name: uspace-cisp
+
+x-go-image: &go-image
+  image: ghcr.io/rootxkit/uspace-cisp:${CISP_IMAGE_TAG:?set CISP_IMAGE_TAG to a short SHA or tag}
+  env_file: .env
+  restart: unless-stopped
+  networks: [cisp]
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  postgres:
+    # One container, two databases (cisp, cisp_ts): the droplet layout
+    # every system adopted (M37).
+    image: timescale/timescaledb-ha:pg16
+    restart: unless-stopped
+    networks: [cisp]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deploy/.env}
+      PG_CISP_API_PASSWORD: ${PG_CISP_API_PASSWORD:?set in deploy/.env}
+      PG_CISP_DELIVER_PASSWORD: ${PG_CISP_DELIVER_PASSWORD:?set in deploy/.env}
+    command: ["postgres", "-c", "shared_buffers=128MB"]
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-cisp.sql:ro
+      - pgdata:/home/postgres/pgdata
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 512M}
+
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    networks: [cisp]
+    command: ["-c", "/etc/nats/nats.conf"]
+    volumes:
+      - ./nats/nats.conf:/etc/nats/nats.conf:ro
+      - natsdata:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 128M}
+
+  migrate:
+    <<: *go-image
+    restart: "no"
+    command: ["cispctl", "migrate"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 64M}
+
+  api:
+    <<: *go-image
+    command: ["api"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      nats: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "api", "-probe=/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 256M}
+
+  deliver:
+    <<: *go-image
+    command: ["deliver"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      nats: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "deliver", "-probe=/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 64M}
+
+  web:
+    # Enabled by WP-9 (`--profile web`); the image does not exist before.
+    profiles: [web]
+    image: ghcr.io/rootxkit/uspace-cisp-web:${CISP_IMAGE_TAG:?set CISP_IMAGE_TAG to a short SHA or tag}
+    restart: unless-stopped
+    networks: [cisp]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+    depends_on:
+      api: {condition: service_healthy}
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 256M}
+
+networks:
+  cisp:
+    name: uspace-cisp
+
+volumes:
+  pgdata:
+  natsdata:

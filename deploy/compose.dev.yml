@@ -1,0 +1,39 @@
+# Local dependencies for development and `make integration`: PostgreSQL
+# (+ PostGIS, TimescaleDB; databases cisp and cisp_ts) and NATS with
+# JetStream, published on 127.0.0.1 only. Run through `make dev-deps`,
+# which writes random passwords to local/dev.env (git-ignored) and
+# passes it as --env-file. DEV_PG_PORT and DEV_NATS_PORT in that file
+# move the published ports when 5432 or 4222 is taken.
+name: uspace-cisp-dev
+
+services:
+  postgres:
+    image: timescale/timescaledb-ha:pg16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run make dev-deps}
+      PG_CISP_API_PASSWORD: ${PG_CISP_API_PASSWORD:?run make dev-deps}
+      PG_CISP_DELIVER_PASSWORD: ${PG_CISP_DELIVER_PASSWORD:?run make dev-deps}
+    ports:
+      - "127.0.0.1:${DEV_PG_PORT:-5432}:5432"
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-cisp.sql:ro
+      - pgdata-dev:/home/postgres/pgdata
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  nats:
+    image: nats:2-alpine
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "127.0.0.1:${DEV_NATS_PORT:-4222}:4222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata-dev:

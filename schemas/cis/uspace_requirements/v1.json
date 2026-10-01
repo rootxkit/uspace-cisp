@@ -1,0 +1,99 @@
+{
+  "$defs": {
+    "AirspaceConstraints": {
+      "description": "Art. 3(4)(d) airspace constraints; max_height_agl_m is optional, others pass.",
+      "properties": {
+        "max_height_agl_m": {
+          "exclusiveMinimum": 0,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "ServicePerformance": {
+      "description": "Art. 3(4)(c) service performance; the three named members are required, others pass.",
+      "properties": {
+        "cis_latency_s": {
+          "exclusiveMinimum": 0,
+          "format": "double",
+          "type": "number"
+        },
+        "nid_update_hz": {
+          "exclusiveMinimum": 0,
+          "format": "double",
+          "type": "number"
+        },
+        "ti_update_hz": {
+          "exclusiveMinimum": 0,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "nid_update_hz",
+        "ti_update_hz",
+        "cis_latency_s"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.uspace.ge/cis/uspace_requirements/v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "cis/uspace_requirements/v1: the 2021/664 Art. 3(4) requirements\nof a U-space airspace (spec 02 F1, 03 section 1\nuspace_airspaces; docs/PLAN.md section 15 Q6). It travels in the\nextendedProperties of every USPACE feature under the member\nuspace_requirements (section 15 Q32); other extendedProperties\nmembers pass through. The block is closed at its top level:\nan unknown member is refused. adjacent names U-space airspaces\npublished in the same publication.\n",
+  "properties": {
+    "adjacent": {
+      "description": "Identifiers of the adjacent U-space airspaces in the same publication.",
+      "items": {
+        "maxLength": 7,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 1000,
+      "type": "array"
+    },
+    "airspace_constraints": {
+      "$ref": "#/$defs/AirspaceConstraints"
+    },
+    "operational_conditions": {
+      "description": "Art. 3(4)(b) operational conditions and constraints (free form).",
+      "type": "object"
+    },
+    "service_performance": {
+      "$ref": "#/$defs/ServicePerformance"
+    },
+    "services_required": {
+      "description": "The U-space services required; NID, GEO, FA and TI always (Art. 3(3)).",
+      "items": {
+        "enum": [
+          "NID",
+          "GEO",
+          "FA",
+          "TI",
+          "WX",
+          "CM"
+        ],
+        "type": "string"
+      },
+      "maxItems": 6,
+      "minItems": 4,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "uas_requirements": {
+      "description": "Art. 3(4)(a) UAS performance and equipment requirements (free form).",
+      "type": "object"
+    }
+  },
+  "required": [
+    "uas_requirements",
+    "service_performance",
+    "operational_conditions",
+    "airspace_constraints",
+    "services_required",
+    "adjacent"
+  ],
+  "title": "cis/uspace_requirements/v1: the Art. 3(4) requirements of a U-space airspace",
+  "type": "object"
+}

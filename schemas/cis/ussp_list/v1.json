@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "Ussp": {
+      "additionalProperties": false,
+      "description": "One certified USSP. ussp_id is unique in the list.",
+      "properties": {
+        "base_url": {
+          "description": "https, no userinfo, host at most 253 characters.",
+          "format": "uri",
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "certificate_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "certification_limitations": {
+          "items": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "contact": {
+          "$ref": "#/$defs/UsspContact"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "services": {
+          "description": "The Annex VI services the USSP is certified for.",
+          "items": {
+            "enum": [
+              "network_identification",
+              "geo_awareness",
+              "flight_authorisation",
+              "traffic_information",
+              "weather",
+              "conformance_monitoring"
+            ],
+            "type": "string"
+          },
+          "maxItems": 6,
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "operating",
+            "suspended",
+            "limited"
+          ],
+          "type": "string"
+        },
+        "terms_url": {
+          "description": "https, no userinfo.",
+          "format": "uri",
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "ussp_id": {
+          "description": "The authority's certificate code, also the USSP's USSP_SYSTEM_ID (Q5).",
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "valid_from": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "valid_until": {
+          "description": "Not before valid_from.",
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ussp_id",
+        "name",
+        "contact",
+        "certificate_id",
+        "base_url",
+        "services",
+        "certification_limitations",
+        "valid_from",
+        "valid_until",
+        "terms_url",
+        "status"
+      ],
+      "type": "object"
+    },
+    "UsspContact": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "maxLength": 254,
+          "minLength": 3,
+          "type": "string"
+        },
+        "phone": {
+          "maxLength": 50,
+          "minLength": 1,
+          "type": "string"
+        },
+        "url": {
+          "description": "https, no userinfo.",
+          "format": "uri",
+          "maxLength": 2048,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.uspace.ge/cis/ussp_list/v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "cis/ussp_list/v1: the national list of certified USSPs and their\nterms (spec 02 F1, Annex III; docs/PLAN.md section 15 Q5),\nproduced by the authority and published as the ussp_list\ndataset. A closed schema: an unknown member anywhere is refused.\nThe cis_* members are written by the CISP when it serves the\nlist and are refused in a publication.\n",
+  "properties": {
+    "cis_dataset": {
+      "const": "ussp_list",
+      "description": "Served only; refused in a publication.",
+      "type": "string"
+    },
+    "cis_updated_at": {
+      "description": "Served only; refused in a publication.",
+      "format": "date-time",
+      "type": "string"
+    },
+    "cis_version": {
+      "description": "Served only; refused in a publication.",
+      "format": "int64",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "issued": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "schema": {
+      "const": "cis/ussp_list/v1",
+      "type": "string"
+    },
+    "ussps": {
+      "items": {
+        "$ref": "#/$defs/Ussp"
+      },
+      "maxItems": 200,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "issued",
+    "ussps"
+  ],
+  "title": "cis/ussp_list/v1: the national list of certified USSPs",
+  "type": "object"
+}

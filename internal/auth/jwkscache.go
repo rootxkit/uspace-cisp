@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -31,8 +32,9 @@ const (
 // at most core's MaxJWKSBytes each.
 const maxCacheFileBytes = 8 * coreauth.DefaultMaxJWKSBytes
 
-// cacheFile is the on-disk form: the last good JWKS of every URL, with
-// the time it was fetched. JWKS hold public keys only.
+// cacheFile is the on-disk form: the last JWKS core accepted from every
+// configured URL, with the time it was fetched. JWKS hold public keys
+// only; the file is written 0600.
 type cacheFile struct {
 	Entries map[string]cacheEntry `json:"entries"`
 }
@@ -42,10 +44,16 @@ type cacheEntry struct {
 	JWKS      json.RawMessage `json:"jwks"`
 }
 
-// JWKSCache keeps the last good JWKS of every issuer on disk, so that a
-// process can start while an issuer is down (docs/WORKPACKAGES/WP-2.md).
-// Every successful fetch through Client is written; Lookup reads it back.
-// It is safe for concurrent use.
+// JWKSCache keeps on disk the last JWKS that uspace-core accepted from
+// every configured issuer URL, so that a process can start while an
+// issuer is down (docs/WORKPACKAGES/WP-2.md).
+//
+// The bytes of every 200 answer fetched through Client are only staged,
+// keyed by the URL the fetch was asked for (never a redirect hop). They
+// are written by Commit, which Reloading calls once core has built a
+// verifier from that URL (it fetched and accepted the set) or has
+// counted a successful refresh: a set core refused never reaches the
+// disk. It is safe for concurrent use.
 type JWKSCache struct {
 	path   string
 	client *http.Client
@@ -54,6 +62,7 @@ type JWKSCache struct {
 
 	mu      sync.Mutex
 	entries map[string]cacheEntry
+	staged  map[string]cacheEntry
 }
 
 // JWKSCacheOptions configure OpenJWKSCache.
@@ -69,9 +78,10 @@ type JWKSCacheOptions struct {
 }
 
 // OpenJWKSCache reads the cache file at path when it exists. A missing
-// file is an empty cache; a file that cannot be read or parsed is an
-// error naming it (a corrupt copy must not be trusted silently, nor
-// overwritten unseen).
+// file is an empty cache. A file that cannot be read or parsed, or that
+// another user could have written (group- or world-writable, or owned by
+// another user; not checked on Windows, whose ACLs have no such bits), is
+// an error naming it: a planted or corrupt key set must not be trusted.
 func OpenJWKSCache(path string, opts JWKSCacheOptions) (*JWKSCache, error) {
 	if path == "" {
 		return nil, errors.New("JWKS cache: no file configured")
@@ -85,17 +95,24 @@ func OpenJWKSCache(path string, opts JWKSCacheOptions) (*JWKSCache, error) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	c := &JWKSCache{path: path, now: opts.Now, comp: opts.Component, entries: map[string]cacheEntry{}}
+	c := &JWKSCache{path: path, now: opts.Now, comp: opts.Component, entries: map[string]cacheEntry{}, staged: map[string]cacheEntry{}}
 	c.client = &http.Client{
-		Transport:     &recordingTransport{base: opts.Transport, cache: c},
+		Transport:     &stagingTransport{base: opts.Transport, cache: c},
 		Timeout:       opts.Timeout,
 		CheckRedirect: refuseInsecureRedirect,
 	}
-	raw, err := readBounded(path, maxCacheFileBytes)
+	info, err := os.Stat(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		return c, nil
 	case err != nil:
+		return nil, fmt.Errorf("JWKS cache %s: %w", path, err)
+	}
+	if err := ownedSafely(info); err != nil {
+		return nil, fmt.Errorf("JWKS cache %s refused: %w", path, err)
+	}
+	raw, err := readBounded(path, maxCacheFileBytes)
+	if err != nil {
 		return nil, fmt.Errorf("JWKS cache %s: %w", path, err)
 	}
 	var f cacheFile
@@ -106,6 +123,22 @@ func OpenJWKSCache(path string, opts JWKSCacheOptions) (*JWKSCache, error) {
 		c.entries[u] = e
 	}
 	return c, nil
+}
+
+// cacheFileProblem judges the mode and owner of the cache file: it must
+// not be writable by group or others, and must belong to this process's
+// user. ownedSafely supplies owner and me where the OS has them.
+func cacheFileProblem(mode fs.FileMode, owner, me int) error {
+	if !mode.IsRegular() {
+		return errors.New("not a regular file")
+	}
+	if mode.Perm()&0o022 != 0 {
+		return fmt.Errorf("mode %v is group- or world-writable; it must be 0600", mode.Perm())
+	}
+	if owner != me {
+		return fmt.Errorf("owned by uid %d, not this process's uid %d", owner, me)
+	}
+	return nil
 }
 
 func readBounded(path string, maxBytes int64) ([]byte, error) {
@@ -128,7 +161,7 @@ func readBounded(path string, maxBytes int64) ([]byte, error) {
 func (c *JWKSCache) Path() string { return c.path }
 
 // Client is the HTTP client every JWKS fetch goes through (give it to
-// core's Config.HTTPClient): it records every good JWKS response, and,
+// core's Config.HTTPClient): it stages every 200 answer for Commit, and,
 // because a client given to core replaces core's redirect check, it
 // refuses a redirect to anything but https (or http on loopback).
 func (c *JWKSCache) Client() *http.Client { return c.client }
@@ -148,8 +181,8 @@ func (c *JWKSCache) Lookup(u string) (jwk.Set, time.Time, bool) {
 	return set, e.FetchedAt, true
 }
 
-// Fetch GETs url through Client (recording it when good) and reports
-// whether it answered with a usable JWKS.
+// Fetch GETs url through Client and reports whether it answered with a
+// JWKS. It stages the answer but never writes it: core has not judged it.
 func (c *JWKSCache) Fetch(ctx context.Context, u string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
@@ -171,8 +204,8 @@ func (c *JWKSCache) Fetch(ctx context.Context, u string) error {
 	return checkJWKS(body)
 }
 
-// checkJWKS reports whether body is a JWKS core would take: within its
-// size bound, with at least one key.
+// checkJWKS reports whether body is within core's size bound and parses
+// as a JWKS with at least one key.
 func checkJWKS(body []byte) error {
 	if int64(len(body)) > coreauth.DefaultMaxJWKSBytes {
 		return fmt.Errorf("JWKS larger than %d bytes", coreauth.DefaultMaxJWKSBytes)
@@ -192,12 +225,32 @@ func parseJWKS(body []byte) (jwk.Set, error) {
 	return set, nil
 }
 
-// record stores a good JWKS of u and rewrites the file. A write failure
-// is counted and leaves the previous file in place.
-func (c *JWKSCache) record(u string, body []byte) {
+// stage keeps the latest answer of the configured URL u until Commit.
+func (c *JWKSCache) stage(u string, body []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.entries[u] = cacheEntry{FetchedAt: c.now().UTC(), JWKS: append(json.RawMessage(nil), body...)}
+	c.staged[u] = cacheEntry{FetchedAt: c.now().UTC(), JWKS: append(json.RawMessage(nil), body...)}
+}
+
+// Commit writes the staged answers of urls, which the caller has just
+// seen core accept, and rewrites the file. A URL with nothing staged is
+// skipped. A write failure is counted and leaves the previous file.
+func (c *JWKSCache) Commit(urls ...string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	changed := false
+	for _, u := range urls {
+		e, ok := c.staged[u]
+		if !ok {
+			continue
+		}
+		delete(c.staged, u)
+		c.entries[u] = e
+		changed = true
+	}
+	if !changed {
+		return
+	}
 	if err := c.writeLocked(); err != nil {
 		c.count(CounterJWKSCacheWriteFailed, "JWKS cache file writes that failed (the previous copy stays).")
 		return
@@ -241,16 +294,17 @@ func (c *JWKSCache) writeLocked() error {
 	return os.Rename(name, c.path)
 }
 
-// recordingTransport passes every request through and records the body
-// of a good GET answer (200, at most core's MaxJWKSBytes, a JWKS with at
-// least one key) in the cache. The caller reads the same bytes.
-type recordingTransport struct {
+// stagingTransport passes every request through and stages the body of
+// a 200 GET answer (at most core's MaxJWKSBytes) under the URL of the
+// request the client was asked for, following a redirect back to it.
+// The caller reads the same bytes.
+type stagingTransport struct {
 	base  http.RoundTripper
 	cache *JWKSCache
 }
 
 // RoundTrip implements http.RoundTripper.
-func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *stagingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := t.base.RoundTrip(req)
 	if err != nil || req.Method != http.MethodGet || resp.StatusCode != http.StatusOK {
 		return resp, err
@@ -261,10 +315,19 @@ func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error
 		return nil, err
 	}
 	resp.Body = readCloser{Reader: io.MultiReader(bytes.NewReader(head), resp.Body), Closer: resp.Body}
-	if checkJWKS(head) == nil {
-		t.cache.record(req.URL.String(), head)
+	if int64(len(head)) <= coreauth.DefaultMaxJWKSBytes {
+		t.cache.stage(originalURL(req), head)
 	}
 	return resp, nil
+}
+
+// originalURL is the URL of the first request of a redirect chain: the
+// configured JWKS URL, not the hop that answered.
+func originalURL(req *http.Request) string {
+	for req.Response != nil && req.Response.Request != nil {
+		req = req.Response.Request
+	}
+	return req.URL.String()
 }
 
 type readCloser struct {

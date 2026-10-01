@@ -3,14 +3,17 @@ package auth_test
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -266,23 +269,37 @@ func TestJWKSCacheWriteFailureIsCounted(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := c.Fetch(context.Background(), r.srv.URL()); err != nil {
-		t.Fatalf("the fetch failed with the write: %v", err)
+		t.Fatalf("the fetch failed: %v", err)
 	}
+	c.Commit(r.srv.URL())
 	if r.comp.Counter(auth.CounterJWKSCacheWriteFailed, "").Value() != 1 {
 		t.Error("the failed write is not counted")
 	}
 }
 
-// Only a good JWKS is recorded: an error status, an empty set, a body
-// that is not JWKS and one past the size bound are passed through and
-// not kept.
-func TestJWKSCacheRecordsOnlyGoodSets(t *testing.T) {
-	bodies := map[string]string{
-		"/status":   "",
-		"/empty":    `{"keys":[]}`,
-		"/notjwks":  `{"hello":"world"}`,
-		"/oversize": `{"keys":[` + strings.Repeat(" ", 1<<20) + `]}`,
+// A fetch only stages: nothing reaches the disk until Commit, and a URL
+// with nothing staged (an error status, a closed port) writes nothing.
+func TestJWKSCacheFetchStagesCommitWrites(t *testing.T) {
+	r := newRig(t)
+	c := r.cache(t)
+	if err := c.Fetch(context.Background(), r.srv.URL()); err != nil {
+		t.Fatal(err)
 	}
+	if _, _, ok := c.Lookup(r.srv.URL()); ok {
+		t.Error("a fetched set is in the cache before Commit")
+	}
+	if _, err := os.Stat(r.path); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a file before Commit: %v", err)
+	}
+	c.Commit(r.srv.URL())
+	if set, _, ok := c.Lookup(r.srv.URL()); !ok || set.Len() != 1 {
+		t.Error("the committed set is not in the cache")
+	}
+	if _, _, ok := r.cache(t).Lookup(r.srv.URL()); !ok {
+		t.Error("the copy did not survive a reopen")
+	}
+
+	bodies := map[string]string{"/empty": `{"keys":[]}`, "/notjwks": `{"hello":"world"}`, "/oversize": `{"keys":[` + strings.Repeat(" ", 1<<20) + `]}`}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/status" {
 			http.Error(w, "no", http.StatusInternalServerError)
@@ -291,36 +308,141 @@ func TestJWKSCacheRecordsOnlyGoodSets(t *testing.T) {
 		_, _ = io.WriteString(w, bodies[req.URL.Path])
 	}))
 	defer srv.Close()
-	c, err := auth.OpenJWKSCache(filepath.Join(t.TempDir(), "c.json"), auth.JWKSCacheOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for p := range bodies {
+	for _, p := range []string{"/status", "/empty", "/notjwks", "/oversize"} {
 		if err := c.Fetch(context.Background(), srv.URL+p); err == nil {
 			t.Errorf("%s: Fetch reported a usable JWKS", p)
 		}
-		if _, _, ok := c.Lookup(srv.URL + p); ok {
-			t.Errorf("%s was recorded", p)
+	}
+	c.Commit(srv.URL+"/status", "http://127.0.0.1:1/jwks")
+	for _, u := range []string{srv.URL + "/status", "http://127.0.0.1:1/jwks"} {
+		if _, _, ok := c.Lookup(u); ok {
+			t.Errorf("%s written with nothing staged", u)
 		}
 	}
 	if err := c.Fetch(context.Background(), "http://[::1]:0/%zz"); err == nil {
 		t.Error("an unparseable URL fetched")
 	}
-	if err := c.Fetch(context.Background(), "http://127.0.0.1:1/jwks"); err == nil {
-		t.Error("a closed port fetched")
-	}
-	// The good twin is recorded and read back.
+}
+
+// Only a set core accepted is written: a JWKS core refuses (no keys)
+// fails the start and leaves no file; once the issuer serves a good set
+// the start succeeds and writes it.
+func TestJWKSCacheWritesOnlyWhatCoreAccepted(t *testing.T) {
 	r := newRig(t)
-	c2 := r.cache(t)
-	if err := c2.Fetch(context.Background(), r.srv.URL()); err != nil {
+	r.srv.SetKeys(t, authtest.PublicSet(t, nil))
+	if _, err := r.start(t, r.cache(t)); err == nil {
+		t.Fatal("core accepted an empty JWKS")
+	}
+	if _, err := os.Stat(r.path); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a set core refused reached the disk: %v", err)
+	}
+	r.srv.SetKeys(t, r.iss.JWKS())
+	if _, err := r.start(t, r.cache(t)); err != nil {
 		t.Fatal(err)
 	}
-	if set, _, ok := c2.Lookup(r.srv.URL()); !ok || set.Len() != 1 {
-		t.Error("the good set was not recorded")
+	if _, _, ok := r.cache(t).Lookup(r.srv.URL()); !ok {
+		t.Error("the accepted set was not written")
 	}
-	reopened := r.cache(t)
-	if _, _, ok := reopened.Lookup(r.srv.URL()); !ok {
-		t.Error("the copy did not survive a reopen")
+}
+
+// The copy is keyed by the configured URL, not the redirect hop that
+// answered.
+func TestJWKSCacheKeysByConfiguredURL(t *testing.T) {
+	r := newRig(t)
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req, r.srv.URL(), http.StatusFound)
+	}))
+	defer redirect.Close()
+	configured := redirect.URL + "/.well-known/jwks.json"
+	c := r.cache(t)
+	if err := c.Fetch(context.Background(), configured); err != nil {
+		t.Fatal(err)
+	}
+	c.Commit(configured, r.srv.URL())
+	if _, _, ok := c.Lookup(configured); !ok {
+		t.Error("not keyed by the configured URL")
+	}
+	if _, _, ok := c.Lookup(r.srv.URL()); ok {
+		t.Error("keyed by the redirect hop")
+	}
+}
+
+// A background refresh core accepted reaches the disk at the next Sync,
+// not before; a Sync with no new refresh writes nothing.
+func TestMachineVerifierSyncWritesAcceptedRefresh(t *testing.T) {
+	r := newRig(t)
+	mv, err := auth.NewMachineVerifier(context.Background(), auth.MachineConfig{
+		Issuers: []auth.Source{{ID: issuer, JWKSURL: r.srv.URL()}}, Audiences: []string{host},
+		Cache: r.cache(t), Component: r.comp, MinRefreshInterval: time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	written := func() uint64 { return r.comp.Counter(auth.CounterJWKSCacheWritten, "").Value() }
+	before := written()
+	mv.Sync()
+	if written() != before {
+		t.Error("a Sync without a refresh wrote")
+	}
+	next := newIssuer(t, issuer, "issuer-next", "tok-2")
+	both := authtest.PublicSet(t, map[string]*rsa.PrivateKey{"tok-1": authtest.Key(t, "issuer", 2048), "tok-2": authtest.Key(t, "issuer-next", 2048)})
+	r.srv.SetKeys(t, both)
+	time.Sleep(5 * time.Millisecond) // past the 1 ms rate limit
+	tok, err := next.Issue("ussp-GEO1-01", host, nil, time.Minute, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mv.Verify(context.Background(), tok); err != nil {
+		t.Fatalf("the rotated key: %v", err)
+	}
+	if raw, _ := os.ReadFile(r.path); strings.Contains(string(raw), "tok-2") {
+		t.Error("the refresh reached the disk before Sync")
+	}
+	mv.Sync()
+	if raw, _ := os.ReadFile(r.path); !strings.Contains(string(raw), "tok-2") || written() != before+1 {
+		t.Errorf("after Sync: written %d, file %s", written()-before, raw)
+	}
+}
+
+// A cache file another user could have written is refused: the mode and
+// owner rule everywhere, and the real file on systems that have modes.
+func TestJWKSCacheFileOwnership(t *testing.T) {
+	me := 1000
+	for _, c := range []struct {
+		name  string
+		mode  fs.FileMode
+		owner int
+		ok    bool
+	}{
+		{"0600, mine", 0o600, me, true},
+		{"0644, mine", 0o644, me, true},
+		{"group-writable", 0o620, me, false},
+		{"world-writable", 0o606, me, false},
+		{"another user's", 0o600, 0, false},
+		{"a directory", fs.ModeDir | 0o700, me, false},
+	} {
+		if err := auth.CacheFileProblem(c.mode, c.owner, me); (err == nil) != c.ok {
+			t.Errorf("%s: %v", c.name, err)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("the mode and owner of the real file are not checked on Windows (ACLs, no mode bits); the rule above is")
+	}
+	r := newRig(t)
+	if _, err := r.start(t, r.cache(t)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(r.path, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.OpenJWKSCache(r.path, auth.JWKSCacheOptions{}); err == nil || !strings.Contains(err.Error(), "writable") {
+		t.Errorf("a world-writable cache: %v", err)
+	}
+	if err := os.Chmod(r.path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.OpenJWKSCache(r.path, auth.JWKSCacheOptions{}); err != nil {
+		t.Errorf("the 0600 twin: %v", err)
 	}
 }
 

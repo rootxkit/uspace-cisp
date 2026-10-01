@@ -94,6 +94,7 @@ func publisherVerifier(ctx context.Context, cfg *config.API, cache *auth.JWKSCac
 		Sources:   []auth.Source{{ID: clientID, JWKSURL: url}},
 		Cache:     cache,
 		Component: comp,
+		Refreshes: func(v *jws.DetachedVerifier) uint64 { return v.Counters().Get(coreauth.CounterJWKSRefresh) },
 		Build: func(ctx context.Context, src map[string]coreauth.IssuerConfig) (*jws.DetachedVerifier, error) {
 			return jws.NewDetachedVerifier(ctx, jws.KeySource{Publisher: clientID, Keys: src[clientID]},
 				cfg.PublisherSignatureMaxSkew, jws.Options{MaxPayloadBytes: cfg.MaxPublicationBytes, HTTPClient: cache.Client()})
@@ -101,7 +102,8 @@ func publisherVerifier(ctx context.Context, cfg *config.API, cache *auth.JWKSCac
 	})
 }
 
-// retry asks every verifier running on a disk copy again, on every tick.
+// retry asks every verifier running on a disk copy again, and writes the
+// JWKS core accepted since the last tick to the disk copy, on every tick.
 func (s *security) retry(ctx context.Context, tick <-chan time.Time) {
 	for {
 		select {
@@ -109,8 +111,10 @@ func (s *security) retry(ctx context.Context, tick <-chan time.Time) {
 			return
 		case <-tick:
 			_ = s.machine.Retry(ctx) // the outcome is the jwks component's state
+			s.machine.Sync()
 			for _, r := range s.publishers {
 				_ = r.Retry(ctx)
+				r.Sync()
 			}
 		}
 	}

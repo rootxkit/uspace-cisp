@@ -19,8 +19,12 @@
 //
 // Core fetches every JWKS at start and refuses to start when one cannot
 // be fetched. The CISP adds a disk copy (JWKSCache, CISP_JWKS_CACHE_FILE,
-// default local/jwks-cache.json) written on every successful fetch,
-// start-up and refresh alike, through the HTTP client core is given. When
+// default local/jwks-cache.json) of the sets core accepted: the HTTP
+// client core is given stages every answer under the configured URL
+// (never a redirect hop), and the copy is written only after core built a
+// verifier from it or counted a successful refresh (Reloading.Sync, every
+// retry tick). A copy that is group- or world-writable or owned by
+// another user is refused at start (not checked on Windows). When
 // a JWKS is unreachable at start and a copy exists, the verifier starts
 // on the copy as a static key set and the status line says
 // "jwks: stale since T" at error level (Reloading); it retries the issuer

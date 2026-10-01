@@ -35,8 +35,12 @@ type ReloadConfig[T any] struct {
 	// unreachable at start stops the start.
 	Cache *JWKSCache
 	// Build makes the verifier from one IssuerConfig per source ID. It
-	// must fetch through Cache.Client() so every good fetch is recorded.
+	// must fetch through Cache.Client() so every answer is staged.
 	Build func(ctx context.Context, sources map[string]coreauth.IssuerConfig) (*T, error)
+	// Refreshes is core's count of JWKS fetches the verifier accepted
+	// (its jwks_refresh counter). Sync writes the staged sets to disk
+	// when it grows; nil: only builds write.
+	Refreshes func(*T) uint64
 	// Component shows "stale since T" while a source runs on its disk
 	// copy; nil shows it nowhere.
 	Component *obs.Component
@@ -49,8 +53,9 @@ type Reloading[T any] struct {
 	cfg ReloadConfig[T]
 	cur atomic.Pointer[T]
 
-	mu    sync.Mutex
-	stale map[string]time.Time // source ID -> fetched_at of the copy in use
+	mu        sync.Mutex
+	stale     map[string]time.Time // source ID -> fetched_at of the copy in use
+	refreshes uint64               // Refreshes at the last commit
 }
 
 // StartReloading builds the verifier. When the build fails and a cache
@@ -63,8 +68,7 @@ func StartReloading[T any](ctx context.Context, cfg ReloadConfig[T]) (*Reloading
 	r := &Reloading[T]{cfg: cfg, stale: map[string]time.Time{}}
 	v, err := cfg.Build(ctx, r.configs(nil))
 	if err == nil {
-		r.cur.Store(v)
-		r.report()
+		r.install(v, map[string]time.Time{})
 		return r, nil
 	}
 	if cfg.Cache == nil {
@@ -91,12 +95,58 @@ func StartReloading[T any](ctx context.Context, cfg ReloadConfig[T]) (*Reloading
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cfg.Name, err)
 	}
+	r.install(v, stale)
+	return r, nil
+}
+
+// install swaps v in with the given stale sources and writes to disk the
+// staged sets of the live URL sources: core has just fetched and accepted
+// them to build v.
+func (r *Reloading[T]) install(v *T, stale map[string]time.Time) {
 	r.cur.Store(v)
 	r.mu.Lock()
 	r.stale = stale
+	if r.cfg.Refreshes != nil {
+		r.refreshes = r.cfg.Refreshes(v)
+	}
 	r.mu.Unlock()
+	r.commitLive(stale)
 	r.report()
-	return r, nil
+}
+
+// commitLive commits the staged sets of the URL sources not in stale.
+func (r *Reloading[T]) commitLive(stale map[string]time.Time) {
+	if r.cfg.Cache == nil {
+		return
+	}
+	var urls []string
+	for _, s := range r.cfg.Sources {
+		if _, isStale := stale[s.ID]; s.JWKSURL != "" && !isStale {
+			urls = append(urls, s.JWKSURL)
+		}
+	}
+	r.cfg.Cache.Commit(urls...)
+}
+
+// Sync writes the staged sets of the live sources to disk when core has
+// accepted a refresh since the last write (its counter grew). Call it
+// periodically; core refreshes in the background.
+func (r *Reloading[T]) Sync() {
+	if r.cfg.Refreshes == nil {
+		return
+	}
+	n := r.cfg.Refreshes(r.cur.Load())
+	r.mu.Lock()
+	grew := n > r.refreshes
+	r.refreshes = n
+	stale := make(map[string]time.Time, len(r.stale))
+	for k, v := range r.stale {
+		stale[k] = v
+	}
+	r.mu.Unlock()
+	if grew {
+		r.commitLive(stale)
+	}
 }
 
 // configs is one IssuerConfig per source: the cached set for the IDs in
@@ -167,11 +217,7 @@ func (r *Reloading[T]) Retry(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("%s: rebuild: %w", r.cfg.Name, err)
 	}
-	r.cur.Store(v)
-	r.mu.Lock()
-	r.stale = stale
-	r.mu.Unlock()
-	r.report()
+	r.install(v, stale)
 	return nil
 }
 

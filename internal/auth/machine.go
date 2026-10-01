@@ -72,6 +72,7 @@ func NewMachineVerifier(ctx context.Context, mc MachineConfig) (*MachineVerifier
 		Sources:   mc.Issuers,
 		Cache:     mc.Cache,
 		Component: mc.Component,
+		Refreshes: func(v *coreauth.Verifier) uint64 { return v.Counters().Get(coreauth.CounterJWKSRefresh) },
 		Build: func(ctx context.Context, issuers map[string]coreauth.IssuerConfig) (*coreauth.Verifier, error) {
 			return coreauth.NewVerifier(ctx, coreauth.Config{
 				Issuers:             issuers,
@@ -103,3 +104,7 @@ func (m *MachineVerifier) Stale() map[string]time.Time { return m.r.Stale() }
 
 // Retry asks the stale issuers again (see Reloading.Retry).
 func (m *MachineVerifier) Retry(ctx context.Context) error { return m.r.Retry(ctx) }
+
+// Sync writes the JWKS core accepted since the last write to the disk
+// copy (see Reloading.Sync).
+func (m *MachineVerifier) Sync() { m.r.Sync() }

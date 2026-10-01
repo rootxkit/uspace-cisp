@@ -9,8 +9,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/oapi-codegen/runtime"
@@ -76,6 +78,81 @@ func (e JWKUse) Valid() bool {
 	}
 }
 
+// Defines values for PublicationAttemptOutcome.
+const (
+	Accepted PublicationAttemptOutcome = "accepted"
+	Refused  PublicationAttemptOutcome = "refused"
+)
+
+// Valid indicates whether the value is a known member of the PublicationAttemptOutcome enum.
+func (e PublicationAttemptOutcome) Valid() bool {
+	switch e {
+	case Accepted:
+		return true
+	case Refused:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PublicationResultDataset.
+const (
+	PublicationResultDatasetUspaceAirspace PublicationResultDataset = "uspace_airspace"
+	PublicationResultDatasetUsspList       PublicationResultDataset = "ussp_list"
+	PublicationResultDatasetZones          PublicationResultDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the PublicationResultDataset enum.
+func (e PublicationResultDataset) Valid() bool {
+	switch e {
+	case PublicationResultDatasetUspaceAirspace:
+		return true
+	case PublicationResultDatasetUsspList:
+		return true
+	case PublicationResultDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PublicationVersionReason.
+const (
+	Publication          PublicationVersionReason = "publication"
+	Republished          PublicationVersionReason = "republished"
+	RestrictionActivated PublicationVersionReason = "restriction_activated"
+	RestrictionCancelled PublicationVersionReason = "restriction_cancelled"
+	RestrictionCreated   PublicationVersionReason = "restriction_created"
+	RestrictionEnded     PublicationVersionReason = "restriction_ended"
+	RestrictionExpired   PublicationVersionReason = "restriction_expired"
+	RestrictionExtended  PublicationVersionReason = "restriction_extended"
+)
+
+// Valid indicates whether the value is a known member of the PublicationVersionReason enum.
+func (e PublicationVersionReason) Valid() bool {
+	switch e {
+	case Publication:
+		return true
+	case Republished:
+		return true
+	case RestrictionActivated:
+		return true
+	case RestrictionCancelled:
+		return true
+	case RestrictionCreated:
+		return true
+	case RestrictionEnded:
+		return true
+	case RestrictionExpired:
+		return true
+	case RestrictionExtended:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReadinessStatus.
 const (
 	NotReady ReadinessStatus = "not_ready"
@@ -113,6 +190,191 @@ func (e StatusDegradedComponent) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Defines values for UspaceRequirementsServicesRequired.
+const (
+	CM  UspaceRequirementsServicesRequired = "CM"
+	FA  UspaceRequirementsServicesRequired = "FA"
+	GEO UspaceRequirementsServicesRequired = "GEO"
+	NID UspaceRequirementsServicesRequired = "NID"
+	TI  UspaceRequirementsServicesRequired = "TI"
+	WX  UspaceRequirementsServicesRequired = "WX"
+)
+
+// Valid indicates whether the value is a known member of the UspaceRequirementsServicesRequired enum.
+func (e UspaceRequirementsServicesRequired) Valid() bool {
+	switch e {
+	case CM:
+		return true
+	case FA:
+		return true
+	case GEO:
+		return true
+	case NID:
+		return true
+	case TI:
+		return true
+	case WX:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsspServices.
+const (
+	ConformanceMonitoring UsspServices = "conformance_monitoring"
+	FlightAuthorisation   UsspServices = "flight_authorisation"
+	GeoAwareness          UsspServices = "geo_awareness"
+	NetworkIdentification UsspServices = "network_identification"
+	TrafficInformation    UsspServices = "traffic_information"
+	Weather               UsspServices = "weather"
+)
+
+// Valid indicates whether the value is a known member of the UsspServices enum.
+func (e UsspServices) Valid() bool {
+	switch e {
+	case ConformanceMonitoring:
+		return true
+	case FlightAuthorisation:
+		return true
+	case GeoAwareness:
+		return true
+	case NetworkIdentification:
+		return true
+	case TrafficInformation:
+		return true
+	case Weather:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsspStatus.
+const (
+	Limited   UsspStatus = "limited"
+	Operating UsspStatus = "operating"
+	Suspended UsspStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the UsspStatus enum.
+func (e UsspStatus) Valid() bool {
+	switch e {
+	case Limited:
+		return true
+	case Operating:
+		return true
+	case Suspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsspListCisDataset.
+const (
+	UsspListCisDatasetUsspList UsspListCisDataset = "ussp_list"
+)
+
+// Valid indicates whether the value is a known member of the UsspListCisDataset enum.
+func (e UsspListCisDataset) Valid() bool {
+	switch e {
+	case UsspListCisDatasetUsspList:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsspListSchema.
+const (
+	CisusspListv1 UsspListSchema = "cis/ussp_list/v1"
+)
+
+// Valid indicates whether the value is a known member of the UsspListSchema enum.
+func (e UsspListSchema) Valid() bool {
+	switch e {
+	case CisusspListv1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPublicationsParamsDataset.
+const (
+	ListPublicationsParamsDatasetRestrictions   ListPublicationsParamsDataset = "restrictions"
+	ListPublicationsParamsDatasetUspaceAirspace ListPublicationsParamsDataset = "uspace_airspace"
+	ListPublicationsParamsDatasetUsspList       ListPublicationsParamsDataset = "ussp_list"
+	ListPublicationsParamsDatasetZones          ListPublicationsParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the ListPublicationsParamsDataset enum.
+func (e ListPublicationsParamsDataset) Valid() bool {
+	switch e {
+	case ListPublicationsParamsDatasetRestrictions:
+		return true
+	case ListPublicationsParamsDatasetUspaceAirspace:
+		return true
+	case ListPublicationsParamsDatasetUsspList:
+		return true
+	case ListPublicationsParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutPublicationParamsDataset.
+const (
+	PutPublicationParamsDatasetUspaceAirspace PutPublicationParamsDataset = "uspace_airspace"
+	PutPublicationParamsDatasetUsspList       PutPublicationParamsDataset = "ussp_list"
+	PutPublicationParamsDatasetZones          PutPublicationParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the PutPublicationParamsDataset enum.
+func (e PutPublicationParamsDataset) Valid() bool {
+	switch e {
+	case PutPublicationParamsDatasetUspaceAirspace:
+		return true
+	case PutPublicationParamsDatasetUsspList:
+		return true
+	case PutPublicationParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPublicationAttemptsParamsDataset.
+const (
+	ListPublicationAttemptsParamsDatasetRestrictions   ListPublicationAttemptsParamsDataset = "restrictions"
+	ListPublicationAttemptsParamsDatasetUspaceAirspace ListPublicationAttemptsParamsDataset = "uspace_airspace"
+	ListPublicationAttemptsParamsDatasetUsspList       ListPublicationAttemptsParamsDataset = "ussp_list"
+	ListPublicationAttemptsParamsDatasetZones          ListPublicationAttemptsParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the ListPublicationAttemptsParamsDataset enum.
+func (e ListPublicationAttemptsParamsDataset) Valid() bool {
+	switch e {
+	case ListPublicationAttemptsParamsDatasetRestrictions:
+		return true
+	case ListPublicationAttemptsParamsDatasetUspaceAirspace:
+		return true
+	case ListPublicationAttemptsParamsDatasetUsspList:
+		return true
+	case ListPublicationAttemptsParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// AirspaceConstraints Art. 3(4)(d) airspace constraints; max_height_agl_m is optional, others pass.
+type AirspaceConstraints struct {
+	MaxHeightAglM *float64 `json:"max_height_agl_m,omitempty"`
 }
 
 // FieldProblem defines model for FieldProblem.
@@ -178,6 +440,116 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// PublicationAttempt defines model for PublicationAttempt.
+type PublicationAttempt struct {
+	BodySha256    *string                   `json:"body_sha256,omitempty"`
+	Bytes         int64                     `json:"bytes"`
+	Dataset       string                    `json:"dataset"`
+	Id            string                    `json:"id"`
+	Outcome       PublicationAttemptOutcome `json:"outcome"`
+	Problems      []FieldProblem            `json:"problems"`
+	PublicationId *string                   `json:"publication_id,omitempty"`
+	ReceivedAt    time.Time                 `json:"received_at"`
+
+	// Truncated How many problems beyond the 100 listed were found.
+	Truncated *int `json:"truncated,omitempty"`
+}
+
+// PublicationAttemptOutcome defines model for PublicationAttempt.Outcome.
+type PublicationAttemptOutcome string
+
+// PublicationAttemptList defines model for PublicationAttemptList.
+type PublicationAttemptList struct {
+	Attempts []PublicationAttempt `json:"attempts"`
+	Dataset  string               `json:"dataset"`
+}
+
+// PublicationBody The whole dataset as the publisher signed it: an ED-318
+// FeatureCollection (zones, uspace_airspace) or a UsspList
+// (ussp_list). The server validates it (uspace-core/ed318, the
+// dataset rules, the UsspList schema) and stores the bytes as
+// received.
+type PublicationBody = json.RawMessage
+
+// PublicationResult The outcome of an accepted PUT: the new version (201) or the
+// current one with unchanged true (200). added, changed and
+// removed list at most 1000 identifiers each; truncated counts the
+// rest.
+type PublicationResult struct {
+	Added        *[]string                `json:"added,omitempty"`
+	AddedCount   *int                     `json:"added_count,omitempty"`
+	Changed      *[]string                `json:"changed,omitempty"`
+	ChangedCount *int                     `json:"changed_count,omitempty"`
+	Dataset      PublicationResultDataset `json:"dataset"`
+
+	// Etag Examples: "zones:5"
+	Etag         string     `json:"etag"`
+	FeatureCount *int       `json:"feature_count,omitempty"`
+	ReceivedAt   *time.Time `json:"received_at,omitempty"`
+	Removed      *[]string  `json:"removed,omitempty"`
+	RemovedCount *int       `json:"removed_count,omitempty"`
+
+	// Truncated How many identifiers each list left out.
+	Truncated *struct {
+		Added   int `json:"added"`
+		Changed int `json:"changed"`
+		Removed int `json:"removed"`
+	} `json:"truncated,omitempty"`
+	Unchanged *bool      `json:"unchanged,omitempty"`
+	Version   int64      `json:"version"`
+	Warnings  *[]Warning `json:"warnings,omitempty"`
+}
+
+// PublicationResultDataset defines model for PublicationResult.Dataset.
+type PublicationResultDataset string
+
+// PublicationVersion defines model for PublicationVersion.
+type PublicationVersion struct {
+	Added int `json:"added"`
+
+	// BodySha256 SHA-256 of the verbatim body, lower-case hex.
+	BodySha256   string `json:"body_sha256"`
+	Bytes        int64  `json:"bytes"`
+	Changed      int    `json:"changed"`
+	ContentType  string `json:"content_type"`
+	Dataset      string `json:"dataset"`
+	Etag         string `json:"etag"`
+	FeatureCount int    `json:"feature_count"`
+
+	// Publisher The client id that published the version.
+	Publisher  string                   `json:"publisher"`
+	Reason     PublicationVersionReason `json:"reason"`
+	ReceivedAt time.Time                `json:"received_at"`
+	Removed    int                      `json:"removed"`
+
+	// SignatureKid The kid of the publisher's detached JWS; absent for versions the CISP made.
+	SignatureKid      *string   `json:"signature_kid,omitempty"`
+	SupersedesVersion *int64    `json:"supersedes_version,omitempty"`
+	Version           int64     `json:"version"`
+	Warnings          []Warning `json:"warnings"`
+}
+
+// PublicationVersionReason defines model for PublicationVersion.Reason.
+type PublicationVersionReason string
+
+// PublicationVersionList defines model for PublicationVersionList.
+type PublicationVersionList struct {
+	Dataset string `json:"dataset"`
+
+	// NextBefore Pass as before for the next page; absent on the last page.
+	NextBefore *int64               `json:"next_before,omitempty"`
+	Versions   []PublicationVersion `json:"versions"`
+}
+
+// PublisherHeartbeat defines model for PublisherHeartbeat.
+type PublisherHeartbeat struct {
+	// ActiveRefs The ANSP's active ansp_refs, stored verbatim; the authority sends none.
+	ActiveRefs *[]string `json:"active_refs,omitempty"`
+
+	// SentAt The publisher's clock when it sent the heartbeat.
+	SentAt time.Time `json:"sent_at"`
+}
+
 // Readiness defines model for Readiness.
 type Readiness struct {
 	Checks struct {
@@ -195,6 +567,13 @@ type Readiness struct {
 
 // ReadinessStatus defines model for Readiness.Status.
 type ReadinessStatus string
+
+// ServicePerformance Art. 3(4)(c) service performance; the three named members are required, others pass.
+type ServicePerformance struct {
+	CisLatencyS float64 `json:"cis_latency_s"`
+	NidUpdateHz float64 `json:"nid_update_hz"`
+	TiUpdateHz  float64 `json:"ti_update_hz"`
+}
 
 // Status Stub of the status document (docs/PLAN.md section 6.3).
 type Status struct {
@@ -218,10 +597,163 @@ type Status struct {
 // StatusDegradedComponent defines model for Status.Degraded.Component.
 type StatusDegradedComponent string
 
+// UspaceRequirements cis/uspace_requirements/v1: the 2021/664 Art. 3(4) requirements
+// of a U-space airspace (spec 02 F1, 03 section 1
+// uspace_airspaces; docs/PLAN.md section 15 Q6). It travels in the
+// extendedProperties of every USPACE feature under the member
+// uspace_requirements (section 15 Q32); other extendedProperties
+// members pass through. The block is closed at its top level:
+// an unknown member is refused. adjacent names U-space airspaces
+// published in the same publication.
+type UspaceRequirements struct {
+	// Adjacent Identifiers of the adjacent U-space airspaces in the same publication.
+	Adjacent []string `json:"adjacent"`
+
+	// AirspaceConstraints Art. 3(4)(d) airspace constraints; max_height_agl_m is optional, others pass.
+	AirspaceConstraints AirspaceConstraints `json:"airspace_constraints"`
+
+	// OperationalConditions Art. 3(4)(b) operational conditions and constraints (free form).
+	OperationalConditions map[string]interface{} `json:"operational_conditions"`
+
+	// ServicePerformance Art. 3(4)(c) service performance; the three named members are required, others pass.
+	ServicePerformance ServicePerformance `json:"service_performance"`
+
+	// ServicesRequired The U-space services required; NID, GEO, FA and TI always (Art. 3(3)).
+	ServicesRequired []UspaceRequirementsServicesRequired `json:"services_required"`
+
+	// UasRequirements Art. 3(4)(a) UAS performance and equipment requirements (free form).
+	UasRequirements map[string]interface{} `json:"uas_requirements"`
+}
+
+// UspaceRequirementsServicesRequired defines model for UspaceRequirements.ServicesRequired.
+type UspaceRequirementsServicesRequired string
+
+// Ussp One certified USSP. ussp_id is unique in the list.
+type Ussp struct {
+	// BaseUrl https, no userinfo, host at most 253 characters.
+	BaseUrl                  string      `json:"base_url"`
+	CertificateId            string      `json:"certificate_id"`
+	CertificationLimitations []string    `json:"certification_limitations"`
+	Contact                  UsspContact `json:"contact"`
+	Name                     string      `json:"name"`
+
+	// Services The Annex VI services the USSP is certified for.
+	Services []UsspServices `json:"services"`
+	Status   UsspStatus     `json:"status"`
+
+	// TermsUrl https, no userinfo.
+	TermsUrl string `json:"terms_url"`
+
+	// UsspId The authority's certificate code, also the USSP's USSP_SYSTEM_ID (Q5).
+	UsspId    string    `json:"ussp_id"`
+	ValidFrom time.Time `json:"valid_from"`
+
+	// ValidUntil Not before valid_from.
+	ValidUntil time.Time `json:"valid_until"`
+}
+
+// UsspServices defines model for Ussp.Services.
+type UsspServices string
+
+// UsspStatus defines model for Ussp.Status.
+type UsspStatus string
+
+// UsspContact defines model for UsspContact.
+type UsspContact struct {
+	Email *string `json:"email,omitempty"`
+	Phone *string `json:"phone,omitempty"`
+
+	// Url https, no userinfo.
+	Url *string `json:"url,omitempty"`
+}
+
+// UsspList cis/ussp_list/v1: the national list of certified USSPs and their
+// terms (spec 02 F1, Annex III; docs/PLAN.md section 15 Q5),
+// produced by the authority and published as the ussp_list
+// dataset. A closed schema: an unknown member anywhere is refused.
+// The cis_* members are written by the CISP when it serves the
+// list and are refused in a publication.
+type UsspList struct {
+	// CisDataset Served only; refused in a publication.
+	CisDataset *UsspListCisDataset `json:"cis_dataset,omitempty"`
+
+	// CisUpdatedAt Served only; refused in a publication.
+	CisUpdatedAt *time.Time `json:"cis_updated_at,omitempty"`
+
+	// CisVersion Served only; refused in a publication.
+	CisVersion *int64         `json:"cis_version,omitempty"`
+	Issued     time.Time      `json:"issued"`
+	Schema     UsspListSchema `json:"schema"`
+	Ussps      []Ussp         `json:"ussps"`
+}
+
+// UsspListCisDataset Served only; refused in a publication.
+type UsspListCisDataset string
+
+// UsspListSchema defines model for UsspList.Schema.
+type UsspListSchema string
+
+// Warning Something a consumer can still judge safely, such as a daylight
+// schedule without end dates that only ed318.Applies evaluates.
+// Anything about geometry or limits is a refusal, never a warning.
+type Warning struct {
+	// Field The JSON path of the feature or member.
+	Field  string `json:"field"`
+	Reason string `json:"reason"`
+}
+
+// PreconditionFailed The ecosystem-wide error body (RFC 9457), the same shape as
+// uspace-lab schemas/common/problem/v1.
+type PreconditionFailed = Problem
+
 // GetJWKSParams defines parameters for GetJWKS.
 type GetJWKSParams struct {
 	IfNoneMatch *string `json:"If-None-Match,omitempty"`
 }
+
+// ListPublicationsParams defines parameters for ListPublications.
+type ListPublicationsParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Before Only versions below this one.
+	Before *int64 `form:"before,omitempty" json:"before,omitempty"`
+}
+
+// ListPublicationsParamsDataset defines parameters for ListPublications.
+type ListPublicationsParamsDataset string
+
+// PutPublicationParams defines parameters for PutPublication.
+type PutPublicationParams struct {
+	// IfMatch The current ETag; required by the server (428 when absent).
+	IfMatch *string `json:"If-Match,omitempty"`
+
+	// XJWSSignature RFC 7515 Appendix F detached JWS with RFC 7797 b64 false over
+	// the exact body bytes (alg RS256, kid, iat, crit ["b64"]);
+	// required by the server (403 signature when absent).
+	XJWSSignature *string `json:"X-JWS-Signature,omitempty"`
+}
+
+// PutPublicationParamsDataset defines parameters for PutPublication.
+type PutPublicationParamsDataset string
+
+// ListPublicationAttemptsParams defines parameters for ListPublicationAttempts.
+type ListPublicationAttemptsParams struct {
+	// Since Only attempts received after this instant.
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
+	Limit *int       `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListPublicationAttemptsParamsDataset defines parameters for ListPublicationAttempts.
+type ListPublicationAttemptsParamsDataset string
+
+// PutPublicationApplicationGeoPlusJSONRequestBody defines body for PutPublication for application/geo+json ContentType.
+type PutPublicationApplicationGeoPlusJSONRequestBody = PublicationBody
+
+// PutPublicationJSONRequestBody defines body for PutPublication for application/json ContentType.
+type PutPublicationJSONRequestBody = PublicationBody
+
+// PostPublisherHeartbeatJSONRequestBody defines body for PostPublisherHeartbeat for application/json ContentType.
+type PostPublisherHeartbeatJSONRequestBody = PublisherHeartbeat
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -234,6 +766,18 @@ type ServerInterface interface {
 	// GetReadyz Readiness
 	// (GET /readyz)
 	GetReadyz(w http.ResponseWriter, r *http.Request)
+	// ListPublications The version history of a dataset
+	// (GET /v1/publications/{dataset})
+	ListPublications(w http.ResponseWriter, r *http.Request, dataset ListPublicationsParamsDataset, params ListPublicationsParams)
+	// PutPublication Publish a whole dataset (F1)
+	// (PUT /v1/publications/{dataset})
+	PutPublication(w http.ResponseWriter, r *http.Request, dataset PutPublicationParamsDataset, params PutPublicationParams)
+	// ListPublicationAttempts The caller's refused publications (Annex III A(5))
+	// (GET /v1/publications/{dataset}/attempts)
+	ListPublicationAttempts(w http.ResponseWriter, r *http.Request, dataset ListPublicationAttemptsParamsDataset, params ListPublicationAttemptsParams)
+	// PostPublisherHeartbeat Publisher heartbeat (every 15 s)
+	// (POST /v1/publishers/heartbeat)
+	PostPublisherHeartbeat(w http.ResponseWriter, r *http.Request)
 	// GetStatus Service status (stub)
 	// (GET /v1/status)
 	GetStatus(w http.ResponseWriter, r *http.Request)
@@ -308,6 +852,199 @@ func (siw *ServerInterfaceWrapper) GetReadyz(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReadyz(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPublications operation middleware
+func (siw *ServerInterfaceWrapper) ListPublications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset ListPublicationsParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPublicationsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublications(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutPublication operation middleware
+func (siw *ServerInterfaceWrapper) PutPublication(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset PutPublicationParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutPublicationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	// ------------- Optional header parameter "X-JWS-Signature" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-JWS-Signature")]; found {
+		var XJWSSignature string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-JWS-Signature", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-JWS-Signature", valueList[0], &XJWSSignature, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-JWS-Signature", Err: err})
+			return
+		}
+
+		params.XJWSSignature = &XJWSSignature
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutPublication(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPublicationAttempts operation middleware
+func (siw *ServerInterfaceWrapper) ListPublicationAttempts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset ListPublicationAttemptsParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPublicationAttemptsParams
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublicationAttempts(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostPublisherHeartbeat operation middleware
+func (siw *ServerInterfaceWrapper) PostPublisherHeartbeat(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostPublisherHeartbeat(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -454,9 +1191,22 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/healthz", wrapper.GetHealthz)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/readyz", wrapper.GetReadyz)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/status", wrapper.GetStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/publications/{dataset}", wrapper.ListPublications)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/publications/{dataset}", wrapper.PutPublication)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/publications/{dataset}/attempts", wrapper.ListPublicationAttempts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/publishers/heartbeat", wrapper.PostPublisherHeartbeat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/.well-known/jwks.json", wrapper.GetJWKS)
 
 	return m
+}
+
+type PreconditionFailedResponseHeaders struct {
+	ETag *string
+}
+type PreconditionFailedApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers PreconditionFailedResponseHeaders
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
@@ -640,6 +1390,530 @@ func (response GetReadyzdefaultApplicationProblemPlusJSONResponse) VisitGetReady
 	return err
 }
 
+type ListPublicationsRequestObject struct {
+	Dataset ListPublicationsParamsDataset `json:"dataset"`
+	Params  ListPublicationsParams
+}
+
+type ListPublicationsResponseObject interface {
+	VisitListPublicationsResponse(w http.ResponseWriter) error
+}
+
+type ListPublications200JSONResponse PublicationVersionList
+
+func (response ListPublications200JSONResponse) VisitListPublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublications400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListPublications400ApplicationProblemPlusJSONResponse) VisitListPublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublications401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublications401ApplicationProblemPlusJSONResponse) VisitListPublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublications403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublications403ApplicationProblemPlusJSONResponse) VisitListPublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublications404ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublications404ApplicationProblemPlusJSONResponse) VisitListPublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublications503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublications503ApplicationProblemPlusJSONResponse) VisitListPublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListPublicationsdefaultApplicationProblemPlusJSONResponse) VisitListPublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublicationRequestObject struct {
+	Dataset                    PutPublicationParamsDataset `json:"dataset"`
+	Params                     PutPublicationParams
+	ApplicationGeoPlusJSONBody *PutPublicationApplicationGeoPlusJSONRequestBody
+	JSONBody                   *PutPublicationJSONRequestBody
+}
+
+type PutPublicationResponseObject interface {
+	VisitPutPublicationResponse(w http.ResponseWriter) error
+}
+
+type PutPublication200ResponseHeaders struct {
+	ETag *string
+}
+
+type PutPublication200JSONResponse struct {
+	Body    PublicationResult
+	Headers PutPublication200ResponseHeaders
+}
+
+func (response PutPublication200JSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication201ResponseHeaders struct {
+	ETag *string
+}
+
+type PutPublication201JSONResponse struct {
+	Body    PublicationResult
+	Headers PutPublication201ResponseHeaders
+}
+
+func (response PutPublication201JSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response PutPublication400ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication401ApplicationProblemPlusJSONResponse Problem
+
+func (response PutPublication401ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication403ApplicationProblemPlusJSONResponse Problem
+
+func (response PutPublication403ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication404ApplicationProblemPlusJSONResponse Problem
+
+func (response PutPublication404ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response PutPublication412ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication413ApplicationProblemPlusJSONResponse Problem
+
+func (response PutPublication413ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication415ApplicationProblemPlusJSONResponse Problem
+
+func (response PutPublication415ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication428ApplicationProblemPlusJSONResponse Problem
+
+func (response PutPublication428ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublication503ApplicationProblemPlusJSONResponse Problem
+
+func (response PutPublication503ApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPublicationdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PutPublicationdefaultApplicationProblemPlusJSONResponse) VisitPutPublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationAttemptsRequestObject struct {
+	Dataset ListPublicationAttemptsParamsDataset `json:"dataset"`
+	Params  ListPublicationAttemptsParams
+}
+
+type ListPublicationAttemptsResponseObject interface {
+	VisitListPublicationAttemptsResponse(w http.ResponseWriter) error
+}
+
+type ListPublicationAttempts200JSONResponse PublicationAttemptList
+
+func (response ListPublicationAttempts200JSONResponse) VisitListPublicationAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationAttempts400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListPublicationAttempts400ApplicationProblemPlusJSONResponse) VisitListPublicationAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationAttempts401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublicationAttempts401ApplicationProblemPlusJSONResponse) VisitListPublicationAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationAttempts403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublicationAttempts403ApplicationProblemPlusJSONResponse) VisitListPublicationAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationAttempts404ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublicationAttempts404ApplicationProblemPlusJSONResponse) VisitListPublicationAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationAttempts503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListPublicationAttempts503ApplicationProblemPlusJSONResponse) VisitListPublicationAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicationAttemptsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListPublicationAttemptsdefaultApplicationProblemPlusJSONResponse) VisitListPublicationAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostPublisherHeartbeatRequestObject struct {
+	Body *PostPublisherHeartbeatJSONRequestBody
+}
+
+type PostPublisherHeartbeatResponseObject interface {
+	VisitPostPublisherHeartbeatResponse(w http.ResponseWriter) error
+}
+
+type PostPublisherHeartbeat204Response struct {
+}
+
+func (response PostPublisherHeartbeat204Response) VisitPostPublisherHeartbeatResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type PostPublisherHeartbeat400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response PostPublisherHeartbeat400ApplicationProblemPlusJSONResponse) VisitPostPublisherHeartbeatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostPublisherHeartbeat401ApplicationProblemPlusJSONResponse Problem
+
+func (response PostPublisherHeartbeat401ApplicationProblemPlusJSONResponse) VisitPostPublisherHeartbeatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostPublisherHeartbeat403ApplicationProblemPlusJSONResponse Problem
+
+func (response PostPublisherHeartbeat403ApplicationProblemPlusJSONResponse) VisitPostPublisherHeartbeatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostPublisherHeartbeat503ApplicationProblemPlusJSONResponse Problem
+
+func (response PostPublisherHeartbeat503ApplicationProblemPlusJSONResponse) VisitPostPublisherHeartbeatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostPublisherHeartbeatdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PostPublisherHeartbeatdefaultApplicationProblemPlusJSONResponse) VisitPostPublisherHeartbeatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetStatusRequestObject struct {
 }
 
@@ -705,6 +1979,18 @@ type StrictServerInterface interface {
 	// GetReadyz Readiness
 	// (GET /readyz)
 	GetReadyz(ctx context.Context, request GetReadyzRequestObject) (GetReadyzResponseObject, error)
+	// ListPublications The version history of a dataset
+	// (GET /v1/publications/{dataset})
+	ListPublications(ctx context.Context, request ListPublicationsRequestObject) (ListPublicationsResponseObject, error)
+	// PutPublication Publish a whole dataset (F1)
+	// (PUT /v1/publications/{dataset})
+	PutPublication(ctx context.Context, request PutPublicationRequestObject) (PutPublicationResponseObject, error)
+	// ListPublicationAttempts The caller's refused publications (Annex III A(5))
+	// (GET /v1/publications/{dataset}/attempts)
+	ListPublicationAttempts(ctx context.Context, request ListPublicationAttemptsRequestObject) (ListPublicationAttemptsResponseObject, error)
+	// PostPublisherHeartbeat Publisher heartbeat (every 15 s)
+	// (POST /v1/publishers/heartbeat)
+	PostPublisherHeartbeat(ctx context.Context, request PostPublisherHeartbeatRequestObject) (PostPublisherHeartbeatResponseObject, error)
 	// GetStatus Service status (stub)
 	// (GET /v1/status)
 	GetStatus(ctx context.Context, request GetStatusRequestObject) (GetStatusResponseObject, error)
@@ -816,6 +2102,138 @@ func (sh *strictHandler) GetReadyz(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetReadyzResponseObject); ok {
 		if err := validResponse.VisitGetReadyzResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPublications operation middleware
+func (sh *strictHandler) ListPublications(w http.ResponseWriter, r *http.Request, dataset ListPublicationsParamsDataset, params ListPublicationsParams) {
+	var request ListPublicationsRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPublications(ctx, request.(ListPublicationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPublications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPublicationsResponseObject); ok {
+		if err := validResponse.VisitListPublicationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutPublication operation middleware
+func (sh *strictHandler) PutPublication(w http.ResponseWriter, r *http.Request, dataset PutPublicationParamsDataset, params PutPublicationParams) {
+	var request PutPublicationRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/geo+json") {
+
+		var body PutPublicationApplicationGeoPlusJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.ApplicationGeoPlusJSONBody = &body
+
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body PutPublicationJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutPublication(ctx, request.(PutPublicationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutPublication")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutPublicationResponseObject); ok {
+		if err := validResponse.VisitPutPublicationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPublicationAttempts operation middleware
+func (sh *strictHandler) ListPublicationAttempts(w http.ResponseWriter, r *http.Request, dataset ListPublicationAttemptsParamsDataset, params ListPublicationAttemptsParams) {
+	var request ListPublicationAttemptsRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPublicationAttempts(ctx, request.(ListPublicationAttemptsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPublicationAttempts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPublicationAttemptsResponseObject); ok {
+		if err := validResponse.VisitListPublicationAttemptsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostPublisherHeartbeat operation middleware
+func (sh *strictHandler) PostPublisherHeartbeat(w http.ResponseWriter, r *http.Request) {
+	var request PostPublisherHeartbeatRequestObject
+
+	var body PostPublisherHeartbeatJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostPublisherHeartbeat(ctx, request.(PostPublisherHeartbeatRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostPublisherHeartbeat")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostPublisherHeartbeatResponseObject); ok {
+		if err := validResponse.VisitPostPublisherHeartbeatResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

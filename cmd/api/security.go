@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"time"
 
@@ -124,9 +125,36 @@ func (s *security) retry(ctx context.Context, tick <-chan time.Time) {
 // httpapi.PublicRoutes. The router is fail-closed: an operation added to
 // api/openapi.yaml without an entry here stops the start. GET /v1/status
 // takes an ecosystem token with cis.read (console sessions arrive with
-// WP-8).
-func (s *security) routes() map[string]func(http.Handler) http.Handler {
-	return map[string]func(http.Handler) http.Handler{
+// WP-8); the publications tag is httpapi.PublicationAuth's (WP-3: the
+// publish scope, the authority binding, the media type and the
+// authority's detached signature on PUT; the ANSP's client certificate
+// on its heartbeat).
+func (s *security) routes(cfg *config.API, status *obs.Status) map[string]func(http.Handler) http.Handler {
+	out := map[string]func(http.Handler) http.Handler{
 		"GET /v1/status": s.guard.RequireScopes(auth.ScopeRead),
+	}
+	pub := httpapi.PublicationAuth{
+		Guard: s.guard,
+		AuthoritySignature: jws.SignatureGuard{
+			Verifier:     s.verifier(auth.PublisherAuthority),
+			Problems:     httpapi.WriteProblem,
+			MaxBodyBytes: cfg.MaxPublicationBytes,
+			Component:    status.Component("signature"),
+		},
+		Component: status.Component("publishers"),
+	}
+	maps.Copy(out, pub.Routes())
+	return out
+}
+
+// verifier is the publisher's detached verifier in use, nil when its
+// JWKS is not configured (the signature guard then answers 503).
+func (s *security) verifier(p auth.Publisher) func() *jws.DetachedVerifier {
+	return func() *jws.DetachedVerifier {
+		r := s.publishers[p]
+		if r == nil {
+			return nil
+		}
+		return r.Current()
 	}
 }

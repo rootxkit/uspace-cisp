@@ -104,9 +104,9 @@ func TestRouteMiddlewareGuardsStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := newFixture(t, &Server{}, Options{RouteMiddleware: map[string]func(http.Handler) http.Handler{
-		"GET /v1/status": g.RequireScopes(auth.ScopeRead),
-	}})
+	routes := openRoutes()
+	routes["GET /v1/status"] = g.RequireScopes(auth.ScopeRead)
+	f := newFixture(t, &Server{}, Options{RouteMiddleware: routes})
 	tok := func(scopes ...string) string {
 		s, err := iss.Issue("ussp-GEO1-01", "uspace-cisp.example.test", scopes, time.Minute, now)
 		if err != nil {

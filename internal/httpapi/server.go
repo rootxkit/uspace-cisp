@@ -36,6 +36,9 @@ type Server struct {
 	// Keys is the CISP's signing key ring; nil: GET /.well-known/jwks.json
 	// answers 503.
 	Keys *jws.KeyRing
+	// Publications serves the publications tag (WP-3); nil (no database
+	// configured) answers its operations with 503.
+	Publications *Publications
 }
 
 var _ gen.StrictServerInterface = (*Server)(nil)
@@ -88,4 +91,43 @@ func (s *Server) GetStatus(context.Context, gen.GetStatusRequestObject) (gen.Get
 func notImplemented(op string) gen.ProblemApplicationProblemPlusJSONResponse {
 	return gen.ProblemApplicationProblemPlusJSONResponse(NewProblem(http.StatusNotImplemented, SlugNotImplemented,
 		"Not implemented", op+" is in api/openapi.yaml but not implemented yet", ""))
+}
+
+// intakeUnavailable answers a publications operation when the api runs
+// without a database.
+func intakeUnavailable(ctx context.Context) problemResponse {
+	return problemOf(ctx, http.StatusServiceUnavailable, SlugIntakeUnavailable, "Publication intake unavailable",
+		"the api runs without a database (CISP_DATABASE_URL); nothing can be stored or read")
+}
+
+// PutPublication publishes a whole dataset (WP-3).
+func (s *Server) PutPublication(ctx context.Context, req gen.PutPublicationRequestObject) (gen.PutPublicationResponseObject, error) {
+	if s.Publications == nil {
+		return intakeUnavailable(ctx), nil
+	}
+	return s.Publications.put(ctx, req)
+}
+
+// ListPublications is the version history of a dataset (WP-3).
+func (s *Server) ListPublications(ctx context.Context, req gen.ListPublicationsRequestObject) (gen.ListPublicationsResponseObject, error) {
+	if s.Publications == nil {
+		return intakeUnavailable(ctx), nil
+	}
+	return s.Publications.list(ctx, req)
+}
+
+// ListPublicationAttempts is the caller's refused attempts (WP-3).
+func (s *Server) ListPublicationAttempts(ctx context.Context, req gen.ListPublicationAttemptsRequestObject) (gen.ListPublicationAttemptsResponseObject, error) {
+	if s.Publications == nil {
+		return intakeUnavailable(ctx), nil
+	}
+	return s.Publications.attempts(ctx, req)
+}
+
+// PostPublisherHeartbeat records a publisher heartbeat (WP-3).
+func (s *Server) PostPublisherHeartbeat(ctx context.Context, req gen.PostPublisherHeartbeatRequestObject) (gen.PostPublisherHeartbeatResponseObject, error) {
+	if s.Publications == nil {
+		return intakeUnavailable(ctx), nil
+	}
+	return s.Publications.heartbeat(ctx, req)
 }

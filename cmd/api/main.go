@@ -23,6 +23,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/rootxkit/uspace-cisp/internal/auth"
+	"github.com/rootxkit/uspace-cisp/internal/bus"
 	"github.com/rootxkit/uspace-cisp/internal/config"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
@@ -142,25 +143,32 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 
 	natsComp := status.Component("nats")
 	var nc *nats.Conn
+	var changes *bus.Bus
 	if cfg.NATSURL == "" {
 		natsComp.SetDegraded(httpapi.CheckNotConfigured)
 	} else {
-		nc, err = connectNATS(cfg, logger, natsComp)
+		changes, err = connectBus(ctx, cfg, logger, natsComp)
 		if err != nil {
 			logger.ErrorContext(ctx, "nats refused", "error", err.Error())
 			return 1
 		}
+		nc = changes.Conn()
 		ready.NATS = natsCheck(nc)
 	}
 
-	router, err := httpapi.NewRouter(&httpapi.Server{Ready: ready, Keys: sec.keys}, httpapi.Options{
+	server := &httpapi.Server{Ready: ready, Keys: sec.keys}
+	if pool != nil {
+		server.Publications = publications(cfg, pool, changes, sec, status, logger)
+	}
+	router, err := httpapi.NewRouter(server, httpapi.Options{
 		Logger:          logger,
 		Status:          status,
 		Registerer:      reg,
 		Tracer:          tp,
 		HandlerTimeout:  cfg.HandlerTimeout,
 		MaxBodyBytes:    cfg.MaxBodyBytes,
-		RouteMiddleware: sec.routes(),
+		RouteBodyCaps:   map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes},
+		RouteMiddleware: sec.routes(cfg, status),
 	})
 	if err != nil {
 		logger.ErrorContext(ctx, "routes refused", "error", err.Error())
@@ -172,8 +180,8 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 
 	code := httpapi.Serve(ctx, httpapi.ServeOptions{Addr: cfg.HTTPAddr, ShutdownTimeout: cfg.ShutdownTimeout, StatusInterval: cfg.StatusInterval}, top, status, logger)
 
-	if nc != nil {
-		nc.Close()
+	if changes != nil {
+		changes.Close()
 	}
 	flushCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
@@ -232,38 +240,52 @@ func databaseCheck(pool *pgxpool.Pool) httpapi.Check {
 	}
 }
 
-// connectNATS connects without ever giving up (LESSONS B-08): the first
-// connect does not block when the broker is down, reconnects are
-// unlimited, and the component's degraded state follows the connection.
-func connectNATS(cfg *config.API, logger *slog.Logger, comp *obs.Component) (*nats.Conn, error) {
+// connectBus connects to JetStream through internal/bus without ever
+// giving up (LESSONS B-08): the first connect does not block when the
+// broker is down, reconnects are unlimited, and the component's degraded
+// state follows the connection. Committed changes are published on it
+// (D6); while it is down they wait for deliver's scan.
+func connectBus(ctx context.Context, cfg *config.API, logger *slog.Logger, comp *obs.Component) (*bus.Bus, error) {
 	comp.SetDegraded("connecting")
-	opts := []nats.Option{
-		nats.Name("uspace-cisp-" + process),
-		nats.MaxReconnects(-1),
-		nats.RetryOnFailedConnect(true),
-		nats.ReconnectWait(2 * time.Second),
-		nats.ConnectHandler(func(*nats.Conn) { comp.SetHealthy(); logger.Info("nats connected") }),
-		nats.ReconnectHandler(func(*nats.Conn) { comp.SetHealthy(); logger.Info("nats reconnected") }),
-		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
-			reason := "disconnected"
-			if err != nil {
-				reason += ": " + err.Error()
+	b, err := bus.Connect(ctx, bus.Config{
+		URL: cfg.NATSURL, CredsFile: cfg.NATSCredsFile, Name: "uspace-cisp-" + process,
+		PublicBaseURL: cfg.PublicBaseURL,
+		OnState: func(connected bool, state string) {
+			if connected {
+				comp.SetHealthy()
+				logger.Info("nats " + state)
+				return
 			}
-			comp.SetDegraded(reason)
-			logger.Warn("nats disconnected", "reason", reason)
-		}),
-	}
-	if cfg.NATSCredsFile != "" {
-		opts = append(opts, nats.UserCredentials(cfg.NATSCredsFile))
-	}
-	nc, err := nats.Connect(cfg.NATSURL, opts...)
+			comp.SetDegraded(state)
+			logger.Warn("nats disconnected", "reason", state)
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("nats connect: %w", err)
 	}
-	if nc.IsConnected() {
-		comp.SetHealthy()
+	return b, nil
+}
+
+// publications is the publication intake on the database (WP-3): the
+// store publishes committed changes on the bus when there is one, and
+// every snapshot is signed with the CISP's key ring.
+func publications(cfg *config.API, pool *pgxpool.Pool, changes *bus.Bus, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Publications {
+	opts := store.Options{Logger: logger}
+	if changes != nil {
+		opts.Bus = changes
 	}
-	return nc, nil
+	p := &httpapi.Publications{
+		Store:               store.New(pool, opts),
+		MaxPublicationBytes: cfg.MaxPublicationBytes,
+		AuthorityClientID:   cfg.AuthorityClientID,
+		ANSPClientID:        cfg.ANSPClientID,
+		Status:              status,
+		Logger:              logger,
+	}
+	if sec.keys != nil {
+		p.Signer = httpapi.KeyRingSigner{Keys: sec.keys}
+	}
+	return p
 }
 
 func natsCheck(nc *nats.Conn) httpapi.Check {

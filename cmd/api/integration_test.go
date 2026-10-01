@@ -40,7 +40,7 @@ func TestRunRefusesPendingMigrations(t *testing.T) {
 		}
 	})
 
-	env := []string{"CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL=" + url}
+	env := baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL="+url)
 	logs := &syncBuffer{}
 	if c := run(ctx, nil, env, logs, io.Discard); c != 2 {
 		t.Fatalf("exit %d with a pending migration, want 2: %s", c, logs.String())

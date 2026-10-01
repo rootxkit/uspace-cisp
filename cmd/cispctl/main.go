@@ -1,6 +1,8 @@
 // Command cispctl is the CISP's operations tool: the version, the
 // configuration check, the migrations of the two trees, the rebuild of
-// the materialised current version, and the delivery log's retention.
+// the materialised current version, the delivery log's retention, the
+// signing key rotation, and two dev helpers that sign a body and verify
+// a detached signature with a local key.
 // It is never long-running and never on the request path.
 package main
 
@@ -16,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -52,17 +55,36 @@ commands:
                   the current publication's body; print counts before and after
   set-retention --days N
                   replace the delivery log's retention policy (default 90)
+  rotate-key [--out local/] [--kid K] [--force]
+                  generate an RSA-3072 signing key, write signing-<kid>.pem
+                  (0600) and print the CISP_SIGNING_* lines to set; refuses
+                  a directory outside local/ unless --force
+  sign --key FILE --kid K < body
+                  print the X-JWS-Signature value of the body (dev helper)
+  verify-signature --key FILE --kid K --sig SIG < body
+                  verify a detached signature with the public half of a
+                  local key through the api's verifier (dev helper)
 `
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := run(ctx, os.Args[1:], os.Environ(), os.Stdout, os.Stderr)
+	code := runIO(ctx, os.Args[1:], os.Environ(), os.Stdin, os.Stdout, os.Stderr, time.Now())
 	stop()
 	os.Exit(code)
 }
 
 func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer) int {
+	return runIO(ctx, args, environ, strings.NewReader(""), stdout, stderr, time.Now())
+}
+
+func runIO(ctx context.Context, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, now time.Time) int {
 	switch {
+	case len(args) >= 1 && args[0] == "rotate-key":
+		return rotateKey(args[1:], environ, stdout, stderr, now)
+	case len(args) >= 1 && args[0] == "sign":
+		return sign(args[1:], stdin, stdout, stderr, now)
+	case len(args) >= 1 && args[0] == "verify-signature":
+		return verifySignature(ctx, args[1:], stdin, stdout, stderr, now)
 	case len(args) == 1 && args[0] == "version":
 		_, _ = fmt.Fprintln(stdout, version)
 		return exitOK

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
+	"github.com/rootxkit/uspace-cisp/internal/jws"
 )
 
 // Check states shown by /readyz.
@@ -32,6 +33,9 @@ type Readiness struct {
 // that a later work package owns answer 501 not_implemented.
 type Server struct {
 	Ready Readiness
+	// Keys is the CISP's signing key ring; nil: GET /.well-known/jwks.json
+	// answers 503.
+	Keys *jws.KeyRing
 }
 
 var _ gen.StrictServerInterface = (*Server)(nil)

@@ -28,10 +28,92 @@ func problemsOf(t *testing.T, err error) map[string]string {
 	return out
 }
 
+// apiBase is the smallest api environment that validates: the variables
+// with no default (the token issuer, its JWKS, the audiences and, in the
+// default mTLS mode, the ANSP's certificate subject).
+var apiBase = []string{
+	"CISP_TOKEN_ISSUER=https://authority.example.test/",
+	"CISP_TOKEN_JWKS_URL=https://authority.example.test/.well-known/jwks.json",
+	"CISP_AUDIENCES=uspace-cisp.example.test",
+	"CISP_ANSP_MTLS_SUBJECT=CN=ansp-01",
+}
+
+func withBase(env ...string) []string { return append(append([]string{}, apiBase...), env...) }
+
+// The api refuses to start without the variables that have no default,
+// naming each.
+func TestAPIRequiredVariables(t *testing.T) {
+	_, err := LoadAPI(nil)
+	probs := problemsOf(t, err)
+	for _, name := range []string{EnvTokenIssuer, EnvTokenJWKSURL, EnvAudiences, EnvANSPMTLSSubject} {
+		if _, ok := probs[name]; !ok {
+			t.Errorf("no problem for %s in %v", name, probs)
+		}
+	}
+	if len(probs) != 4 {
+		t.Errorf("problems = %v, want exactly the four", probs)
+	}
+	if _, err := LoadAPI(apiBase); err != nil {
+		t.Fatalf("the four set: %v", err)
+	}
+	// mTLS off needs no subject.
+	if _, err := LoadAPI([]string{apiBase[0], apiBase[1], apiBase[2], "CISP_MTLS_MODE=off"}); err != nil {
+		t.Errorf("mTLS off without a subject: %v", err)
+	}
+}
+
+// Pairs that must be set together, kids that must differ, issuers and
+// client ids that must differ, beside their accepted twins.
+func TestAPICrossChecks(t *testing.T) {
+	key := []string{"CISP_SIGNING_KEY_FILE=/k.pem", "CISP_SIGNING_KID=k2"}
+	cases := []struct {
+		name      string
+		bad, good []string
+		field     string
+	}{
+		{"lab issuer without JWKS", []string{"CISP_LAB_ISSUER=https://lab.example.test/"},
+			[]string{"CISP_LAB_ISSUER=https://lab.example.test/", "CISP_LAB_JWKS_URL=http://localhost:8099/jwks"}, EnvLabJWKSURL},
+		{"lab JWKS without issuer", []string{"CISP_LAB_JWKS_URL=https://lab.example.test/jwks"},
+			[]string{"CISP_LAB_ISSUER=https://lab.example.test/", "CISP_LAB_JWKS_URL=https://lab.example.test/jwks"}, EnvLabIssuer},
+		{"lab issuer equals the token issuer", []string{"CISP_LAB_ISSUER=https://authority.example.test/", "CISP_LAB_JWKS_URL=https://lab.example.test/jwks"},
+			[]string{"CISP_LAB_ISSUER=https://lab.example.test/", "CISP_LAB_JWKS_URL=https://lab.example.test/jwks"}, EnvLabIssuer},
+		{"same client id twice", []string{"CISP_ANSP_CLIENT_ID=authority-01"}, []string{"CISP_ANSP_CLIENT_ID=ansp-02"}, EnvANSPClientID},
+		{"signing key without kid", []string{"CISP_SIGNING_KEY_FILE=/k.pem"}, key, EnvSigningKID},
+		{"kid without signing key", []string{"CISP_SIGNING_KID=k2"}, key, EnvSigningKeyFile},
+		{"malformed kid", []string{"CISP_SIGNING_KEY_FILE=/k.pem", "CISP_SIGNING_KID=kid/1"}, key, EnvSigningKID},
+		{"previous key without kid", append([]string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem"}, key...),
+			append([]string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem", "CISP_SIGNING_KID_PREV=k1"}, key...), EnvSigningKIDPrev},
+		{"malformed previous kid", append([]string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem", "CISP_SIGNING_KID_PREV=k 1"}, key...),
+			append([]string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem", "CISP_SIGNING_KID_PREV=k1"}, key...), EnvSigningKIDPrev},
+		{"previous key without a current one", []string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem", "CISP_SIGNING_KID_PREV=k1"},
+			append([]string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem", "CISP_SIGNING_KID_PREV=k1"}, key...), EnvSigningKeyPrevFile},
+		{"same kid twice", append([]string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem", "CISP_SIGNING_KID_PREV=k2"}, key...),
+			append([]string{"CISP_SIGNING_KEY_PREV_FILE=/p.pem", "CISP_SIGNING_KID_PREV=k1"}, key...), EnvSigningKIDPrev},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			probs := problemsOf(t, loadAPIErr(c.bad))
+			if _, ok := probs[c.field]; !ok || len(probs) != 1 {
+				t.Errorf("problems %v, want exactly one on %s", probs, c.field)
+			}
+			if err := loadAPIErr(c.good); err != nil {
+				t.Errorf("twin refused: %v", err)
+			}
+		})
+	}
+	ctl := problemsOf(t, loadCtlErr([]string{"CISP_SIGNING_KEY_FILE=/k.pem"}))
+	if _, ok := ctl[EnvSigningKID]; !ok || len(ctl) != 1 {
+		t.Errorf("cispctl: %v", ctl)
+	}
+	if err := loadCtlErr(key); err != nil {
+		t.Errorf("cispctl twin: %v", err)
+	}
+}
+
 func TestDefaults(t *testing.T) {
-	api, err := LoadAPI(nil)
+	api, err := LoadAPI(apiBase)
 	if err != nil {
-		t.Fatalf("LoadAPI with an empty environment: %v", err)
+		t.Fatalf("LoadAPI with only the required variables: %v", err)
 	}
 	checks := []struct {
 		name string
@@ -49,13 +131,18 @@ func TestDefaults(t *testing.T) {
 		{EnvTimeseriesURL, api.TimeseriesURL, ""},
 		{EnvNATSURL, api.NATSURL, ""},
 		{EnvNATSCredsFile, api.NATSCredsFile, ""},
-		{EnvTokenIssuer, api.TokenIssuer, ""},
-		{EnvTokenJWKSURL, api.TokenJWKSURL, ""},
-		{EnvAudiences, len(api.Audiences), 0},
+		{EnvTokenIssuer, api.TokenIssuer, "https://authority.example.test/"},
+		{EnvTokenJWKSURL, api.TokenJWKSURL, "https://authority.example.test/.well-known/jwks.json"},
+		{EnvLabIssuer, api.LabIssuer, ""},
+		{EnvLabJWKSURL, api.LabJWKSURL, ""},
+		{EnvJWKSCacheFile, api.JWKSCacheFile, "local/jwks-cache.json"},
+		{EnvAudiences, len(api.Audiences), 1},
+		{EnvSigningKIDPrev, api.SigningKIDPrev, ""},
+		{EnvPublisherSigMaxSkewS, api.PublisherSignatureMaxSkew, 5 * time.Minute},
 		{EnvAuthorityClientID, api.AuthorityClientID, "authority-01"},
 		{EnvANSPClientID, api.ANSPClientID, "ansp-01"},
 		{EnvANSPJWKSURL, api.ANSPJWKSURL, ""},
-		{EnvANSPMTLSSubject, api.ANSPMTLSSubject, ""},
+		{EnvANSPMTLSSubject, api.ANSPMTLSSubject, "CN=ansp-01"},
 		{EnvMTLSMode, api.MTLSMode, MTLSRequired},
 		{EnvSigningKeyFile, api.SigningKeyFile, ""},
 		{EnvSigningKID, api.SigningKID, ""},
@@ -122,7 +209,7 @@ func TestValuesOverrideDefaults(t *testing.T) {
 		"PATH=/bin",
 		"NOT_CISP=1",
 	}
-	api, err := LoadAPI(env)
+	api, err := LoadAPI(withBase(env...))
 	if err != nil {
 		t.Fatalf("LoadAPI: %v", err)
 	}
@@ -139,7 +226,7 @@ func TestValuesOverrideDefaults(t *testing.T) {
 
 // An empty value means "not set": the default applies.
 func TestEmptyValueTakesDefault(t *testing.T) {
-	api, err := LoadAPI([]string{"CISP_HTTP_ADDR=", "CISP_PUBLIC_RPM=  "})
+	api, err := LoadAPI(withBase("CISP_HTTP_ADDR=", "CISP_PUBLIC_RPM=  "))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,13 +236,13 @@ func TestEmptyValueTakesDefault(t *testing.T) {
 }
 
 func TestUnknownVariableRefused(t *testing.T) {
-	_, err := LoadAPI([]string{"CISP_HTTP_ADDRESS=:9000"})
+	_, err := LoadAPI(withBase("CISP_HTTP_ADDRESS=:9000"))
 	probs := problemsOf(t, err)
 	if _, ok := probs["CISP_HTTP_ADDRESS"]; !ok || len(probs) != 1 {
 		t.Fatalf("problems = %v, want exactly CISP_HTTP_ADDRESS", probs)
 	}
 	// The same environment with the correct spelling is accepted.
-	if _, err := LoadAPI([]string{"CISP_HTTP_ADDR=:9000"}); err != nil {
+	if _, err := LoadAPI(withBase("CISP_HTTP_ADDR=:9000")); err != nil {
 		t.Fatalf("correct spelling refused: %v", err)
 	}
 	// Every process refuses it, not only api.
@@ -169,7 +256,7 @@ func TestUnknownVariableRefused(t *testing.T) {
 
 // CISP_TEST_* belongs to the integration tests and is never refused.
 func TestTestPrefixIgnored(t *testing.T) {
-	if _, err := LoadAPI([]string{"CISP_TEST_DATABASE_URL=postgres://x@y/z"}); err != nil {
+	if _, err := LoadAPI(withBase("CISP_TEST_DATABASE_URL=postgres://x@y/z")); err != nil {
 		t.Fatalf("CISP_TEST_ variable refused: %v", err)
 	}
 }
@@ -205,13 +292,17 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvNATSURL, "http://nats:4222", "tls://nats:4222", loadAPIErr},
 		{EnvTokenIssuer, "ftp://auth", "https://auth.example.test", loadAPIErr},
 		{EnvTokenJWKSURL, "auth/jwks.json", "https://auth.example.test/.well-known/jwks.json", loadAPIErr},
+		{EnvTokenJWKSURL, "http://auth.example.test/jwks", "http://127.0.0.1:8099/jwks", loadAPIErr},
+		{EnvTokenJWKSURL, "http://127.0.0.2/jwks", "http://localhost/jwks", loadAPIErr},
+		{EnvPublisherSigMaxSkewS, "0", "3600", loadAPIErr},
+		{EnvPublisherSigMaxSkewS, "3601", "1", loadAPIErr},
 		{EnvAudiences, "https://cisp.example.test", "cisp.example.test", loadAPIErr},
 		{EnvAudiences, "a,,b", "a,b", loadAPIErr},
 		{EnvAuthorityClientID, "authority 01", "authority-01", loadAPIErr},
 		{EnvANSPClientID, strings.Repeat("a", 65), strings.Repeat("a", 64), loadAPIErr},
 		{EnvANSPJWKSURL, "file:///jwks", "https://ansp.example.test/.well-known/jwks.json", loadAPIErr},
+		{EnvANSPJWKSURL, "http://ansp.example.test/jwks", "http://[::1]:9000/jwks", loadAPIErr},
 		{EnvMTLSMode, "optional", "off", loadAPIErr},
-		{EnvSigningKID, "kid/1", "cisp-2026-10", loadAPIErr},
 		{EnvPublicBaseURL, "cisp.example.test", "https://cisp.example.test", loadAPIErr},
 		{EnvIssuerURL, "mailto:x@y", "https://cisp.example.test", loadAPIErr},
 		{EnvReadMaxAgeS, "-1", "86400", loadAPIErr},
@@ -233,7 +324,6 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvIssuerURL, "cisp", "http://cisp.lab.test", loadDeliverErr},
 		{EnvDatabaseURL, "redis://db", "postgres://db/cisp", loadCtlErr},
 		{EnvTimeseriesURL, "redis://db", "postgres://db/cisp_ts", loadCtlErr},
-		{EnvSigningKID, "kid 1", "kid-1", loadCtlErr},
 		{EnvDatabaseMaxConns, "many", "3", loadCtlErr},
 		{EnvLogLevel, "loud", "error", loadCtlErr},
 	}
@@ -256,7 +346,7 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 	}
 }
 
-func loadAPIErr(env []string) error     { _, err := LoadAPI(env); return err }
+func loadAPIErr(env []string) error     { _, err := LoadAPI(withBase(env...)); return err }
 func loadDeliverErr(env []string) error { _, err := LoadDeliver(env); return err }
 func loadCtlErr(env []string) error     { _, err := LoadCtl(env); return err }
 
@@ -302,8 +392,9 @@ func TestRedactedNeverPrintsASecret(t *testing.T) {
 		"CISP_NATS_URL=nats://" + natsToken + "@nats:4222",
 		"CISP_SECRETS_KEY=" + secretsKey,
 		"CISP_SIGNING_KEY_FILE=/run/secrets/cisp-signing.pem",
+		"CISP_SIGNING_KID=cisp-1",
 	}
-	api, err := LoadAPI(env)
+	api, err := LoadAPI(withBase(env...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,8 +420,8 @@ func TestRedactedNeverPrintsASecret(t *testing.T) {
 	if red[EnvHTTPAddr] != ":8080" {
 		t.Errorf("plain value changed: %q", red[EnvHTTPAddr])
 	}
-	if red[EnvTokenIssuer] != "" {
-		t.Errorf("unset value = %q", red[EnvTokenIssuer])
+	if red[EnvLabIssuer] != "" {
+		t.Errorf("unset value = %q", red[EnvLabIssuer])
 	}
 }
 

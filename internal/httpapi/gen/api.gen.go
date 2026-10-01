@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/oapi-codegen/runtime"
 )
 
 // Defines values for HealthStatus.
@@ -23,6 +25,51 @@ const (
 func (e HealthStatus) Valid() bool {
 	switch e {
 	case Ok:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for JWKAlg.
+const (
+	RS256 JWKAlg = "RS256"
+)
+
+// Valid indicates whether the value is a known member of the JWKAlg enum.
+func (e JWKAlg) Valid() bool {
+	switch e {
+	case RS256:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for JWKKty.
+const (
+	RSA JWKKty = "RSA"
+)
+
+// Valid indicates whether the value is a known member of the JWKKty enum.
+func (e JWKKty) Valid() bool {
+	switch e {
+	case RSA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for JWKUse.
+const (
+	Sig JWKUse = "sig"
+)
+
+// Valid indicates whether the value is a known member of the JWKUse enum.
+func (e JWKUse) Valid() bool {
+	switch e {
+	case Sig:
 		return true
 	default:
 		return false
@@ -82,6 +129,34 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// JWK One RSA public key (RFC 7517, RFC 7518 section 6.3.1).
+type JWK struct {
+	Alg JWKAlg `json:"alg"`
+
+	// E The exponent, base64url without padding.
+	E   string `json:"e"`
+	Kid string `json:"kid"`
+	Kty JWKKty `json:"kty"`
+
+	// N The modulus, base64url without padding.
+	N   string `json:"n"`
+	Use JWKUse `json:"use"`
+}
+
+// JWKAlg defines model for JWK.Alg.
+type JWKAlg string
+
+// JWKKty defines model for JWK.Kty.
+type JWKKty string
+
+// JWKUse defines model for JWK.Use.
+type JWKUse string
+
+// JWKS A JSON Web Key Set (RFC 7517 section 5) of RSA signing keys.
+type JWKS struct {
+	Keys []JWK `json:"keys"`
+}
 
 // Problem The ecosystem-wide error body (RFC 9457), the same shape as
 // uspace-lab schemas/common/problem/v1.
@@ -143,8 +218,16 @@ type Status struct {
 // StatusDegradedComponent defines model for Status.Degraded.Component.
 type StatusDegradedComponent string
 
+// GetJWKSParams defines parameters for GetJWKS.
+type GetJWKSParams struct {
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetJWKS The CISP's signing keys (JWKS)
+	// (GET /.well-known/jwks.json)
+	GetJWKS(w http.ResponseWriter, r *http.Request, params GetJWKSParams)
 	// GetHealthz Liveness
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
@@ -164,6 +247,47 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetJWKS operation middleware
+func (siw *ServerInterfaceWrapper) GetJWKS(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetJWKSParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetJWKS(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealthz operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Request) {
@@ -330,11 +454,101 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/healthz", wrapper.GetHealthz)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/readyz", wrapper.GetReadyz)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/status", wrapper.GetStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/.well-known/jwks.json", wrapper.GetJWKS)
 
 	return m
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type GetJWKSRequestObject struct {
+	Params GetJWKSParams
+}
+
+type GetJWKSResponseObject interface {
+	VisitGetJWKSResponse(w http.ResponseWriter) error
+}
+
+type GetJWKS200ResponseHeaders struct {
+	CacheControl *string
+	ETag         *string
+}
+
+type GetJWKS200JSONResponse struct {
+	Body    JWKS
+	Headers GetJWKS200ResponseHeaders
+}
+
+func (response GetJWKS200JSONResponse) VisitGetJWKSResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJWKS304ResponseHeaders struct {
+	CacheControl *string
+	ETag         *string
+}
+
+type GetJWKS304Response struct {
+	Headers GetJWKS304ResponseHeaders
+}
+
+func (response GetJWKS304Response) VisitGetJWKSResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetJWKS503ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetJWKS503ApplicationProblemPlusJSONResponse) VisitGetJWKSResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJWKSdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetJWKSdefaultApplicationProblemPlusJSONResponse) VisitGetJWKSResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type GetHealthzRequestObject struct {
 }
@@ -482,6 +696,9 @@ func (response GetStatusdefaultApplicationProblemPlusJSONResponse) VisitGetStatu
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetJWKS The CISP's signing keys (JWKS)
+	// (GET /.well-known/jwks.json)
+	GetJWKS(ctx context.Context, request GetJWKSRequestObject) (GetJWKSResponseObject, error)
 	// GetHealthz Liveness
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
@@ -530,6 +747,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetJWKS operation middleware
+func (sh *strictHandler) GetJWKS(w http.ResponseWriter, r *http.Request, params GetJWKSParams) {
+	var request GetJWKSRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetJWKS(ctx, request.(GetJWKSRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetJWKS")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetJWKSResponseObject); ok {
+		if err := validResponse.VisitGetJWKSResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetHealthz operation middleware

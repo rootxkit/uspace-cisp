@@ -38,6 +38,9 @@ const (
 	EnvNATSCredsFile             = "CISP_NATS_CREDS_FILE" //nolint:gosec // G101: a variable name, not a credential
 	EnvTokenIssuer               = "CISP_TOKEN_ISSUER"    //nolint:gosec // G101: a variable name, not a credential
 	EnvTokenJWKSURL              = "CISP_TOKEN_JWKS_URL"  //nolint:gosec // G101: a variable name, not a credential
+	EnvLabIssuer                 = "CISP_LAB_ISSUER"
+	EnvLabJWKSURL                = "CISP_LAB_JWKS_URL"
+	EnvJWKSCacheFile             = "CISP_JWKS_CACHE_FILE"
 	EnvAudiences                 = "CISP_AUDIENCES"
 	EnvAuthorityClientID         = "CISP_AUTHORITY_CLIENT_ID"
 	EnvANSPClientID              = "CISP_ANSP_CLIENT_ID"
@@ -47,6 +50,8 @@ const (
 	EnvSigningKeyFile            = "CISP_SIGNING_KEY_FILE"
 	EnvSigningKID                = "CISP_SIGNING_KID"
 	EnvSigningKeyPrevFile        = "CISP_SIGNING_KEY_PREV_FILE"
+	EnvSigningKIDPrev            = "CISP_SIGNING_KID_PREV"
+	EnvPublisherSigMaxSkewS      = "CISP_PUBLISHER_SIGNATURE_MAX_SKEW_S"
 	EnvSessionKeyFile            = "CISP_SESSION_KEY_FILE"
 	EnvSecretsKey                = "CISP_SECRETS_KEY" //nolint:gosec // G101: a variable name, not a credential
 	EnvPublicBaseURL             = "CISP_PUBLIC_BASE_URL"
@@ -84,6 +89,9 @@ var Catalogue = []Var{
 	{Name: EnvMaxBodyBytes, Default: "65536"},
 	{Name: EnvTokenIssuer, Default: ""},
 	{Name: EnvTokenJWKSURL, Default: ""},
+	{Name: EnvLabIssuer, Default: ""},
+	{Name: EnvLabJWKSURL, Default: ""},
+	{Name: EnvJWKSCacheFile, Default: "local/jwks-cache.json"},
 	{Name: EnvAudiences, Default: ""},
 	{Name: EnvAuthorityClientID, Default: "authority-01"},
 	{Name: EnvANSPClientID, Default: "ansp-01"},
@@ -93,6 +101,8 @@ var Catalogue = []Var{
 	{Name: EnvSigningKeyFile, Default: ""},
 	{Name: EnvSigningKID, Default: ""},
 	{Name: EnvSigningKeyPrevFile, Default: ""},
+	{Name: EnvSigningKIDPrev, Default: ""},
+	{Name: EnvPublisherSigMaxSkewS, Default: "300"},
 	{Name: EnvSessionKeyFile, Default: ""},
 	{Name: EnvSecretsKey, Default: "", Secret: true},
 	{Name: EnvPublicBaseURL, Default: ""},

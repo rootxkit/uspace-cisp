@@ -11,6 +11,7 @@ info:
 
     Skeleton (WP-0): health, readiness and the status stub. Every other
     work package adds its paths under its tag; see api/README.md.
+    WP-2: the signing JWKS.
 servers:
   - url: /
 tags:
@@ -30,6 +31,8 @@ tags:
     description: The CISP operators' console.
   - name: status
     description: Service status for consumers and consoles.
+  - name: keys
+    description: The CISP's public signing keys.
 
 paths:
   /healthz:
@@ -98,6 +101,51 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /.well-known/jwks.json:
+    get:
+      operationId: getJWKS
+      tags: [keys]
+      summary: The CISP's signing keys (JWKS)
+      description: |
+        The public keys of the CISP's signing key ring (RFC 7517): the key
+        that signs, and during a rotation the previous one, each with
+        kid, alg RS256 and use sig. Webhook deliveries and signed
+        snapshots are verified with it. No authentication; cacheable for
+        an hour; If-None-Match with the current ETag answers 304.
+      security: []
+      parameters:
+        - name: If-None-Match
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The key set.
+          headers:
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JWKS"
+        "304":
+          description: The key set has not changed.
+          headers:
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
 
 components:
   securitySchemes:
@@ -160,6 +208,39 @@ components:
           description: The JSON path or parameter name.
         reason:
           type: string
+
+    JWKS:
+      type: object
+      description: A JSON Web Key Set (RFC 7517 section 5) of RSA signing keys.
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/JWK"
+    JWK:
+      type: object
+      description: One RSA public key (RFC 7517, RFC 7518 section 6.3.1).
+      required: [kty, kid, use, alg, n, e]
+      properties:
+        kty:
+          type: string
+          enum: [RSA]
+        kid:
+          type: string
+        use:
+          type: string
+          enum: [sig]
+        alg:
+          type: string
+          enum: [RS256]
+        n:
+          type: string
+          description: The modulus, base64url without padding.
+        e:
+          type: string
+          description: The exponent, base64url without padding.
 
     Health:
       type: object

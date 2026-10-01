@@ -117,7 +117,7 @@ func (r apiRun) stop(t *testing.T) int {
 // not configured and is not ready; the status line is at error because
 // the stores are missing; the stop is clean.
 func TestRunWithoutStores(t *testing.T) {
-	r := startRun(t, []string{"CISP_HTTP_ADDR=127.0.0.1:0"})
+	r := startRun(t, baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0"))
 	if code, body := get(t, r.base+"/healthz"); code != 200 || !strings.Contains(body, `"ok"`) {
 		t.Errorf("healthz = %d %s", code, body)
 	}
@@ -143,11 +143,11 @@ func TestRunWithoutStores(t *testing.T) {
 // configured database password never reaches the log.
 func TestRunWithUnreachableStores(t *testing.T) {
 	const password = "never-in-the-log-7"
-	r := startRun(t, []string{
+	r := startRun(t, baseEnv(t,
 		"CISP_HTTP_ADDR=127.0.0.1:0",
-		"CISP_DATABASE_URL=postgres://cisp_api:" + password + "@" + closedPort(t) + "/cisp?connect_timeout=1",
-		"CISP_NATS_URL=nats://" + closedPort(t),
-	})
+		"CISP_DATABASE_URL=postgres://cisp_api:"+password+"@"+closedPort(t)+"/cisp?connect_timeout=1",
+		"CISP_NATS_URL=nats://"+closedPort(t),
+	))
 	code, body := get(t, r.base+"/readyz")
 	if code != 503 || !strings.Contains(body, `"database":"unreachable`) || !strings.Contains(body, `"nats":"disconnected`) {
 		t.Errorf("readyz = %d %s", code, body)
@@ -161,7 +161,7 @@ func TestRunWithUnreachableStores(t *testing.T) {
 }
 
 func TestRunMTLSOffIsAnErrorEveryPeriod(t *testing.T) {
-	r := startRun(t, []string{"CISP_HTTP_ADDR=127.0.0.1:0", "CISP_MTLS_MODE=off"})
+	r := startRun(t, baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_MTLS_MODE=off"))
 	status := waitForLine(t, r.logs, "status")
 	mtls, _ := status["mtls"].(map[string]any)
 	if status["level"] != "ERROR" || !strings.Contains(mtls["degraded"].(string), "CISP_MTLS_MODE=off") {
@@ -239,7 +239,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 func TestRunNATSGoneAndBack(t *testing.T) {
 	broker := startFakeNATS(t, "127.0.0.1:0")
 	natsAddr := broker.ln.Addr().String()
-	r := startRun(t, []string{"CISP_HTTP_ADDR=127.0.0.1:0", "CISP_NATS_URL=nats://" + natsAddr})
+	r := startRun(t, baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_NATS_URL=nats://"+natsAddr))
 	readyNATS := func(want string) func() bool {
 		return func() bool {
 			_, body := get(t, r.base+"/readyz")
@@ -265,8 +265,8 @@ func TestRunNATSGoneAndBack(t *testing.T) {
 // and the reason, rather than serving with the dependency silently gone.
 func TestRunStoreClientRefused(t *testing.T) {
 	cases := map[string][]string{
-		"database pool": {"CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL=postgres://db/cisp?pool_max_conns=many"},
-		"nats":          {"CISP_HTTP_ADDR=127.0.0.1:0", "CISP_NATS_URL=nats://127.0.0.1:1", "CISP_NATS_CREDS_FILE=" + filepath.Join(t.TempDir(), "missing.creds")},
+		"database pool": baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL=postgres://db/cisp?pool_max_conns=many"),
+		"nats":          baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_NATS_URL=nats://127.0.0.1:1", "CISP_NATS_CREDS_FILE="+filepath.Join(t.TempDir(), "missing.creds")),
 	}
 	for name, env := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -295,9 +295,9 @@ func TestRunConfigRefused(t *testing.T) {
 }
 
 func TestProbe(t *testing.T) {
-	r := startRun(t, []string{"CISP_HTTP_ADDR=127.0.0.1:0"})
+	r := startRun(t, baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0"))
 	addr := strings.TrimPrefix(r.base, "http://")
-	env := []string{"CISP_HTTP_ADDR=" + addr}
+	env := baseEnv(t, "CISP_HTTP_ADDR="+addr)
 	if c := run(context.Background(), []string{"-probe=/healthz"}, env, io.Discard, io.Discard); c != 0 {
 		t.Errorf("probe /healthz exit %d, want 0", c)
 	}
@@ -306,7 +306,7 @@ func TestProbe(t *testing.T) {
 		t.Errorf("probe /readyz exit %d (%s), want 1 with 503", c, stderr.String())
 	}
 	r.stop(t)
-	if c := run(context.Background(), []string{"-probe=/healthz"}, []string{"CISP_HTTP_ADDR=" + closedPort(t)}, io.Discard, io.Discard); c != 1 {
+	if c := run(context.Background(), []string{"-probe=/healthz"}, baseEnv(t, "CISP_HTTP_ADDR="+closedPort(t)), io.Discard, io.Discard); c != 1 {
 		t.Errorf("probe of a closed port exit %d, want 1", c)
 	}
 }
@@ -318,7 +318,7 @@ func TestRunListenRefused(t *testing.T) {
 	}
 	defer ln.Close()
 	logs := &syncBuffer{}
-	if c := run(context.Background(), nil, []string{"CISP_HTTP_ADDR=" + ln.Addr().String()}, logs, io.Discard); c != 1 {
+	if c := run(context.Background(), nil, baseEnv(t, "CISP_HTTP_ADDR="+ln.Addr().String()), logs, io.Discard); c != 1 {
 		t.Errorf("exit %d, want 1: %s", c, logs.String())
 	}
 }
@@ -361,7 +361,7 @@ func TestBinaryStopsOnSIGTERM(t *testing.T) {
 	}
 	bin := buildBinary(t)
 	cmd := exec.Command(bin)
-	cmd.Env = cleanEnv("CISP_HTTP_ADDR=127.0.0.1:0")
+	cmd.Env = cleanEnv(baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0")...)
 	logs := &syncBuffer{}
 	cmd.Stdout = logs
 	cmd.Stderr = logs

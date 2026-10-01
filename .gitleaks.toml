@@ -1,0 +1,12 @@
+# gitleaks configuration for uspace-cisp: the default rules, nothing
+# allowlisted. Read by gitleaks (and gitleaks-action) from the
+# repository root; the version is pinned in the Makefile and in CI.
+#
+# There is deliberately no [allowlist]: a global allowlist exempts every
+# file it matches from every rule. If a public value ever trips a rule,
+# add a narrow allowlist on that one rule (as uspace-core does), with
+# the reason beside it.
+title = "uspace-cisp"
+
+[extend]
+useDefault = true

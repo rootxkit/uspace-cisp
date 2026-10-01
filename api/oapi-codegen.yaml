@@ -1,0 +1,12 @@
+# oapi-codegen configuration for internal/httpapi/gen. Run through
+# `make generate` (internal/httpapi/gen/gen.go has the go:generate line);
+# never edit the generated file by hand.
+package: gen
+output: api.gen.go
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+  embedded-spec: false
+output-options:
+  skip-prune: true

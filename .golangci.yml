@@ -1,0 +1,111 @@
+# golangci-lint v2 configuration for uspace-cisp, derived from
+# uspace-core's. Rules behind the choices: docs/PLAN.md section 14.1.
+# The version is pinned in the Makefile (GOLANGCI_LINT_VERSION) and in
+# .github/workflows/ci.yml; change both in one `ci:` commit.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  # The integration tests are linted too.
+  build-tags: [integration]
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - errname # error types end in Error, sentinel errors start with Err
+    - errorlint # wrap and compare errors with errors.Is / errors.As
+    - exhaustive # every switch over an enum lists every value
+    - forbidigo # see settings: no panic, no fmt.Print outside cmd/, slog only
+    - gocritic
+    - gosec
+    - misspell
+    - nolintlint # every nolint names its linter and reason
+    - prealloc
+    - revive
+    - unconvert
+    - unparam
+    - copyloopvar
+    - durationcheck
+    - makezero
+    - nilerr
+    - predeclared
+    - wastedassign
+  settings:
+    staticcheck:
+      checks: ["all", "-ST1000", "-ST1003"] # package comments in the package's main file; names follow E-13 (lower_m in JSON, LowerM in Go)
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment # readability over packing
+        - shadow
+    gocritic:
+      enabled-tags: [diagnostic, performance]
+      disabled-checks:
+        - hugeParam # judged per benchmark, not blanket
+    gosec:
+      excludes:
+        - G115 # integer conversions are bounded at the parser boundary
+    revive:
+      rules:
+        - name: exported
+          arguments: ["checkPrivateReceivers", "disableStutteringCheck"]
+        - name: var-naming
+          arguments: [["ID", "JWT", "JWKS", "KID", "RPM", "NATS", "MTLS", "ANSP", "OTel"], []]
+        - name: unused-parameter
+        - name: context-as-argument
+        - name: error-return
+        - name: error-strings
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # No panics on untrusted input (CLAUDE.md hard rule 8).
+        - pattern: '^panic$'
+          msg: "return an error that names the field (core.FieldError) or a problem+json; panics are not allowed on data paths"
+        - pattern: '^fmt\.Print(f|ln)?$'
+          msg: "only cmd/ prints; everything else logs through slog or returns values"
+        - pattern: '^log\.'
+          msg: "log/slog only (internal/obs builds the logger)"
+        - pattern: '^os\.Exit$'
+          msg: "only a main function exits the process"
+    exhaustive:
+      default-signifies-exhaustive: false
+    misspell:
+      locale: UK
+      ignore-rules: [leveler, authorization, authorize, authorized, authorizing, center, meter, meters, color, analyze, organization]
+  exclusions:
+    # Generated code (internal/httpapi/gen, sqlc output) is exempt from
+    # the style linters by its "Code generated ... DO NOT EDIT" header;
+    # go vet still runs on it.
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters: [gosec, errcheck, forbidigo, unparam, prealloc]
+      # A command prints its output and exits from main.
+      - path: ^cmd/
+        text: 'fmt.Print'
+        linters: [forbidigo]
+      - path: ^cmd/[^/]+/main\.go$
+        text: 'os.Exit'
+        linters: [forbidigo]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [github.com/rootxkit/uspace-cisp]
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

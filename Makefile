@@ -35,7 +35,7 @@ build:
 
 vet:
 	$(GO) vet $(PKGS)
-	$(GO) vet -tags integration ./test/...
+	$(GO) vet -tags integration ./...
 
 fmt:
 	gofmt -w .
@@ -89,13 +89,18 @@ generate-check: generate
 # CISP_TEST_* URLs come from the environment (CI) or, when unset, from
 # the passwords `make dev-deps` wrote to $(DEV_ENV). Fails when a test
 # fails and when zero tests ran: a suite that ran nothing proves nothing.
+# The integration tests live in test/integration and beside the packages
+# they exercise (internal/store, internal/bus, cmd/*), all behind the
+# `integration` tag; -p 1 because they share the two databases (some
+# migrate them down and up).
+INTEGRATION_PKGS ?= ./test/integration/... ./internal/... ./cmd/...
 integration:
 	@set -a; if [ -f $(DEV_ENV) ]; then . ./$(DEV_ENV); fi; set +a; \
 	export CISP_TEST_DATABASE_URL="$${CISP_TEST_DATABASE_URL:-postgres://cisp_api:$${PG_CISP_API_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/cisp?sslmode=disable}"; \
 	export CISP_TEST_TIMESERIES_URL="$${CISP_TEST_TIMESERIES_URL:-postgres://cisp_deliver:$${PG_CISP_DELIVER_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/cisp_ts?sslmode=disable}"; \
 	export CISP_TEST_NATS_URL="$${CISP_TEST_NATS_URL:-nats://127.0.0.1:$${DEV_NATS_PORT:-4222}}"; \
 	set -o pipefail; \
-	$(GO) test -tags integration -count=1 -v ./test/integration/... 2>&1 | tee integration.log; \
+	$(GO) test -tags integration -count=1 -p 1 -v $(INTEGRATION_PKGS) 2>&1 | tee integration.log; \
 	n=$$(grep -c '^--- PASS' integration.log || true); \
 	echo "integration: $$n top-level tests passed"; \
 	if [ "$$n" -eq 0 ]; then echo "integration: zero tests ran"; exit 1; fi

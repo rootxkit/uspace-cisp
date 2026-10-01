@@ -25,6 +25,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/config"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
+	"github.com/rootxkit/uspace-cisp/internal/store"
 )
 
 const process = "api"
@@ -93,29 +94,40 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		return 1
 	}
 
-	// Until WP-1 ships the goose runner nothing can say the migrations
-	// are current, so /readyz is not ready and the status line says why.
-	ready := httpapi.Readiness{
-		Migrations: func(context.Context) (string, bool) { return httpapi.MigrationsPendingWP1, false },
-	}
-	status.Component("migrations").SetDegraded(httpapi.MigrationsPendingWP1)
-
+	ready := httpapi.Readiness{}
 	dbComp := status.Component("database")
+	migComp := status.Component("migrations")
 	var pool *pgxpool.Pool
 	if cfg.DatabaseURL == "" {
 		dbComp.SetDegraded(httpapi.CheckNotConfigured)
+		migComp.SetDegraded(httpapi.CheckNotConfigured)
 	} else {
-		pool, err = pgxpool.New(ctx, cfg.DatabaseURL)
+		pool, err = store.OpenPool(ctx, store.PoolConfig{
+			URL: cfg.DatabaseURL, ApplicationName: "uspace-cisp-" + process, MaxConns: int32(cfg.DatabaseMaxConns),
+		})
 		if err != nil {
 			logger.ErrorContext(ctx, "database pool refused", "error", err.Error())
 			return 1
 		}
+		defer pool.Close()
+		// The api never migrates (docs/PLAN.md section 5.3): pending
+		// migrations stop the start; an unreachable database does not,
+		// and readiness keeps asking.
+		if code, stop := refusePending(ctx, pool, store.TreeRelational, logger); stop {
+			return code
+		}
 		ready.Database = databaseCheck(pool)
+		ready.Migrations = migrationsCheck(pool, store.TreeRelational)
 		status.AddProbe(func(ctx context.Context) {
 			if state, ok := ready.Database(ctx); ok {
 				dbComp.SetHealthy()
 			} else {
 				dbComp.SetDegraded(state)
+			}
+			if state, ok := ready.Migrations(ctx); ok {
+				migComp.SetHealthy()
+			} else {
+				migComp.SetDegraded(state)
 			}
 		})
 	}
@@ -150,9 +162,6 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 	if nc != nil {
 		nc.Close()
 	}
-	if pool != nil {
-		pool.Close()
-	}
 	flushCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	if err := shutdownTracer(flushCtx); err != nil {
@@ -160,6 +169,43 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 	}
 	logger.Info("stopped")
 	return code
+}
+
+// refusePending lists the tree's pending migrations and, when there are
+// any, logs them and says to stop with exit 2. A database it cannot ask
+// is logged and the start continues: readiness reports it.
+func refusePending(ctx context.Context, pool *pgxpool.Pool, tree store.Tree, logger *slog.Logger) (int, bool) {
+	cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	db := store.OpenSQL(pool)
+	defer func() { _ = db.Close() }()
+	pending, err := store.Pending(cctx, db, tree)
+	if err != nil {
+		logger.WarnContext(ctx, "migrations not checked at start", "tree", string(tree), "error", err.Error())
+		return 0, false
+	}
+	if len(pending) > 0 {
+		logger.ErrorContext(ctx, "migrations pending; run cispctl migrate "+string(tree)+" first", "tree", string(tree), "pending", pending)
+		return 2, true
+	}
+	return 0, false
+}
+
+func migrationsCheck(pool *pgxpool.Pool, tree store.Tree) httpapi.Check {
+	return func(ctx context.Context) (string, bool) {
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		db := store.OpenSQL(pool)
+		defer func() { _ = db.Close() }()
+		pending, err := store.Pending(ctx, db, tree)
+		switch {
+		case err != nil:
+			return "unknown: " + err.Error(), false
+		case len(pending) > 0:
+			return "pending: " + strings.Join(pending, ", "), false
+		}
+		return httpapi.CheckOK, true
+	}
 }
 
 func databaseCheck(pool *pgxpool.Pool) httpapi.Check {

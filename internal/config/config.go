@@ -41,6 +41,9 @@ type API struct {
 	NATSURL       string
 	NATSCredsFile string
 
+	DatabaseMaxConns   int64
+	TimeseriesMaxConns int64
+
 	TokenIssuer       string
 	TokenJWKSURL      string
 	Audiences         []string
@@ -76,6 +79,9 @@ type Deliver struct {
 	NATSURL       string
 	NATSCredsFile string
 
+	DatabaseMaxConns   int64
+	TimeseriesMaxConns int64
+
 	SigningKeyFile string
 	SigningKID     string
 	IssuerURL      string
@@ -91,6 +97,9 @@ type Ctl struct {
 
 	DatabaseURL   string
 	TimeseriesURL string
+
+	DatabaseMaxConns   int64
+	TimeseriesMaxConns int64
 
 	SigningKeyFile     string
 	SigningKID         string
@@ -122,6 +131,9 @@ func LoadAPI(environ []string) (*API, error) {
 		TimeseriesURL: e.str(EnvTimeseriesURL),
 		NATSURL:       e.str(EnvNATSURL),
 		NATSCredsFile: e.str(EnvNATSCredsFile),
+
+		DatabaseMaxConns:   e.integer(EnvDatabaseMaxConns),
+		TimeseriesMaxConns: e.integer(EnvTimeseriesMaxConns),
 
 		TokenIssuer:       e.str(EnvTokenIssuer),
 		TokenJWKSURL:      e.str(EnvTokenJWKSURL),
@@ -161,6 +173,9 @@ func LoadDeliver(environ []string) (*Deliver, error) {
 		NATSURL:       e.str(EnvNATSURL),
 		NATSCredsFile: e.str(EnvNATSCredsFile),
 
+		DatabaseMaxConns:   e.integer(EnvDatabaseMaxConns),
+		TimeseriesMaxConns: e.integer(EnvTimeseriesMaxConns),
+
 		SigningKeyFile: e.str(EnvSigningKeyFile),
 		SigningKID:     e.str(EnvSigningKID),
 		IssuerURL:      e.str(EnvIssuerURL),
@@ -179,6 +194,9 @@ func LoadCtl(environ []string) (*Ctl, error) {
 		Common:        loadCommon(e),
 		DatabaseURL:   e.str(EnvDatabaseURL),
 		TimeseriesURL: e.str(EnvTimeseriesURL),
+
+		DatabaseMaxConns:   e.integer(EnvDatabaseMaxConns),
+		TimeseriesMaxConns: e.integer(EnvTimeseriesMaxConns),
 
 		SigningKeyFile:     e.str(EnvSigningKeyFile),
 		SigningKID:         e.str(EnvSigningKID),
@@ -303,6 +321,8 @@ func (c *API) Validate() error {
 	p = intIn(p, EnvMaxBodyBytes, c.MaxBodyBytes, 1024, 1<<30)
 	p = urlOK(p, EnvDatabaseURL, c.DatabaseURL, "postgres", "postgresql")
 	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
+	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)
+	p = intIn(p, EnvTimeseriesMaxConns, c.TimeseriesMaxConns, 1, 1000)
 	p = urlOK(p, EnvNATSURL, c.NATSURL, "nats", "tls")
 	p = urlOK(p, EnvTokenIssuer, c.TokenIssuer, "http", "https")
 	p = urlOK(p, EnvTokenJWKSURL, c.TokenJWKSURL, "http", "https")
@@ -335,6 +355,8 @@ func (c *Deliver) Validate() error {
 	p = addrOK(p, EnvDeliverHTTPAddr, c.HTTPAddr)
 	p = urlOK(p, EnvDatabaseURL, c.DatabaseURL, "postgres", "postgresql")
 	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
+	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)
+	p = intIn(p, EnvTimeseriesMaxConns, c.TimeseriesMaxConns, 1, 1000)
 	p = urlOK(p, EnvNATSURL, c.NATSURL, "nats", "tls")
 	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
 		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
@@ -349,6 +371,8 @@ func (c *Ctl) Validate() error {
 	p := asProblems(c.Common.Validate())
 	p = urlOK(p, EnvDatabaseURL, c.DatabaseURL, "postgres", "postgresql")
 	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
+	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)
+	p = intIn(p, EnvTimeseriesMaxConns, c.TimeseriesMaxConns, 1, 1000)
 	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
 		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
 	}

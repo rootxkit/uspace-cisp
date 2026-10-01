@@ -206,7 +206,7 @@ func TestRequestIDEchoedOrGenerated(t *testing.T) {
 }
 
 func TestReadyz(t *testing.T) {
-	pending := func(context.Context) (string, bool) { return MigrationsPendingWP1, false }
+	pending := func(context.Context) (string, bool) { return "pending: 0006_events.sql", false }
 	down := func(context.Context) (string, bool) { return "unreachable: connection refused", false }
 	cases := []struct {
 		name       string
@@ -216,7 +216,7 @@ func TestReadyz(t *testing.T) {
 		wantChecks [3]string
 	}{
 		{"all ok", Readiness{Database: okCheck, Migrations: okCheck, NATS: okCheck}, 200, gen.Ready, [3]string{"ok", "ok", "ok"}},
-		{"migrations pending is not ready", Readiness{Database: okCheck, Migrations: pending, NATS: okCheck}, 503, gen.NotReady, [3]string{"ok", MigrationsPendingWP1, "ok"}},
+		{"migrations pending is not ready", Readiness{Database: okCheck, Migrations: pending, NATS: okCheck}, 503, gen.NotReady, [3]string{"ok", "pending: 0006_events.sql", "ok"}},
 		{"database unreachable", Readiness{Database: down, Migrations: okCheck, NATS: okCheck}, 503, gen.NotReady, [3]string{"unreachable: connection refused", "ok", "ok"}},
 		{"nats down is ready, degraded", Readiness{Database: okCheck, Migrations: okCheck, NATS: down}, 200, gen.Ready, [3]string{"ok", "ok", "unreachable: connection refused"}},
 		{"nothing configured", Readiness{}, 503, gen.NotReady, [3]string{CheckNotConfigured, CheckNotConfigured, CheckNotConfigured}},

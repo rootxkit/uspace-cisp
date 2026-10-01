@@ -12,9 +12,6 @@ import (
 const (
 	CheckOK            = "ok"
 	CheckNotConfigured = "not configured"
-	// MigrationsPendingWP1 is the migrations check until WP-1 ships the
-	// goose runner: the state is reported, and it counts as not ready.
-	MigrationsPendingWP1 = "pending (WP-1)"
 )
 
 // Check reports one readiness dependency: a state for the body ("ok",

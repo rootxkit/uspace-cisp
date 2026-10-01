@@ -1,0 +1,29 @@
+# Build and test output
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+integration.log
+vectors.log
+
+# Local data that must never be committed (spec 06 section 4): keys,
+# certificates, environment files, the dev-deps passwords under local/.
+/local/
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# web/ (WP-9)
+node_modules/
+web/.next/
+web/coverage/
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

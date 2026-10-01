@@ -255,12 +255,14 @@ func TestJWKSCacheFileProblems(t *testing.T) {
 // response still reaches the caller.
 func TestJWKSCacheWriteFailureIsCounted(t *testing.T) {
 	r := newRig(t)
-	blocker := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	blocker := filepath.Join(t.TempDir(), "local")
 	c, err := auth.OpenJWKSCache(filepath.Join(blocker, "jwks-cache.json"), auth.JWKSCacheOptions{Component: r.comp})
 	if err != nil {
+		t.Fatal(err)
+	}
+	// The cache's directory becomes a regular file after it was opened:
+	// every write now fails, on any OS.
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.Fetch(context.Background(), r.srv.URL()); err != nil {

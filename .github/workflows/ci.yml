@@ -36,6 +36,7 @@ jobs:
       go: ${{ github.event_name != 'pull_request' || steps.filter.outputs.go == 'true' }}
       generate: ${{ github.event_name != 'pull_request' || steps.filter.outputs.generate == 'true' }}
       integration: ${{ github.event_name != 'pull_request' || steps.filter.outputs.integration == 'true' }}
+      web: ${{ github.event_name != 'pull_request' || steps.filter.outputs.web == 'true' }}
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
@@ -62,7 +63,8 @@ jobs:
               - 'sqlc.yaml'
               - 'migrations/**'
               - 'schemas/**'
-              - 'web/**'
+              - 'web/src/api/**'
+              - 'web/pnpm-lock.yaml'
               - 'Makefile'
               - '.github/workflows/ci.yml'
             integration:
@@ -73,6 +75,11 @@ jobs:
               - 'deploy/postgres/**'
               - 'test/e2e/**'
               - 'Makefile'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'web/**'
+              - 'api/openapi.yaml'
+              - 'deploy/Dockerfile.web'
               - '.github/workflows/ci.yml'
 
   build-vet-lint:
@@ -116,14 +123,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: pnpm/action-setup@v4
-        if: hashFiles('web/package.json') != ''
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
       - name: web dependencies (frozen lockfile)
-        if: hashFiles('web/package.json') != ''
         working-directory: web
         run: pnpm install --frozen-lockfile
       # oapi-codegen and sqlc run from the module cache (go.mod tool
-      # directives); openapi-typescript at the Makefile's pinned version.
+      # directives); the TypeScript types through the kit's
+      # uspace-ui-gen-api, pinned by web/pnpm-lock.yaml.
       - name: make generate-check
         run: make generate-check
 
@@ -229,6 +242,79 @@ jobs:
           name: e2e-log
           path: e2e.log
 
+  # web/ (WP-9): the Next.js app on uspace-ui. Path-filtered to web/**,
+  # the OpenAPI and the image's Dockerfile; pnpm's store, Next.js's build
+  # cache and the Playwright browser are cached.
+  web:
+    name: web (lint, types, tests, build, smoke)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
+      - name: generated API types are current (uspace-ui-gen-api)
+        run: |
+          pnpm gen:api
+          out="$(git status --porcelain --untracked-files=all -- src/api)"
+          if [ -n "$out" ]; then echo "$out"; git diff -- src/api | head -50
+            echo "web/src/api differs from api/openapi.yaml: run 'pnpm gen:api' in web/ and commit"; exit 1; fi
+      - name: pnpm lint (the kit's config and the two project rules)
+        run: pnpm lint
+      - name: pnpm typecheck
+        run: pnpm typecheck
+      - name: pnpm test (vitest)
+        run: |
+          pnpm test 2>&1 | tee vitest.log
+          { echo '### web: vitest'; echo '```'; grep -E '^ +(Test Files|Tests) ' vitest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/cache@v4
+        with:
+          path: web/.next/cache
+          key: next-${{ hashFiles('web/pnpm-lock.yaml') }}-${{ hashFiles('web/app/**', 'web/src/**', 'web/*.ts', 'web/*.mjs') }}
+          restore-keys: next-${{ hashFiles('web/pnpm-lock.yaml') }}-
+      - name: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: pnpm build
+      - name: the server bundle names no database, NATS or key variable
+        run: pnpm check:bundle | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Chromium and its system libraries
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Playwright smoke (next start behind test/mock-api.mjs)
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          pnpm e2e 2>&1 | tee playwright.log
+          { echo '### web: Playwright'; echo '```'; grep -E '^ +[0-9]+ (passed|failed|skipped|flaky)' playwright.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if ! grep -qE '^ +[1-9][0-9]* passed' playwright.log; then echo "playwright: zero tests passed"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/test-results
+            web/playwright.log
+
   vectors:
     name: knowledge vectors
     needs: changes
@@ -290,7 +376,7 @@ jobs:
   image:
     name: images
     if: github.event_name == 'push'
-    needs: [build-vet-lint, generate-check, test-race, integration, e2e, vectors, govulncheck, gitleaks]
+    needs: [build-vet-lint, generate-check, test-race, integration, e2e, web, vectors, govulncheck, gitleaks]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -327,11 +413,11 @@ jobs:
           build-args: VERSION=${{ steps.tags.outputs.version }}
           cache-from: type=gha,scope=go
           cache-to: type=gha,mode=max,scope=go
-      - name: web image (from WP-9)
-        if: hashFiles('web/package.json') != ''
+      - name: web image (Next.js standalone, deploy/Dockerfile.web)
         uses: docker/build-push-action@v6
         with:
           context: web
+          file: deploy/Dockerfile.web
           push: true
           tags: ${{ steps.tags.outputs.web }}
           cache-from: type=gha,scope=web

@@ -14,9 +14,10 @@ STATICCHECK_VERSION        ?= v0.8.1
 # The gitleaks version gitleaks-action runs in CI (GITLEAKS_VERSION there).
 GITLEAKS_VERSION           ?= v8.24.3
 GOVULNCHECK_VERSION        ?= v1.8.0
-OPENAPI_TYPESCRIPT_VERSION ?= 7.13.0
 # oapi-codegen, sqlc and goose are not pinned here: they are `tool`
 # directives in go.mod and run with `go tool` from the module cache.
+# The TypeScript API types use the uspace-ui kit's uspace-ui-gen-api,
+# pinned by web/pnpm-lock.yaml.
 
 # Local dependencies for `make dev-deps` and `make integration`.
 DEV_ENV ?= local/dev.env
@@ -75,10 +76,10 @@ cover:
 	$(GO) test -count=1 -shuffle=on -coverprofile=coverage.out -covermode=atomic $(PKGS)
 	$(GO) tool cover -func=coverage.out | tail -n 1
 
-# oapi-codegen (go:generate), sqlc (from WP-1), openapi-typescript, and
+# oapi-codegen (go:generate), sqlc (from WP-1), uspace-ui-gen-api (web/), and
 # the exported JSON Schemas (tools/export-schemas.go, from WP-3).
 generate:
-	GO=$(GO) OPENAPI_TYPESCRIPT_VERSION=$(OPENAPI_TYPESCRIPT_VERSION) tools/generate.sh
+	GO=$(GO) tools/generate.sh
 
 # The committed generated files are exactly what the sources produce.
 GENERATED = internal/httpapi/gen internal/store web/src/api schemas/cis
@@ -159,9 +160,11 @@ $(DEV_ENV):
 	{ echo "POSTGRES_PASSWORD=$$(rnd)"; echo "PG_CISP_API_PASSWORD=$$(rnd)"; echo "PG_CISP_DELIVER_PASSWORD=$$(rnd)"; } > $@
 	@echo "wrote $@ (random local passwords)"
 
-# The Go image with api, deliver and cispctl; the web image is WP-9's.
+# The Go image with api, deliver and cispctl, and the web image (CI
+# builds both; the server never builds Next.js).
 image:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) .
+	docker build -f deploy/Dockerfile.web -t $(IMAGE)-web:$(VERSION) web
 
 ci: build vet lint race jws-smoke generate-check vectors vulncheck secrets integration
 

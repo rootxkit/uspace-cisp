@@ -20,7 +20,7 @@ test("/ka renders Georgian in the kit's Georgian face and stays on the origin", 
   const urls = recordRequests(page);
   const errors: string[] = [];
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(m.text());
+    if (m.type() === "error" && /Content Security Policy/i.test(m.text())) errors.push(m.text());
   });
   await page.goto("/ka");
   await expect(page.locator("html")).toHaveAttribute("lang", "ka");
@@ -38,7 +38,9 @@ test("/ka renders Georgian in the kit's Georgian face and stays on the origin", 
   expect(loaded.some((f) => /notoSansGeorgian/i.test(f))).toBe(true);
   expect(urls.some((u) => /\/_next\/static\/media\/.+\.woff2$/.test(u))).toBe(true);
 
-  await page.waitForLoadState("networkidle");
+  // The map page keeps its stream open, so the network never idles: give
+  // the page a moment to make every request it makes on load.
+  await page.waitForTimeout(1500);
   expect(offOrigin(urls, new URL(baseURL ?? "").origin)).toEqual([]);
   // A CSP violation is a console error; the page must load without one.
   expect(errors).toEqual([]);

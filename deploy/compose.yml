@@ -129,6 +129,12 @@ services:
       # Branding JSON inside the container (mount it read-only); empty
       # uses the code-name defaults.
       CISP_BRANDING_FILE: ${WEB_BRANDING_FILE:-}
+      # The public map's first view, "lng,lat" and a zoom (WP-10). No
+      # default: unset, the page says so instead of choosing a place.
+      NEXT_PUBLIC_MAP_CENTER: ${WEB_MAP_CENTER:-}
+      NEXT_PUBLIC_MAP_ZOOM: ${WEB_MAP_ZOOM:-}
+      # HEAD poll period while the stream is not live, seconds.
+      CISP_WEB_POLL_INTERVAL_S: ${WEB_POLL_INTERVAL_S:-60}
     depends_on:
       api: {condition: service_healthy}
     healthcheck:

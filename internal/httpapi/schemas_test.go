@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/rootxkit/uspace-core/ed318"
 
+	"github.com/rootxkit/uspace-cisp/internal/bus"
 	"github.com/rootxkit/uspace-cisp/internal/dataset"
 )
 
@@ -19,6 +21,7 @@ import (
 var schemaExamples = map[string]string{
 	"UsspList":           "ussp_list",
 	"UspaceRequirements": "uspace_requirements",
+	"Change":             "change",
 }
 
 func components(t *testing.T) openapi3.Schemas {
@@ -89,6 +92,19 @@ func TestSchemaExamples(t *testing.T) {
 // publication, the requirements block inside the vector's USPACE feature.
 func goAccepts(t *testing.T, name string, raw []byte) string {
 	t.Helper()
+	if name == "change" {
+		// The Go type the bus, the change feed and the webhooks write.
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.DisallowUnknownFields()
+		var m bus.ChangeMessage
+		if err := dec.Decode(&m); err != nil {
+			return err.Error()
+		}
+		if m.Schema != bus.SchemaChange {
+			return "schema " + m.Schema
+		}
+		return ""
+	}
 	if name == "ussp_list" {
 		if _, probs := dataset.ValidateUsspList(raw); probs != nil {
 			return probs.Error()

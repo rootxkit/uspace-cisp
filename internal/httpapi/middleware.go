@@ -93,13 +93,14 @@ func routeOf(ctx context.Context) string {
 
 // access logs every request once, at the end, with its route, status
 // and duration, and observes cisp_http_request_seconds by route.
-func access(next http.Handler, logger *slog.Logger, hist *prometheus.HistogramVec, mux *http.ServeMux, now func() time.Time) http.Handler {
+func access(next http.Handler, logger *slog.Logger, hist *prometheus.HistogramVec, mux *http.ServeMux, aliases map[string]string, now func() time.Time) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := now()
 		_, route := mux.Handler(r)
 		if route == "" {
 			route = "unmatched"
 		}
+		route = routeName(route, aliases)
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r.WithContext(context.WithValue(r.Context(), routeKey{}, route)))
 		elapsed := now().Sub(start)

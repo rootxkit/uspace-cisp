@@ -263,18 +263,28 @@ func TestReadyzCheckDeadline(t *testing.T) {
 	}
 }
 
-func TestStatusIsNotImplemented(t *testing.T) {
-	f := newFixture(t, &Server{}, Options{})
+// GET /v1/status without a database: the clock, the mTLS mode and
+// nothing it cannot know (E-02: the branch with the dependency absent).
+func TestStatusWithoutADatabase(t *testing.T) {
+	f := newFixture(t, &Server{Status: &StatusReport{MTLSMode: "off"}}, Options{})
 	req := httptest.NewRequest(http.MethodGet, "/v1/status", http.NoBody)
 	rec := f.do(req)
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("code = %d", rec.Code)
-	}
-	p := decodeProblem(t, rec)
-	if p.Type != ProblemTypeBase+SlugNotImplemented {
-		t.Errorf("type = %q", p.Type)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d %s", rec.Code, rec.Body.String())
 	}
 	conform(t, req, rec)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["mtls_mode"] != "off" || len(body["datasets"].([]any)) != 0 || len(body["publishers"].([]any)) != 0 || body["now"] == nil {
+		t.Errorf("status %v", body)
+	}
+	// A server with no report at all still answers with the clock.
+	rec = newFixture(t, &Server{}, Options{}).do(httptest.NewRequest(http.MethodGet, "/v1/status", http.NoBody))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"now"`) {
+		t.Errorf("no report: %d %s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestUnmatchedPathsAndMethodsAreProblems(t *testing.T) {

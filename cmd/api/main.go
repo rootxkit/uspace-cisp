@@ -156,10 +156,32 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		ready.NATS = natsCheck(nc)
 	}
 
-	server := &httpapi.Server{Ready: ready, Keys: sec.keys}
+	server := &httpapi.Server{Ready: ready, Keys: sec.keys, Status: &httpapi.StatusReport{
+		Configured: []httpapi.ConfiguredPublisher{
+			{ClientID: cfg.AuthorityClientID, Kind: "authority"}, {ClientID: cfg.ANSPClientID, Kind: "ansp"},
+		},
+		Registry: status, MTLSMode: cfg.MTLSMode, Logger: logger,
+	}}
 	if pool != nil {
-		server.Publications = publications(cfg, pool, changes, sec, status, logger)
+		opts := store.Options{Logger: logger}
+		if changes != nil {
+			opts.Bus = changes
+		}
+		st := store.New(pool, opts)
+		cache := startCache(ctx, st, status)
+		server.Publications = publications(cfg, st, sec, status, logger)
+		server.Publications.OnPublished = cache.poke
+		server.Reads = reads(cfg, st, cache.SnapshotCache, sec, status, logger)
+		server.Status.Cache = cache.SnapshotCache
+		server.Status.Publishers = st.Publishers
 	}
+	// The public reads' per-client limit; a request the cache will answer
+	// 304 is counted at the cheap rate.
+	limits := httpapi.RateLimiterConfig{RPM: cfg.PublicRPM, TrustedProxies: cfg.TrustedProxies(), Component: status.Component("ratelimit")}
+	if server.Reads != nil {
+		limits.Cheap = server.Reads.NotModified
+	}
+	limiter := httpapi.NewRateLimiter(limits)
 	router, err := httpapi.NewRouter(server, httpapi.Options{
 		Logger:               logger,
 		Status:               status,
@@ -169,7 +191,7 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		MaxBodyBytes:         cfg.MaxBodyBytes,
 		BodyReadMinBytesPerS: cfg.BodyReadMinBytesPerS,
 		RouteBodyCaps:        map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes},
-		RouteMiddleware:      sec.routes(cfg, status),
+		RouteMiddleware:      sec.routes(cfg, status, limiter),
 	})
 	if err != nil {
 		logger.ErrorContext(ctx, "routes refused", "error", err.Error())
@@ -270,13 +292,9 @@ func connectBus(ctx context.Context, cfg *config.API, logger *slog.Logger, comp 
 // publications is the publication intake on the database (WP-3): the
 // store publishes committed changes on the bus when there is one, and
 // every snapshot is signed with the CISP's key ring.
-func publications(cfg *config.API, pool *pgxpool.Pool, changes *bus.Bus, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Publications {
-	opts := store.Options{Logger: logger}
-	if changes != nil {
-		opts.Bus = changes
-	}
+func publications(cfg *config.API, st *store.Store, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Publications {
 	p := &httpapi.Publications{
-		Store:               store.New(pool, opts),
+		Store:               st,
 		MaxPublicationBytes: cfg.MaxPublicationBytes,
 		AuthorityClientID:   cfg.AuthorityClientID,
 		ANSPClientID:        cfg.ANSPClientID,
@@ -287,6 +305,53 @@ func publications(cfg *config.API, pool *pgxpool.Pool, changes *bus.Bus, sec *se
 		p.Signer = httpapi.KeyRingSigner{Keys: sec.keys}
 	}
 	return p
+}
+
+// reads are the dataset reads (WP-4): the snapshot cache for unfiltered
+// reads, the store for filtered ones, the versions and the change feed;
+// a stored version is signed at serve time with the CISP's key ring.
+func reads(cfg *config.API, st *store.Store, cache *store.SnapshotCache, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Reads {
+	r := &httpapi.Reads{
+		Store: st, Cache: cache, MaxAge: cfg.ReadMaxAge, PublicBaseURL: cfg.PublicBaseURL,
+		Status: status, Logger: logger,
+	}
+	if sec.keys != nil {
+		r.Signer = httpapi.KeyRingSigner{Keys: sec.keys}
+	}
+	return r
+}
+
+// snapshotCache is the per-instance snapshot cache with the channel that
+// asks it to refresh now.
+type snapshotCache struct {
+	*store.SnapshotCache
+	changed chan struct{}
+}
+
+// poke asks the cache to refresh now; a refresh already asked for is
+// enough, so it never blocks.
+func (c snapshotCache) poke() {
+	select {
+	case c.changed <- struct{}{}:
+	default:
+	}
+}
+
+// startCache runs the snapshot cache until ctx ends: it refreshes the
+// current versions every 5 s and when poked, and the status line shows
+// it degraded while it cannot (X-CIS-Stale is then on every read).
+func startCache(ctx context.Context, st *store.Store, status *obs.Status) snapshotCache {
+	c := snapshotCache{SnapshotCache: store.NewSnapshotCache(st, store.CacheConfig{}), changed: make(chan struct{}, 1)}
+	comp := status.Component("snapshot_cache")
+	status.AddProbe(func(context.Context) {
+		if since, stale := c.Stale(); stale {
+			comp.SetDegraded("stale since " + since.UTC().Format(time.RFC3339) + ": reads serve the held snapshots with X-CIS-Stale")
+			return
+		}
+		comp.SetHealthy()
+	})
+	go c.Run(ctx, c.changed)
+	return c
 }
 
 func natsCheck(nc *nats.Conn) httpapi.Check {

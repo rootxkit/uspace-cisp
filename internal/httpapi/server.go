@@ -39,6 +39,12 @@ type Server struct {
 	// Publications serves the publications tag (WP-3); nil (no database
 	// configured) answers its operations with 503.
 	Publications *Publications
+	// Reads serves the datasets tag (WP-4); nil (no database configured)
+	// answers its operations with 503.
+	Reads *Reads
+	// Status is what GET /v1/status reports (WP-4); nil reports the
+	// clock and nothing else.
+	Status *StatusReport
 }
 
 var _ gen.StrictServerInterface = (*Server)(nil)
@@ -79,18 +85,6 @@ func (s *Server) GetReadyz(ctx context.Context, _ gen.GetReadyzRequestObject) (g
 	}
 	body.Status = gen.NotReady
 	return gen.GetReadyz503JSONResponse(body), nil
-}
-
-// GetStatus is not implemented yet.
-func (s *Server) GetStatus(context.Context, gen.GetStatusRequestObject) (gen.GetStatusResponseObject, error) {
-	return gen.GetStatus501ApplicationProblemPlusJSONResponse{ProblemApplicationProblemPlusJSONResponse: notImplemented("GET /v1/status")}, nil
-}
-
-// notImplemented is the body of every operation whose work package has
-// not landed.
-func notImplemented(op string) gen.ProblemApplicationProblemPlusJSONResponse {
-	return gen.ProblemApplicationProblemPlusJSONResponse(NewProblem(http.StatusNotImplemented, SlugNotImplemented,
-		"Not implemented", op+" is in api/openapi.yaml but not implemented yet", ""))
 }
 
 // intakeUnavailable answers a publications operation when the api runs

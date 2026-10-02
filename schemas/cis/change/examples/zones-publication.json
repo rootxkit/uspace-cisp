@@ -1,0 +1,14 @@
+{
+  "schema": "cis/change/v1",
+  "msg_id": "42",
+  "producer": "uspace-cisp",
+  "dataset": "zones",
+  "version": 5,
+  "etag": "\"zones:5\"",
+  "feature_ids": ["TSC001", "TSN001", "TSP001"],
+  "removed_ids": ["TSP001"],
+  "reason": "publication",
+  "at": "2026-10-02T09:15:00Z",
+  "pull_url": "https://uspace-cisp.chikox.net/v1/zones?since_version=4",
+  "bbox": [15.6, 41.73, 44.9, 78.25]
+}

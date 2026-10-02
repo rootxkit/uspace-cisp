@@ -218,14 +218,26 @@ var nonPublic = []netip.Prefix{
 	netip.MustParsePrefix("100::/64"),
 	netip.MustParsePrefix("2001:db8::/32"),
 	netip.MustParsePrefix("64:ff9b:1::/48"),
+	// The IPv6 transition tunnels: 6to4 (RFC 3056) and Teredo (RFC
+	// 4380) carry an IPv4 address a relay will reach, and Teredo's is
+	// obfuscated; neither is how a subscriber is published, so neither
+	// is reached at all.
+	netip.MustParsePrefix("2002::/16"),
+	netip.MustParsePrefix("2001::/32"),
 }
+
+// nat64 is the well-known NAT64 prefix (RFC 6052): its last 32 bits are
+// the IPv4 address the translator reaches, judged as that address.
+var nat64 = netip.MustParsePrefix("64:ff9b::/96")
 
 // AllowedAddress reports whether a callback may be reached at ip: never
 // at a loopback, private (RFC 1918, IPv6 ULA), link-local, multicast,
 // unspecified, CGNAT (100.64.0.0/10) or other non-public address, unless
 // AllowPrivate. An IPv4-mapped IPv6 address is judged as its IPv4
-// address, so ::ffff:127.0.0.1 is loopback. A nil or malformed address
-// is refused.
+// address, so ::ffff:127.0.0.1 is loopback, and a NAT64 address
+// (64:ff9b::/96) as the IPv4 address it embeds, so 64:ff9b::7f00:1 is
+// loopback too; 6to4 (2002::/16) and Teredo (2001::/32) are refused. A
+// nil or malformed address is refused.
 func AllowedAddress(ip net.IP, pol URLPolicy) bool {
 	a, ok := netip.AddrFromSlice(ip)
 	if !ok {
@@ -235,6 +247,10 @@ func AllowedAddress(ip net.IP, pol URLPolicy) bool {
 		return true
 	}
 	a = a.Unmap()
+	if nat64.Contains(a) {
+		b := a.As16()
+		a = netip.AddrFrom4([4]byte{b[12], b[13], b[14], b[15]})
+	}
 	switch {
 	case a.IsLoopback(), a.IsPrivate(), a.IsLinkLocalUnicast(), a.IsLinkLocalMulticast(),
 		a.IsInterfaceLocalMulticast(), a.IsMulticast(), a.IsUnspecified(), cgnat.Contains(a):

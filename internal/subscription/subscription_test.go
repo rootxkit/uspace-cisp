@@ -117,6 +117,12 @@ func TestAllowedAddress(t *testing.T) {
 		"benchmarking":        "198.18.0.1",
 		"reserved class e":    "240.0.0.1",
 		"ietf assignments v4": "192.0.0.8",
+		"nat64 loopback":      "64:ff9b::7f00:1",
+		"nat64 rfc1918":       "64:ff9b::a00:5",
+		"nat64 link-local":    "64:ff9b::a9fe:a9fe",
+		"6to4 of loopback":    "2002:7f00:1::1",
+		"6to4 of public":      "2002:5db8:d822::1",
+		"teredo":              "2001:0:4136:e378:8000:63bf:3fff:fdd2",
 	}
 	for name, s := range refused {
 		ip := net.ParseIP(s)
@@ -130,7 +136,8 @@ func TestAllowedAddress(t *testing.T) {
 			t.Errorf("%s %s refused with AllowPrivate", name, s)
 		}
 	}
-	for _, s := range []string{"93.184.216.34", "100.128.0.1", "2001:4860:4860::8888", "8.8.8.8", "172.32.0.1"} {
+	// NAT64 of a public IPv4 address is that public address.
+	for _, s := range []string{"93.184.216.34", "100.128.0.1", "2001:4860:4860::8888", "8.8.8.8", "172.32.0.1", "64:ff9b::5db8:d822"} {
 		if !AllowedAddress(net.ParseIP(s), URLPolicy{}) {
 			t.Errorf("public %s refused", s)
 		}

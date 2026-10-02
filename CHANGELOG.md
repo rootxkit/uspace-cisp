@@ -204,3 +204,14 @@ additively within `/v1`.
   database, NATS and key variables; vitest and a Playwright smoke run;
   `deploy/Dockerfile.web`, the `web` compose service and the `web` CI job
   (§15 Q41).
+- WP-10 public zone map: `/[locale]` draws `zones`, `uspace_airspace`
+  and `restrictions` from `/public/v1/*` by the view's bbox with
+  `applies_at`, in the kit's symbology with its legend and layer
+  toggles; a feature list and panel with the ED-318 properties as
+  published (limits in their own reference and unit, schedules with
+  their offsets and daylight events by name, zone authorities, the
+  restriction's window and state, the CISP's verdict); the as-of banner
+  with version, update time, publisher staleness, "unavailable since"
+  and live, polling or disconnected from `WS /v1/stream` or `HEAD`; the
+  time control; `/[locale]/ussps`. Playwright scenarios against the
+  fixture server (§15 Q42).

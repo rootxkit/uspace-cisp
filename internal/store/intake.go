@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -36,23 +38,24 @@ func IsIdentifierConflict(err error) bool {
 	return errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == crossDatasetIndex
 }
 
-// Unavailable reports whether err means the database could not be asked
-// (no connection, a closed pool, a network failure), as opposed to a
-// refusal by the database itself or by the store's own checks: the
-// write answers 503 and the publisher retries (docs/PLAN.md section 2).
+// Unavailable reports whether err is a connectivity failure: the
+// database could not be reached (a *pgconn.ConnectError), the network
+// failed (a net.Error that is not a context deadline), or the connection
+// ended mid-exchange (io.EOF, io.ErrUnexpectedEOF). The write answers
+// 503 and the publisher retries (docs/PLAN.md section 2). Every other
+// error, a refusal by the database included, is not: it is a fault to
+// log and answer 500, never an invitation to retry.
 func Unavailable(err error) bool {
-	if err == nil {
+	if err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return false
 	}
 	var pg *pgconn.PgError
-	var fe *core.FieldError
-	switch {
-	case errors.As(err, &pg), errors.As(err, &fe),
-		errors.Is(err, ErrUnchanged), errors.Is(err, ErrVersionMismatch),
-		errors.Is(err, ErrNoopSigner), errors.Is(err, ErrNotFound):
+	if errors.As(err, &pg) {
 		return false
 	}
-	return true
+	var ce *pgconn.ConnectError
+	var ne net.Error
+	return errors.As(err, &ce) || errors.As(err, &ne) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }
 
 // CurrentVersion is the dataset's current version (0 before the first).

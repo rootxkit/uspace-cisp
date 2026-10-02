@@ -6,10 +6,10 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -82,7 +83,8 @@ func newFakeStore() *fakeStore {
 	}
 }
 
-var errFakeDown = errors.New("dial tcp 127.0.0.1:5432: connect: connection refused")
+// errFakeDown is what an unreachable database returns: a network error.
+var errFakeDown = fmt.Errorf("begin: %w", &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED})
 
 func (f *fakeStore) CurrentVersion(_ context.Context, ds publication.Dataset) (int64, error) {
 	f.mu.Lock()

@@ -392,19 +392,28 @@ func notFoundDataset(ctx context.Context, ds string) problemResponse {
 	return problemOf(ctx, http.StatusNotFound, SlugNotFound, "Not found", fe.Error(), fe)
 }
 
-// storeFailure is the answer to a store error: 503 with Retry-After when
-// the database could not be asked, otherwise the error (a 500, logged).
-func storeFailure(ctx context.Context, err error) (problemResponse, error) {
+// storeFailure is the answer to a store error: 503 with Retry-After for
+// a connectivity failure (store.Unavailable), the deadline error as it is
+// (503 timeout), and for anything else a 500 internal problem, logged
+// with the dataset, the client and the error.
+func (p *Publications) storeFailure(ctx context.Context, ds publication.Dataset, err error) (problemResponse, error) {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return problemResponse{}, err
 	}
 	if store.Unavailable(err) {
-		p := problemOf(ctx, http.StatusServiceUnavailable, SlugDatabaseUnavailable, "Database unavailable",
+		resp := problemOf(ctx, http.StatusServiceUnavailable, SlugDatabaseUnavailable, "Database unavailable",
 			"the database could not be reached; nothing was stored; retry later")
-		p.headers = map[string]string{"Retry-After": retryAfterDatabaseDownS}
-		return p, nil
+		resp.headers = map[string]string{"Retry-After": retryAfterDatabaseDownS}
+		return resp, nil
 	}
-	return problemResponse{}, err
+	client := ""
+	if c := auth.CallerFrom(ctx); c != nil {
+		client = c.ClientID
+	}
+	p.logger().LogAttrs(ctx, slog.LevelError, "store error",
+		slog.String("dataset", string(ds)), slog.String("client_id", client), slog.String("error", err.Error()))
+	return problemOf(ctx, http.StatusInternalServerError, SlugInternal, "Internal error",
+		"the store failed; the failure is logged with this request id"), nil
 }
 
 // --- PUT /v1/publications/{dataset} -------------------------------------
@@ -433,7 +442,7 @@ func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObj
 	}
 	current, err := p.Store.CurrentVersion(ctx, ds)
 	if err != nil {
-		return storeFailure(ctx, err)
+		return p.storeFailure(ctx, ds, err)
 	}
 	if etag := publication.ETag(ds, current); strings.TrimSpace(*req.Params.IfMatch) != etag {
 		return preconditionFailed(ctx, *req.Params.IfMatch, etag), nil
@@ -449,7 +458,7 @@ func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObj
 	if probs == nil && len(acc.Rows) > 0 {
 		reserved, err := p.Store.Reserved(ctx, ds, rowIDs(acc.Rows))
 		if err != nil {
-			return storeFailure(ctx, err)
+			return p.storeFailure(ctx, ds, err)
 		}
 		probs = reservedProblems(acc.Rows, reserved)
 	}
@@ -491,7 +500,7 @@ func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObj
 		if errors.As(err, &fe) {
 			return p.refuse(ctx, ds, attempt, &ed269.Problems{List: []ed269.Problem{{Field: fe.Field, Reason: fe.Reason}}}), nil
 		}
-		return storeFailure(ctx, err)
+		return p.storeFailure(ctx, ds, err)
 	}
 
 	p.count(string(ds), CounterPublicationsAccepted)
@@ -661,7 +670,7 @@ func (p *Publications) list(ctx context.Context, req gen.ListPublicationsRequest
 	}
 	versions, err := p.Store.Versions(ctx, ds, before, limit)
 	if err != nil {
-		return storeFailure(ctx, err)
+		return p.storeFailure(ctx, ds, err)
 	}
 	out := gen.PublicationVersionList{Dataset: string(ds), Versions: make([]gen.PublicationVersion, 0, len(versions))}
 	for i := range versions {
@@ -711,7 +720,7 @@ func (p *Publications) attempts(ctx context.Context, req gen.ListPublicationAtte
 	}
 	rows, err := p.Store.RefusedAttempts(ctx, ds, caller.ClientID, since, limit)
 	if err != nil {
-		return storeFailure(ctx, err)
+		return p.storeFailure(ctx, ds, err)
 	}
 	out := gen.PublicationAttemptList{Dataset: string(ds), Attempts: make([]gen.PublicationAttempt, 0, len(rows))}
 	for i := range rows {
@@ -773,7 +782,7 @@ func (p *Publications) heartbeat(ctx context.Context, req gen.PostPublisherHeart
 	if err := p.Store.RecordHeartbeat(ctx, store.Heartbeat{
 		ClientID: caller.ClientID, Kind: kind, ReceivedAt: p.now(), SentAt: req.Body.SentAt, ActiveRefs: refs,
 	}); err != nil {
-		return storeFailure(ctx, err)
+		return p.storeFailure(ctx, "", err)
 	}
 	p.count("publishers", CounterHeartbeats)
 	return gen.PostPublisherHeartbeat204Response{}, nil

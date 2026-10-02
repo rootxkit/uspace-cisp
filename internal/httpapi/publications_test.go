@@ -516,14 +516,32 @@ func TestPutPublicationUnavailableAndUnknown(t *testing.T) {
 		}
 	}
 	h.fake.down = false
-	h.fake.failWith = errors.New("ERROR: something the database refused")
-	if rec := h.put("zones", jsonBytes(t, zonesDoc(t))); rec.Code != 503 {
-		t.Errorf("an error the store did not classify = %d", rec.Code)
+	// Not connectivity: a 500 internal problem, logged with the dataset
+	// and the client, never a 503 that invites a retry.
+	for name, fault := range map[string]error{
+		"an unclassified error": errors.New("closed pool"),
+		"a database refusal":    &pgconn.PgError{Code: "42P01", Message: "relation does not exist"},
+	} {
+		h.logs.Reset()
+		h.fake.failWith = fault
+		req := h.putReq("zones", jsonBytes(t, zonesDoc(t)), `"zones:0"`)
+		rec := h.do(req)
+		conformResponse(t, req, rec)
+		if p := decodeProblem(t, rec); rec.Code != 500 || p.Type != ProblemTypeBase+SlugInternal || rec.Header().Get("Retry-After") != "" {
+			t.Errorf("%s = %d %s", name, rec.Code, rec.Body.String())
+		}
+		logs := h.logs.String()
+		if !strings.Contains(logs, `"msg":"store error"`) || !strings.Contains(logs, `"dataset":"zones"`) || !strings.Contains(logs, `"client_id":"authority-01"`) || !strings.Contains(logs, fault.Error()) {
+			t.Errorf("%s not logged with its context: %s", name, logs)
+		}
 	}
-	h.fake.failWith = &pgconn.PgError{Code: "42P01", Message: "relation does not exist"}
-	if rec := h.put("zones", jsonBytes(t, zonesDoc(t))); rec.Code != 500 || !strings.Contains(h.logs.String(), "handler error") {
-		t.Errorf("a database refusal = %d", rec.Code)
+	h.fake.failWith = nil
+	h.fake.down = true
+	h.fake.beforePublish = nil
+	if _, rec := h.heartbeat(h.token(authorityID, auth.ScopePublishZones), `{"sent_at":"2026-10-02T10:00:00Z"}`); rec.Code != 503 {
+		t.Errorf("heartbeat with the database down = %d", rec.Code)
 	}
+	h.fake.down = false
 
 	// restrictions is not published here; an unknown dataset neither.
 	h = newPubHarness(t, nil)

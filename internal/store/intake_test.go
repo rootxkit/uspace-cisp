@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"syscall"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -28,29 +31,34 @@ func TestIsIdentifierConflict(t *testing.T) {
 	}
 }
 
-// Unavailable is true for an error that is not the database's or the
-// store's own answer, false for those.
+// Unavailable is true for connectivity failures only; everything else,
+// a database refusal included, is a fault (500), not a retry (503).
 func TestUnavailable(t *testing.T) {
 	for _, down := range []error{
-		errors.New("dial tcp 127.0.0.1:5432: connect: connection refused"),
 		fmt.Errorf("begin: %w", &pgconn.ConnectError{}),
-		context.Canceled,
+		fmt.Errorf("query: %w", &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}),
+		fmt.Errorf("query: %w", io.ErrUnexpectedEOF),
+		io.EOF,
 	} {
 		if !Unavailable(down) {
 			t.Errorf("%v: not unavailable", down)
 		}
 	}
-	for _, answered := range []error{
+	for _, fault := range []error{
 		nil,
 		&pgconn.PgError{Code: "23505"},
+		fmt.Errorf("insert: %w", &pgconn.PgError{Code: "42P01"}),
+		errors.New("closed pool"),
+		errors.New("ERROR: something unexpected"),
 		fmt.Errorf("x: %w", ErrUnchanged),
 		ErrVersionMismatch,
-		ErrNoopSigner,
 		ErrNotFound,
+		context.Canceled,
+		fmt.Errorf("q: %w", context.DeadlineExceeded),
 		core.Fieldf("body", "is empty"),
 	} {
-		if Unavailable(answered) {
-			t.Errorf("%v: unavailable", answered)
+		if Unavailable(fault) {
+			t.Errorf("%v: unavailable", fault)
 		}
 	}
 }

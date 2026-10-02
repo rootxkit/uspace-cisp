@@ -14,7 +14,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -156,12 +158,25 @@ func TestIntakeOnPostgres(t *testing.T) {
 	}
 }
 
-// The database gone (E-02, for real): the pool's database is closed, a
-// PUT is 503 with Retry-After and the history 503, never a hang.
+// The database gone (E-02, for real): a pool on a port where nothing
+// listens; a PUT is 503 with Retry-After, never a hang and never a 500.
 func TestIntakeWithTheDatabaseGone(t *testing.T) {
-	st, pool := pgStore(t)
-	h := newPubHarness(t, st)
-	pool.Close()
+	u, err := url.Parse(os.Getenv("CISP_TEST_DATABASE_URL"))
+	if err != nil || u.Host == "" {
+		t.Fatalf("CISP_TEST_DATABASE_URL: %v", err)
+	}
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Host = l.Addr().String()
+	_ = l.Close() // nothing listens there now
+	pool, err := store.OpenPool(context.Background(), store.PoolConfig{URL: u.String(), ApplicationName: "uspace-cisp-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	h := newPubHarness(t, store.New(pool, store.Options{}))
 	rec := h.do(h.putReq("zones", jsonBytes(t, zonesDoc(t)), `"zones:0"`))
 	if p := decodeProblem(t, rec); rec.Code != 503 || p.Type != ProblemTypeBase+SlugDatabaseUnavailable || rec.Header().Get("Retry-After") == "" {
 		t.Fatalf("PUT = %d %s", rec.Code, rec.Body.String())

@@ -124,7 +124,50 @@ type sessionRig struct {
 	rawKey  *coreauth.Issuer // the session key outside the helper (realm tests)
 	guard   *auth.SessionGuard
 	revoked *fakeRevocations
+	touches *fakeTouches
 	comp    *obs.Component
+}
+
+// fakeTouches is the sessions table as TouchSession sees it: every jti
+// is live unless marked over (idle), err is a database down, and writes
+// counts the last_seen_at writes per jti.
+type fakeTouches struct {
+	mu     sync.Mutex
+	over   map[string]bool
+	writes map[string]int
+	err    error
+}
+
+func newFakeTouches() *fakeTouches {
+	return &fakeTouches{over: map[string]bool{}, writes: map[string]int{}}
+}
+
+func (f *fakeTouches) TouchSession(_ context.Context, jti string, idle time.Duration) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if idle != auth.SessionIdle {
+		return false, errors.New("unexpected idle timeout")
+	}
+	if f.err != nil {
+		return false, f.err
+	}
+	if f.over[jti] {
+		return false, nil
+	}
+	f.writes[jti]++
+	return true, nil
+}
+
+func (f *fakeTouches) set(jti string, over bool, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.over[jti], f.err = over, err
+}
+
+func (f *fakeTouches) count(jti string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.writes[jti]
 }
 
 type fakeRevocations struct {
@@ -159,12 +202,17 @@ func newSessionRig(t *testing.T) *sessionRig {
 		t.Fatal(err)
 	}
 	rv := &fakeRevocations{jtis: map[string]bool{}}
-	comp := obs.NewStatus("api", nil, time.Now()).Component("console_auth")
-	g, err := auth.NewSessionGuard(auth.SessionGuardConfig{Verifier: mv, Issuer: consoleIss, Revocations: rv, Problems: problems, Component: comp})
+	touches := newFakeTouches()
+	activity, err := auth.NewActivity(auth.ActivityConfig{Source: touches})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &sessionRig{machine: machine, session: si, rawKey: raw, guard: g, revoked: rv, comp: comp}
+	comp := obs.NewStatus("api", nil, time.Now()).Component("console_auth")
+	g, err := auth.NewSessionGuard(auth.SessionGuardConfig{Verifier: mv, Issuer: consoleIss, Revocations: rv, Activity: activity, Problems: problems, Component: comp})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &sessionRig{machine: machine, session: si, rawKey: raw, guard: g, revoked: rv, touches: touches, comp: comp}
 }
 
 func problems(w http.ResponseWriter, status int, slug, _, detail string, _ ...*core.FieldError) {
@@ -256,6 +304,28 @@ func TestRequireRole(t *testing.T) {
 	if s, slug := r.do(t, auth.RoleViewer, admin); s != 503 || slug != auth.SlugSessionUnavailable {
 		t.Errorf("revocation list down: %d %s", s, slug)
 	}
+	r.revoked.mu.Lock()
+	r.revoked.err = nil
+	r.revoked.mu.Unlock()
+	// Idle past the timeout: 401 session_revoked, counted as idle; the
+	// use cannot be recorded: 503 (fail closed). The pair is admin's
+	// 200 above, recorded once.
+	if n := r.touches.count("jti-admin"); n != 1 {
+		t.Errorf("admin's uses wrote last_seen_at %d times, want 1 (throttled)", n)
+	}
+	idle := r.token(t, auth.RoleViewer, "jti-idle")
+	r.touches.set("jti-idle", true, nil)
+	if s, slug := r.do(t, auth.RoleViewer, idle); s != 401 || slug != auth.SlugSessionRevoked {
+		t.Errorf("idle: %d %s", s, slug)
+	}
+	if got := r.comp.Counter(auth.CounterSessionIdle, "").Value(); got != 1 {
+		t.Errorf("session_rejected_idle = %d", got)
+	}
+	unrecorded := r.token(t, auth.RoleViewer, "jti-unrecorded")
+	r.touches.set("jti-unrecorded", false, errors.New("database down"))
+	if s, slug := r.do(t, auth.RoleViewer, unrecorded); s != 503 || slug != auth.SlugSessionUnavailable {
+		t.Errorf("activity down: %d %s", s, slug)
+	}
 	if _, err := r.guard.RequireRole("owner"); err == nil {
 		t.Error("an unknown required role was accepted")
 	}
@@ -294,6 +364,80 @@ func TestVerifySessionAndIssuer(t *testing.T) {
 	}
 	if auth.ConsoleRole(nil) != "" || auth.ConsoleRole(&auth.Caller{Kind: auth.KindMachine}) != "" {
 		t.Error("a role for no console caller")
+	}
+}
+
+// The idle timeout and the write throttle: two uses within a minute
+// write once, a use a minute later writes again, a session the
+// database says is over is refused and not remembered, a database that
+// does not answer is an error; the bound forgets old writes first and
+// past it writes every use rather than accept one from memory.
+func TestActivity(t *testing.T) {
+	clock := time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC)
+	var mu sync.Mutex
+	now := func() time.Time { mu.Lock(); defer mu.Unlock(); return clock }
+	advance := func(d time.Duration) { mu.Lock(); clock = clock.Add(d); mu.Unlock() }
+	src := newFakeTouches()
+	a, err := auth.NewActivity(auth.ActivityConfig{Source: src, MaxEntries: 2, Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	use := func(jti string) bool {
+		t.Helper()
+		ok, err := a.Active(ctx, jti)
+		if err != nil {
+			t.Fatalf("%s: %v", jti, err)
+		}
+		return ok
+	}
+	for range 2 {
+		if !use("s1") {
+			t.Fatal("a live session refused")
+		}
+	}
+	advance(59 * time.Second)
+	if !use("s1") || src.count("s1") != 1 {
+		t.Errorf("uses within a minute wrote %d times, want 1", src.count("s1"))
+	}
+	advance(time.Second)
+	if !use("s1") || src.count("s1") != 2 {
+		t.Errorf("a use a minute later: %d writes, want 2", src.count("s1"))
+	}
+	// Over in the database (idle): refused, and asked again next time.
+	src.set("s2", true, nil)
+	for range 2 {
+		if use("s2") {
+			t.Error("an idle session was accepted")
+		}
+	}
+	if a.Len() != 1 {
+		t.Errorf("remembered %d, want 1 (a refused session is not remembered)", a.Len())
+	}
+	src.set("s3", false, errors.New("down"))
+	if ok, err := a.Active(ctx, "s3"); ok || err == nil {
+		t.Errorf("database down: %v %v", ok, err)
+	}
+	src.set("s3", false, nil)
+	// The bound (2): s1 and s3 remembered; s4 is written on every use.
+	s3, s4a, s4b := use("s3"), use("s4"), use("s4")
+	if !s3 || !s4a || !s4b || src.count("s4") != 2 || a.Len() != 2 {
+		t.Errorf("past the bound: s4 writes %d, remembered %d", src.count("s4"), a.Len())
+	}
+	// A minute on, the old writes are forgotten to make room.
+	advance(time.Minute)
+	first, second := use("s4"), use("s4")
+	if !first || !second || src.count("s4") != 3 || a.Len() != 1 {
+		t.Errorf("after pruning: s4 writes %d, remembered %d", src.count("s4"), a.Len())
+	}
+	if a.Idle() != auth.SessionIdle {
+		t.Errorf("idle %s", a.Idle())
+	}
+	if _, err := auth.NewActivity(auth.ActivityConfig{}); err == nil {
+		t.Error("no source accepted")
+	}
+	if _, err := auth.NewActivity(auth.ActivityConfig{Source: src, Idle: time.Minute, Every: time.Minute}); err == nil {
+		t.Error("a throttle as long as the idle timeout accepted")
 	}
 }
 

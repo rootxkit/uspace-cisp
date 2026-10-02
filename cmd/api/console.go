@@ -116,8 +116,12 @@ func startConsole(ctx context.Context, cfg *config.API, keys consoleKeys, sec *s
 		defer tick.Stop()
 		cache.Run(ctx, tick.C)
 	}()
+	activity, err := auth.NewActivity(auth.ActivityConfig{Source: st})
+	if err != nil {
+		return consoleParts{}, err
+	}
 	guard, err := auth.NewSessionGuard(auth.SessionGuardConfig{
-		Verifier: sec.machine, Issuer: keys.issuer.Issuer(), Revocations: cache, Problems: httpapi.WriteProblem,
+		Verifier: sec.machine, Issuer: keys.issuer.Issuer(), Revocations: cache, Activity: activity, Problems: httpapi.WriteProblem,
 		Component: status.Component("console_auth"), Logger: logger, LogEvery: cfg.StatusInterval,
 	})
 	if err != nil {

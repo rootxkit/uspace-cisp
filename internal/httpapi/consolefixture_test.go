@@ -221,6 +221,7 @@ func (c *fakeConsole) AuditEvents(_ context.Context, f store.AuditFilter) ([]sto
 type consoleAccountStore interface {
 	console.Store
 	auth.RevocationSource
+	auth.ActivitySource
 }
 
 // withConsole builds the console on st and returns its routes.
@@ -243,8 +244,18 @@ func (h *pubHarness) withConsole(st PublicationStore, server *Server, status *ob
 	// As the api does: a database that is down at start leaves the cache
 	// unloaded, and every check asks the database (fail closed).
 	_ = h.revocations.Refresh(context.Background())
+	// On the fake store the throttle reads the store's clock, so a test
+	// that advances it moves both, as time does in the api.
+	var clock func() time.Time
+	if h.accounts != nil {
+		clock = h.accounts.Now
+	}
+	activity, err := auth.NewActivity(auth.ActivityConfig{Source: accounts, Now: clock})
+	if err != nil {
+		h.t.Fatal(err)
+	}
 	guard, err := auth.NewSessionGuard(auth.SessionGuardConfig{
-		Verifier: h.verifier, Issuer: consoleIssuer, Revocations: h.revocations, Problems: WriteProblem, Component: status.Component("console_auth"),
+		Verifier: h.verifier, Issuer: consoleIssuer, Revocations: h.revocations, Activity: activity, Problems: WriteProblem, Component: status.Component("console_auth"),
 	})
 	if err != nil {
 		h.t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rootxkit/uspace-cisp/internal/auth"
 	"github.com/rootxkit/uspace-cisp/internal/bus"
 	"github.com/rootxkit/uspace-cisp/internal/publication"
 )
@@ -132,4 +133,100 @@ func TestEnsureEventPartitionsOnPostgres(t *testing.T) {
 	if _, err := s.EnsureEventPartitions(ctx, 121); err == nil {
 		t.Error("121 months accepted")
 	}
+}
+
+// The idle end on the database's clock (migration 0011): a session last
+// seen 29 minutes ago is live and its last_seen_at moves to now; one
+// last seen 31 minutes ago is over, and stays over; revoked, expired and
+// unknown sessions are over too. Through auth.Activity two uses within a
+// minute write once.
+func TestTouchSessionOnPostgres(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t, Options{})
+	acc := "acc-idle-" + suffix(t)
+	if _, err := s.pool.Exec(ctx, `INSERT INTO accounts (id, username, password_hash, role, status, created_at)
+		VALUES ($1, lower($1), 'x', 'viewer', 'active', now())`, acc); err != nil {
+		t.Fatal(err)
+	}
+	session := func(lastSeenAgo string, extra string) string {
+		t.Helper()
+		jti := "jti-" + suffix(t) + suffix(t)
+		if _, err := s.pool.Exec(ctx, `INSERT INTO sessions (jti, account_id, issued_at, expires_at, last_seen_at)
+			VALUES ($1, $2, now() - interval '1 hour', now() + interval '1 hour', now() - $3::interval)`, jti, acc, lastSeenAgo); err != nil {
+			t.Fatal(err)
+		}
+		if extra != "" {
+			if _, err := s.pool.Exec(ctx, `UPDATE sessions SET `+extra+` WHERE jti = $1`, jti); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return jti
+	}
+	lastSeen := func(jti string) time.Time {
+		t.Helper()
+		sess, err := s.Session(ctx, jti)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sess.LastSeenAt
+	}
+	touch := func(jti string) bool {
+		t.Helper()
+		ok, err := s.TouchSession(ctx, jti, auth.SessionIdle)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+
+	live := session("29 minutes", "")
+	before := lastSeen(live)
+	if !touch(live) {
+		t.Fatal("a session used 29 minutes ago was refused")
+	}
+	if after := lastSeen(live); after.Sub(before) < 28*time.Minute {
+		t.Errorf("last_seen_at moved from %s to %s, want about now", before, after)
+	}
+	idle := session("31 minutes", "")
+	before = lastSeen(idle)
+	for range 2 {
+		if touch(idle) {
+			t.Error("a session idle for 31 minutes was accepted")
+		}
+	}
+	if !lastSeen(idle).Equal(before) {
+		t.Error("an idle session's last_seen_at moved")
+	}
+	for name, jti := range map[string]string{
+		"revoked": session("1 minute", "revoked_at = now()"),
+		"expired": session("1 minute", "expires_at = now() - interval '1 second'"),
+		"unknown": "jti-unknown-" + suffix(t),
+	} {
+		if touch(jti) {
+			t.Errorf("%s session accepted", name)
+		}
+	}
+
+	// The throttle: the first use writes; a second within the minute is
+	// accepted from memory and does not write (last_seen_at is put back
+	// by hand to see whether anything moves it).
+	a, err := auth.NewActivity(auth.ActivityConfig{Source: s})
+	if err != nil {
+		t.Fatal(err)
+	}
+	used := session("10 minutes", "")
+	if ok, err := a.Active(ctx, used); !ok || err != nil {
+		t.Fatalf("first use: %v %v", ok, err)
+	}
+	if _, err := s.pool.Exec(ctx, `UPDATE sessions SET last_seen_at = now() - interval '10 minutes' WHERE jti = $1`, used); err != nil {
+		t.Fatal(err)
+	}
+	marked := lastSeen(used)
+	if ok, err := a.Active(ctx, used); !ok || err != nil {
+		t.Fatalf("second use: %v %v", ok, err)
+	}
+	if !lastSeen(used).Equal(marked) {
+		t.Error("a second use within the minute wrote last_seen_at")
+	}
+	t.Logf("live session touched; idle (31 min), revoked, expired and unknown refused; a second use within a minute not written")
 }

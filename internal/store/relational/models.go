@@ -211,6 +211,8 @@ type Session struct {
 	IssuedAt  time.Time
 	ExpiresAt time.Time
 	RevokedAt *time.Time
+	// Last use of the session (database clock), written at most once a minute; idle past the timeout ends it.
+	LastSeenAt time.Time
 }
 
 // The unfiltered GET /v1/{dataset} body of each version, gzip, with the CISP compact detached JWS over the uncompressed body.

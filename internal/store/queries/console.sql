@@ -67,10 +67,11 @@ UPDATE accounts SET
 WHERE id = sqlc.arg(id);
 
 -- name: InsertSession :exec
-INSERT INTO sessions (jti, account_id, issued_at, expires_at) VALUES ($1, $2, $3, $4);
+-- A new session was last seen when it was issued.
+INSERT INTO sessions (jti, account_id, issued_at, expires_at, last_seen_at) VALUES ($1, $2, $3, $4, $3);
 
 -- name: GetSession :one
-SELECT jti, account_id, issued_at, expires_at, revoked_at FROM sessions WHERE jti = $1;
+SELECT jti, account_id, issued_at, expires_at, revoked_at, last_seen_at FROM sessions WHERE jti = $1;
 
 -- name: RevokeSession :execrows
 UPDATE sessions SET revoked_at = now() WHERE jti = $1 AND revoked_at IS NULL;
@@ -87,6 +88,16 @@ SELECT jti FROM sessions
 WHERE revoked_at IS NOT NULL AND expires_at > now()
 ORDER BY expires_at DESC
 LIMIT sqlc.arg(max_rows);
+
+-- name: TouchSession :execrows
+-- A use of a live session moves last_seen_at to now; a session that is
+-- revoked, expired, idle for more than idle_s or unknown is not touched
+-- (0 rows), and is over.
+UPDATE sessions SET last_seen_at = now()
+WHERE jti = sqlc.arg(jti)
+  AND revoked_at IS NULL
+  AND expires_at > now()
+  AND last_seen_at > now() - make_interval(secs => sqlc.arg(idle_s)::double precision);
 
 -- name: SessionRevoked :one
 SELECT (revoked_at IS NOT NULL OR expires_at <= now())::boolean AS revoked FROM sessions WHERE jti = $1;

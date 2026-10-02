@@ -38,6 +38,13 @@ the last failure; an admin can also reset its MFA (`PATCH
 /v1/console/accounts/{id}` with `reset_mfa`). Disabling an account or
 changing its role revokes its sessions on every replica within 10 s.
 
+A session ends at 12 h, or for good once it has been unused for 30
+minutes (the ecosystem's session contract): `sessions.last_seen_at`
+records the last use on the database's clock, written at most once a
+minute per session and replica, and an idle session answers 401
+`session_revoked` (counted as `cisp_session_rejected_idle_total`). The
+user signs in again.
+
 ## The audit log
 
 `events` is insert-only for `cisp_api` and hash-chained (06 T7).

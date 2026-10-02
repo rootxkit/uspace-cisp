@@ -143,7 +143,8 @@ section 9) where it names one.
 | `cisp_restrictions_refused_total` | counter | `component` | Dynamic restrictions. | — |
 | `cisp_restrictions_replayed_total` | counter | `component` | Dynamic restrictions. | — |
 | `cisp_session_accepted_total` | counter | `component` | Console sessions verified on a console route. | — |
-| `cisp_session_check_failed_total` | counter | `component` | Console requests refused 503 because the revocation list could not be read (fail closed). | any increase |
+| `cisp_session_check_failed_total` | counter | `component` | Console requests refused 503 because the revocation list could not be read or a session's use could not be recorded (fail closed). | any increase |
+| `cisp_session_rejected_idle_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
 | `cisp_session_rejected_not_session_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
 | `cisp_session_rejected_realm_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
 | `cisp_session_rejected_revoked_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |

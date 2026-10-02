@@ -22,6 +22,7 @@ type Store struct {
 	accounts map[string]store.Account
 	sessions map[string]store.Session
 	events   []store.Event
+	touches  int
 	// Fail, when set, is returned by every call (a database down).
 	Fail error
 }
@@ -36,6 +37,13 @@ func (s *Store) Advance(d time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.now = s.now.Add(d)
+}
+
+// Now reads the store's clock (the database's).
+func (s *Store) Now() time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.now
 }
 
 // Events are the audit rows written, oldest first.
@@ -104,7 +112,7 @@ func (s *Store) Login(_ context.Context, username string, decide func(a *store.A
 	s.events = append(s.events, out.Events...)
 	if out.Session != nil {
 		ns := out.Session
-		s.sessions[ns.JTI] = store.Session{JTI: ns.JTI, AccountID: ns.AccountID, IssuedAt: ns.IssuedAt, ExpiresAt: ns.ExpiresAt}
+		s.sessions[ns.JTI] = store.Session{JTI: ns.JTI, AccountID: ns.AccountID, IssuedAt: ns.IssuedAt, ExpiresAt: ns.ExpiresAt, LastSeenAt: ns.IssuedAt}
 	}
 	return out.Refusal
 }
@@ -248,6 +256,33 @@ func (s *Store) RevokedSessions(_ context.Context, limit int) ([]string, error) 
 		out = out[:limit]
 	}
 	return out, nil
+}
+
+// TouchSession implements auth.ActivitySource as the store does: a
+// live session (not revoked, not expired, last seen within idle on the
+// store's clock) moves its LastSeenAt to now; anything else is over.
+// Touches counts the writes.
+func (s *Store) TouchSession(_ context.Context, jti string, idle time.Duration) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.Fail != nil {
+		return false, s.Fail
+	}
+	sess, ok := s.sessions[jti]
+	if !ok || sess.RevokedAt != nil || !sess.ExpiresAt.After(s.now) || !sess.LastSeenAt.After(s.now.Add(-idle)) {
+		return false, nil
+	}
+	sess.LastSeenAt = s.now
+	s.sessions[jti] = sess
+	s.touches++
+	return true, nil
+}
+
+// Touches is the number of last_seen_at writes TouchSession made.
+func (s *Store) Touches() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.touches
 }
 
 // SessionRevoked implements auth.RevocationSource: unknown is revoked.

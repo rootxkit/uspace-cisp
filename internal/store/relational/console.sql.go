@@ -268,7 +268,7 @@ func (q *Queries) GetPublicationIDByVersion(ctx context.Context, arg GetPublicat
 }
 
 const getSession = `-- name: GetSession :one
-SELECT jti, account_id, issued_at, expires_at, revoked_at FROM sessions WHERE jti = $1
+SELECT jti, account_id, issued_at, expires_at, revoked_at, last_seen_at FROM sessions WHERE jti = $1
 `
 
 func (q *Queries) GetSession(ctx context.Context, jti string) (Session, error) {
@@ -280,6 +280,7 @@ func (q *Queries) GetSession(ctx context.Context, jti string) (Session, error) {
 		&i.IssuedAt,
 		&i.ExpiresAt,
 		&i.RevokedAt,
+		&i.LastSeenAt,
 	)
 	return i, err
 }
@@ -326,7 +327,7 @@ func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) er
 }
 
 const insertSession = `-- name: InsertSession :exec
-INSERT INTO sessions (jti, account_id, issued_at, expires_at) VALUES ($1, $2, $3, $4)
+INSERT INTO sessions (jti, account_id, issued_at, expires_at, last_seen_at) VALUES ($1, $2, $3, $4, $3)
 `
 
 type InsertSessionParams struct {
@@ -336,6 +337,7 @@ type InsertSessionParams struct {
 	ExpiresAt time.Time
 }
 
+// A new session was last seen when it was issued.
 func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) error {
 	_, err := q.db.Exec(ctx, insertSession,
 		arg.Jti,
@@ -751,6 +753,30 @@ func (q *Queries) SessionRevoked(ctx context.Context, jti string) (bool, error) 
 	var revoked bool
 	err := row.Scan(&revoked)
 	return revoked, err
+}
+
+const touchSession = `-- name: TouchSession :execrows
+UPDATE sessions SET last_seen_at = now()
+WHERE jti = $1
+  AND revoked_at IS NULL
+  AND expires_at > now()
+  AND last_seen_at > now() - make_interval(secs => $2::double precision)
+`
+
+type TouchSessionParams struct {
+	Jti   string
+	IdleS float64
+}
+
+// A use of a live session moves last_seen_at to now; a session that is
+// revoked, expired, idle for more than idle_s or unknown is not touched
+// (0 rows), and is over.
+func (q *Queries) TouchSession(ctx context.Context, arg TouchSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, touchSession, arg.Jti, arg.IdleS)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateAccount = `-- name: UpdateAccount :exec

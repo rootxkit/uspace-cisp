@@ -266,6 +266,9 @@ type Session struct {
 	IssuedAt  time.Time
 	ExpiresAt time.Time
 	RevokedAt *time.Time
+	// LastSeenAt is the last recorded use (written at most once a
+	// minute per replica, see TouchSession).
+	LastSeenAt time.Time
 }
 
 // Session is the row of jti, or ErrNotFound.
@@ -277,7 +280,7 @@ func (s *Store) Session(ctx context.Context, jti string) (Session, error) {
 	if err != nil {
 		return Session{}, fmt.Errorf("session: %w", err)
 	}
-	return Session{JTI: r.Jti, AccountID: r.AccountID, IssuedAt: r.IssuedAt.UTC(), ExpiresAt: r.ExpiresAt.UTC(), RevokedAt: utcPtr(r.RevokedAt)}, nil
+	return Session{JTI: r.Jti, AccountID: r.AccountID, IssuedAt: r.IssuedAt.UTC(), ExpiresAt: r.ExpiresAt.UTC(), RevokedAt: utcPtr(r.RevokedAt), LastSeenAt: r.LastSeenAt.UTC()}, nil
 }
 
 // RevokeSession revokes jti with its audit row; false when it was
@@ -307,6 +310,19 @@ func (s *Store) RevokedSessions(ctx context.Context, limit int) ([]string, error
 		return nil, fmt.Errorf("revoked sessions: %w", err)
 	}
 	return jtis, nil
+}
+
+// TouchSession implements auth.ActivitySource: it moves last_seen_at to
+// now (the database's clock) when jti is live, that is not revoked, not
+// expired and last seen within idle, and says whether it was. false is a
+// session that is over: idle past the timeout, revoked, expired or
+// unknown. An idle session is never moved again, so it ends for good.
+func (s *Store) TouchSession(ctx context.Context, jti string, idle time.Duration) (bool, error) {
+	n, err := relational.New(s.pool).TouchSession(ctx, relational.TouchSessionParams{Jti: jti, IdleS: idle.Seconds()})
+	if err != nil {
+		return false, fmt.Errorf("touch session: %w", err)
+	}
+	return n == 1, nil
 }
 
 // SessionRevoked says whether jti is revoked or expired; a jti with no

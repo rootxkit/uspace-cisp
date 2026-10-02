@@ -60,7 +60,11 @@ func TestConsoleSessionsOnPostgres(t *testing.T) {
 	if err := replica.Refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
-	guard2, err := auth.NewSessionGuard(auth.SessionGuardConfig{Verifier: h.verifier, Issuer: consoleIssuer, Revocations: replica, Problems: WriteProblem})
+	activity2, err := auth.NewActivity(auth.ActivityConfig{Source: st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard2, err := auth.NewSessionGuard(auth.SessionGuardConfig{Verifier: h.verifier, Issuer: consoleIssuer, Revocations: replica, Activity: activity2, Problems: WriteProblem})
 	if err != nil {
 		t.Fatal(err)
 	}

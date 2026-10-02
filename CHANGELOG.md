@@ -187,4 +187,6 @@ additively within `/v1`.
   content) as audited actions with a reason. No console route reaches
   content (a test reads the handlers). `cispctl create-account`,
   `export-audit` (signed JSON lines), `verify-audit` and `partitions`.
-  Migration `0010_console`.
+  Migration `0010_console`. Sessions end for good after 30 minutes
+  unused: `sessions.last_seen_at` (migration `0011_session_idle`),
+  written at most once a minute per session and replica.

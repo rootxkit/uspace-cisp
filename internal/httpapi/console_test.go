@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -342,6 +344,77 @@ func TestConsoleLogin(t *testing.T) {
 	if rec := httptestDo(h, h.consoleReq(http.MethodPost, "/v1/console/session", "", big)); rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("over the cap: %d", rec.Code)
 	}
+}
+
+// The idle end (M20: 30 min): a session used within the window stays
+// live and its last_seen_at moves, at most one write a minute; one left
+// idle for more than 30 minutes is refused for good.
+func TestConsoleSessionIdle(t *testing.T) {
+	h := newPubHarness(t, nil)
+	tok, _ := h.consoleToken(t, auth.RoleViewer)
+	me := func() *httptest.ResponseRecorder {
+		return h.consoleDo(t, h.consoleReq(http.MethodGet, "/v1/console/me", tok, nil))
+	}
+	jti := sessionJTI(t, tok)
+	issued, err := h.accounts.Session(context.Background(), jti)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Two uses within a minute: one write.
+	if rec := me(); rec.Code != http.StatusOK {
+		t.Fatalf("first use: %d %s", rec.Code, rec.Body.String())
+	}
+	h.accounts.Advance(30 * time.Second)
+	if rec := me(); rec.Code != http.StatusOK {
+		t.Fatalf("second use: %d", rec.Code)
+	}
+	if n := h.accounts.Touches(); n != 1 {
+		t.Errorf("two uses within a minute wrote last_seen_at %d times, want 1", n)
+	}
+	// Used every 29 minutes, for longer than 30 in all: kept alive, and
+	// last_seen_at moves with each use.
+	for i := range 3 {
+		h.accounts.Advance(29 * time.Minute)
+		if rec := me(); rec.Code != http.StatusOK {
+			t.Fatalf("use %d after 29 min: %d %s", i, rec.Code, rec.Body.String())
+		}
+		s, _ := h.accounts.Session(context.Background(), jti)
+		if !s.LastSeenAt.Equal(h.accounts.Now()) || !s.LastSeenAt.After(issued.LastSeenAt) {
+			t.Errorf("use %d: last_seen_at %s, now %s", i, s.LastSeenAt, h.accounts.Now())
+		}
+	}
+	// Idle for 31 minutes: refused, and still refused after (for good).
+	h.accounts.Advance(31 * time.Minute)
+	for i := range 2 {
+		rec := me()
+		if rec.Code != http.StatusUnauthorized || decodeProblem(t, rec).Type != ProblemTypeBase+auth.SlugSessionRevoked {
+			t.Errorf("idle, try %d: %d %s", i, rec.Code, rec.Body.String())
+		}
+	}
+	if got := h.counter("console_auth", auth.CounterSessionIdle); got != 2 {
+		t.Errorf("session_rejected_idle = %d, want 2", got)
+	}
+}
+
+// sessionJTI reads the jti of a session token (unverified: the token is
+// the test's own).
+func sessionJTI(t *testing.T, token string) string {
+	t.Helper()
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("not a JWT: %q", token)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c struct {
+		JTI string `json:"jti"`
+	}
+	if err := json.Unmarshal(raw, &c); err != nil || c.JTI == "" {
+		t.Fatalf("no jti in %s (%v)", raw, err)
+	}
+	return c.JTI
 }
 
 // The login limit: 20 attempts per address per 15 minutes; the 21st

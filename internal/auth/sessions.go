@@ -61,6 +61,7 @@ const (
 	CounterSessionRealm          = "session_rejected_realm"
 	CounterSessionRole           = "session_rejected_role"
 	CounterSessionRevoked        = "session_rejected_revoked"
+	CounterSessionIdle           = "session_rejected_idle"
 	CounterSessionRoleTooLow     = "session_rejected_role_too_low"
 	CounterSessionCheckFailed    = "session_check_failed"
 	CounterRevocationCacheBypass = "session_revocation_cache_bypassed"
@@ -148,6 +149,12 @@ type RevocationChecker interface {
 	Revoked(ctx context.Context, jti string) (bool, error)
 }
 
+// SessionActivity records a session's use and enforces its idle end
+// (Activity).
+type SessionActivity interface {
+	Active(ctx context.Context, jti string) (bool, error)
+}
+
 // SessionGuardConfig configures a SessionGuard.
 type SessionGuardConfig struct {
 	// Verifier is the shared verifier (the console issuer allow-listed
@@ -157,7 +164,10 @@ type SessionGuardConfig struct {
 	// not a console session here.
 	Issuer      string
 	Revocations RevocationChecker
-	Problems    ProblemWriter
+	// Activity records each use and refuses a session idle for more
+	// than 30 minutes.
+	Activity SessionActivity
+	Problems ProblemWriter
 	// Component counts the outcomes; nil: a private one.
 	Component *obs.Component
 	Logger    *slog.Logger
@@ -173,10 +183,11 @@ type SessionGuard struct {
 }
 
 // NewSessionGuard returns the guard; it refuses a config without a
-// verifier, an issuer, a revocation check or a problem writer.
+// verifier, an issuer, a revocation check, an activity tracker or a
+// problem writer.
 func NewSessionGuard(cfg SessionGuardConfig) (*SessionGuard, error) {
-	if cfg.Verifier == nil || cfg.Issuer == "" || cfg.Revocations == nil || cfg.Problems == nil {
-		return nil, errors.New("session guard: a verifier, an issuer, a revocation check and a problem writer are required")
+	if cfg.Verifier == nil || cfg.Issuer == "" || cfg.Revocations == nil || cfg.Activity == nil || cfg.Problems == nil {
+		return nil, errors.New("session guard: a verifier, an issuer, a revocation check, an activity tracker and a problem writer are required")
 	}
 	if cfg.Component == nil {
 		cfg.Component = obs.NewStatus("auth", nil, time.Now()).Component("console_auth")
@@ -216,7 +227,9 @@ func sessionErr(status int, slug, counter string, fe *core.FieldError) *SessionE
 // Session verifies a console session token: the shared verifier (401
 // on its refusals), then the console issuer and scope exactly "session"
 // (403: a machine token is not a session), realm console, exactly one
-// known role (403), and a jti that is not revoked (401 session_revoked).
+// known role (403), a jti that is not revoked (401 session_revoked) and
+// a session used within the idle timeout (401 session_revoked; the use
+// is recorded).
 // It returns the caller with its role in Claims.Roles[0].
 func (g *SessionGuard) Session(ctx context.Context, token string) (*Caller, error) {
 	claims, err := g.cfg.Verifier.Verify(ctx, token)
@@ -247,6 +260,15 @@ func (g *SessionGuard) Session(ctx context.Context, token string) (*Caller, erro
 	}
 	if revoked {
 		return nil, sessionErr(http.StatusUnauthorized, SlugSessionRevoked, CounterSessionRevoked, core.Fieldf("jti", "the session is revoked or expired"))
+	}
+	active, err := g.cfg.Activity.Active(ctx, claims.JTI)
+	if err != nil {
+		return nil, sessionErr(http.StatusServiceUnavailable, SlugSessionUnavailable, CounterSessionCheckFailed,
+			core.Fieldf("jti", "the session's last use cannot be recorded: %v", err))
+	}
+	if !active {
+		return nil, sessionErr(http.StatusUnauthorized, SlugSessionRevoked, CounterSessionIdle,
+			core.Fieldf("jti", "the session was idle for more than %s, or is revoked or expired; sign in again", SessionIdle))
 	}
 	g.count(CounterSessionAccepted)
 	return &Caller{Kind: KindConsole, ClientID: claims.Subject, Scopes: claims.Scopes, Claims: claims}, nil

@@ -163,6 +163,9 @@ type Claim struct {
 	CallbackURL        string
 	Datasets           []publication.Dataset
 	SubscriptionStatus subscription.Status
+	// LeaseUntil is when the lease runs out and any instance may claim
+	// the row again.
+	LeaseUntil time.Time
 }
 
 // ClaimDeliveries locks and leases at most limit due deliveries of
@@ -187,7 +190,7 @@ func (s *Store) ClaimDeliveries(ctx context.Context, now, leaseUntil time.Time, 
 			out = append(out, Claim{
 				DeliveryID: r.ID, SubscriptionID: r.SubscriptionID, ChangeID: r.ChangeID, Attempts: int(r.Attempts),
 				CreatedAt: r.CreatedAt.UTC(), CallbackURL: r.CallbackUrl, Datasets: datasetsOf(r.Datasets),
-				SubscriptionStatus: subscription.Status(r.Status),
+				SubscriptionStatus: subscription.Status(r.Status), LeaseUntil: leaseUntil,
 			})
 		}
 		return nil

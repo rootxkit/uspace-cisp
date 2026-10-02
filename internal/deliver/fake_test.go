@@ -34,7 +34,11 @@ type fakeStore struct {
 	suspended  map[string]string
 	// err, when set, fails every call.
 	err error
-	seq int
+	// hang makes FinishDelivered and FinishFailed wait for their
+	// context (a hung database) and records its deadline.
+	hang     bool
+	deadline time.Time
+	seq      int
 }
 
 type fakeDelivery struct {
@@ -208,12 +212,31 @@ func (f *fakeStore) ClaimDeliveries(_ context.Context, now, lease time.Time, lim
 		d.nextRetry = &l
 		s := f.sub(d.sub)
 		out = append(out, store.Claim{DeliveryID: d.id, SubscriptionID: d.sub, ChangeID: d.changeID, Attempts: d.attempts,
-			CreatedAt: d.created, CallbackURL: s.CallbackURL, Datasets: s.Datasets, SubscriptionStatus: s.Status})
+			CreatedAt: d.created, CallbackURL: s.CallbackURL, Datasets: s.Datasets, SubscriptionStatus: s.Status, LeaseUntil: lease})
 	}
 	return out, nil
 }
 
-func (f *fakeStore) FinishDelivered(_ context.Context, id, sub string, at time.Time, code int) (store.Delivered, error) {
+// wait is the hung database: it waits for ctx and records its deadline.
+func (f *fakeStore) wait(ctx context.Context) error {
+	f.mu.Lock()
+	hang := f.hang
+	f.mu.Unlock()
+	if !hang {
+		return nil
+	}
+	dl, _ := ctx.Deadline()
+	f.mu.Lock()
+	f.deadline = dl
+	f.mu.Unlock()
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (f *fakeStore) FinishDelivered(ctx context.Context, id, sub string, at time.Time, code int) (store.Delivered, error) {
+	if err := f.wait(ctx); err != nil {
+		return store.Delivered{}, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
@@ -231,7 +254,10 @@ func (f *fakeStore) FinishDelivered(_ context.Context, id, sub string, at time.T
 	return store.Delivered{Attempts: d.attempts, Verified: verified}, nil
 }
 
-func (f *fakeStore) FinishFailed(_ context.Context, fa store.FailedAttempt) (store.Failed, error) {
+func (f *fakeStore) FinishFailed(ctx context.Context, fa store.FailedAttempt) (store.Failed, error) {
+	if err := f.wait(ctx); err != nil {
+		return store.Failed{}, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {

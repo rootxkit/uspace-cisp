@@ -317,9 +317,24 @@ func (s *Service) contextOf(ctx context.Context, claims []store.Claim) (map[int6
 	return changes, versions, nil
 }
 
+// writeContext bounds the store writes after a POST: Lease - Timeout
+// from now, and never past the claim's lease.
+func (s *Service) writeContext(ctx context.Context, cl store.Claim) (context.Context, context.CancelFunc) {
+	deadline := time.Now().Add(s.cfg.Lease - s.cfg.Timeout)
+	if !cl.LeaseUntil.IsZero() {
+		// LeaseUntil is on the service's clock; translate it to the
+		// wall clock the deadline runs on.
+		if until := time.Now().Add(cl.LeaseUntil.Sub(s.now())); until.Before(deadline) {
+			deadline = until
+		}
+	}
+	return context.WithDeadline(context.WithoutCancel(ctx), deadline)
+}
+
 // Attempt makes one attempt of a claimed delivery and records it: the
 // delivery_attempts row, the deliveries row, the subscription's run, the
-// first-attempt latency and the result counter.
+// first-attempt latency and the result counter. The writes after the
+// POST share one deadline inside the lease (writeContext).
 func (s *Service) Attempt(ctx context.Context, cl store.Claim, c *publication.Change, versions map[publication.Dataset]int64) {
 	at := s.now()
 	changeAt := cl.CreatedAt
@@ -338,6 +353,12 @@ func (s *Service) Attempt(ctx context.Context, cl store.Claim, c *publication.Ch
 		o = s.Post(ctx, cl, token)
 	}
 	end := s.now()
+	// What follows the POST must end inside the lease: a write still
+	// waiting on a hung database when the lease runs out would let
+	// another instance send the delivery again.
+	wctx, cancel := s.writeContext(ctx, cl)
+	defer cancel()
+	ctx = wctx
 	s.results.WithLabelValues(o.Code).Inc()
 	if cl.Attempts == 0 {
 		s.firstHist.Observe(end.Sub(changeAt).Seconds())

@@ -641,3 +641,40 @@ func TestRunSenderDrains(t *testing.T) {
 		t.Errorf("in-flight attempt lost: %+v", d)
 	}
 }
+
+// A database that hangs after the POST: the writes give up at Lease -
+// Timeout, inside the claim's lease, so no other instance can claim the
+// row and send it again while this one still waits; the failure is
+// counted. Both outcomes (2xx and failure) are bounded.
+func TestPostWritesEndInsideTheLease(t *testing.T) {
+	for _, code := range []int{http.StatusOK, http.StatusInternalServerError} {
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			h := newHarness(t, func(c *Config) { c.Timeout = 100 * time.Millisecond; c.Lease = 400 * time.Millisecond })
+			r := newReceiver(t, code)
+			h.subscribe("S1", r.url(), subscription.Active)
+			h.queueChange(t, "S1", 1, time.Now())
+			h.st.mu.Lock()
+			h.st.hang = true
+			h.st.mu.Unlock()
+			start := time.Now()
+			claims, err := h.st.ClaimDeliveries(context.Background(), h.s.now(), h.s.now().Add(h.s.cfg.Lease), 1)
+			if err != nil || len(claims) != 1 {
+				t.Fatalf("claim %v %v", claims, err)
+			}
+			h.s.Attempt(context.Background(), claims[0], &publication.Change{ID: 1, Dataset: publication.DatasetZones, At: time.Now()}, nil)
+			took := time.Since(start)
+			h.st.mu.Lock()
+			deadline := h.st.deadline
+			h.st.mu.Unlock()
+			if deadline.IsZero() || deadline.After(start.Add(h.s.cfg.Lease)) {
+				t.Errorf("write deadline %s is past the lease (claimed at %s, lease %s)", deadline, start, h.s.cfg.Lease)
+			}
+			if took >= h.s.cfg.Lease {
+				t.Errorf("the attempt and its writes took %s, the lease is %s", took, h.s.cfg.Lease)
+			}
+			if h.counter(CounterRecordFailed) != 1 {
+				t.Errorf("record failure not counted")
+			}
+		})
+	}
+}

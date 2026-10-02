@@ -12,7 +12,9 @@ info:
     Skeleton (WP-0): health, readiness and the status stub. Every other
     work package adds its paths under its tag; see api/README.md.
     WP-2: the signing JWKS. WP-4: the reads (datasets, versions, the
-    change feed, status) and the public subset.
+    change feed, status) and the public subset. WP-5: the dynamic
+    restrictions of the ANSP (F2), their expiry and the publisher
+    staleness.
 servers:
   - url: /
 tags:
@@ -336,6 +338,13 @@ paths:
         changes a restriction's state. 403 when sub is not a configured
         publisher; the ANSP's heartbeat is bound to its client
         certificate subject like its other routes (section 8.3).
+
+        The ANSP's active_refs are compared with the restrictions the
+        CISP holds as active: a declared ansp_ref the CISP does not hold
+        as active, and an active restriction the ANSP did not declare,
+        are counted (heartbeat_ref_unknown, heartbeat_ref_missing) and
+        listed in GET /v1/status, and never acted on: only the ANSP's
+        POST and PATCH change a restriction.
       requestBody:
         required: true
         content:
@@ -350,6 +359,275 @@ paths:
         "401":
           $ref: "#/components/responses/Problem"
         "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/restrictions:
+    post:
+      operationId: createRestriction
+      tags: [restrictions]
+      summary: Create a dynamic restriction (F2)
+      description: |
+        The ANSP publishes a dynamic restriction (ATS.TR.237: activation,
+        deactivation, temporary limitation), planned or active. Token
+        scope cis.publish:restrictions, sub the configured ANSP client
+        id, and the ANSP's client certificate subject
+        (X-Client-Cert-Subject, forwarded by Caddy) equal to
+        CISP_ANSP_MTLS_SUBJECT when CISP_MTLS_MODE is required (403
+        mtls_required otherwise). The body is application/json (415
+        otherwise), at most CISP_MAX_RESTRICTION_BYTES (256 KiB), and
+        carries the ANSP's detached JWS over its exact bytes in
+        X-JWS-Signature, verified with the ANSP's own key from the ANSP's
+        JWKS (CISP_ANSP_JWKS_URL; docs/PLAN.md section 15 Q8): absent or
+        refused is 403 signature, before anything else is read.
+
+        Idempotency: the key is the body pair (ansp_ref, ansp_version),
+        never a header. The same pair with the same body bytes again is
+        200 with the stored head and replay true, and makes no new
+        version (a retry storm from a degraded ANSP cannot flood
+        subscribers); the same pair with another body, and a lower
+        ansp_version for the ansp_ref, are 409 ansp_version. An Idempotency-Key header, if
+        the ANSP's planner sends one, is ignored: nothing depends on it,
+        and two different values on the same pair still replay.
+
+        The body is the closed RestrictionCreate (cis/restriction/v1):
+        an unknown member is refused, never ignored. The feature is
+        parsed strictly as a one-feature ED-318 collection
+        (uspace-core ed318.Parse) and held to the DAR rules: reason holds
+        DAR; type PROHIBITED, REQ_AUTHORIZATION or CONDITIONAL (a DAR
+        that opens airspace is not a restriction); exactly one
+        limitedApplicability period whose startDateTime and endDateTime
+        are starts_at and ends_at, without daylight events; ed318.ToZones
+        can build it; at most 1000 vertices and 10 000 km2 (F3548
+        CstrMaxVertices, CstrMaxAreaKm2); ends_at - starts_at at most 24
+        h, starts_at at most 56 days ahead (CstrMaxDurationHours,
+        CstrMaxPlanningHorizonDays), ends_at after now, and an active
+        create starting within 60 s. The identifier is checked for
+        length (at most 7 characters, ED-318) and uniqueness across
+        zones, uspace_airspace and restrictions only, never for a prefix:
+        the ANSP mints DAR plus 4 base-36 characters (docs/PLAN.md
+        section 15 Q17). uspace_airspace_id must name a current USPACE
+        feature of the uspace_airspace dataset and the restriction must
+        intersect it; there is no option to skip the check, and the lab
+        publishes a designation for every demo (section 15 Q6). A refusal
+        is 400 restriction_refused with every problem by path, recorded
+        as an attempt the ANSP reads at
+        /v1/publications/restrictions/attempts.
+
+        Accepted, the restriction is a new version of the restrictions
+        dataset with reason restriction_created (planned) or
+        restriction_activated (active) and a change record, in the same
+        transaction as the head; 201 with the head and the version. The
+        ANSP is the master of the state (section 15 Q2): the CISP moves a
+        restriction itself only from planned or active to ended, with
+        ended_by expiry, when its ends_at passes (judged on the
+        database's clock); a planned restriction past its starts_at but
+        before its ends_at stays planned.
+      parameters:
+        - $ref: "#/components/parameters/JWSSignature"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestrictionCreate"
+      responses:
+        "200":
+          $ref: "#/components/responses/RestrictionReplay"
+        "201":
+          description: Accepted as a new version of the restrictions dataset.
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestrictionResult"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "415":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/restrictions/heads:
+    get:
+      operationId: listRestrictions
+      tags: [restrictions]
+      summary: The restriction heads, with their events
+      description: |
+        The lifecycle heads, newest window first, each with its events;
+        the restrictions dataset (GET /v1/restrictions) is the ED-318
+        view of the same rows. Token scope cis.read. state keeps one
+        state; airspace keeps the restrictions of one U-space airspace;
+        at keeps the heads whose window [starts_at, ends_at) holds that
+        instant, whatever their state. While the ANSP is stale (no
+        heartbeat for its stale_after_s, 60 s) the list carries
+        cis_publisher_stale_since; nothing is ended or hidden because the
+        ANSP is silent: active restrictions stay active until their
+        ends_at (spec 02 F2).
+
+        This list is at /v1/restrictions/heads, not at /v1/restrictions,
+        because GET /v1/restrictions is the dataset read every consumer
+        already runs for zones (docs/PLAN.md section 15 Q35).
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [planned, active, ended, cancelled]
+        - name: airspace
+          in: query
+          required: false
+          description: The uspace_airspace_id.
+          schema:
+            type: string
+            maxLength: 7
+        - name: at
+          in: query
+          required: false
+          description: RFC 3339 instant with an offset inside the window.
+          schema:
+            type: string
+            examples: ["2026-10-02T12:00:00Z"]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: The heads.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestrictionList"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/restrictions/{id}:
+    get:
+      operationId: getRestriction
+      tags: [restrictions]
+      summary: One restriction head with its events
+      description: |
+        The head and its events by the CISP's id, or by=ansp_ref by the
+        ANSP's reference. Token scope cis.read. 404 when none.
+      parameters:
+        - $ref: "#/components/parameters/RestrictionID"
+        - $ref: "#/components/parameters/RestrictionBy"
+      responses:
+        "200":
+          description: The head.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestrictionHead"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: patchRestriction
+      tags: [restrictions]
+      summary: Activate, extend, end or cancel a restriction (F2)
+      description: |
+        The ANSP changes a restriction's state: planned to active
+        (activate), planned to cancelled (cancel), active to ended (end,
+        ended_by ansp), and active to active with a later ends_at
+        (extend). Anything else is 409 state; an ended or cancelled
+        restriction changes no more. Authentication, mTLS, the body cap
+        and the signature are those of POST /v1/restrictions; the head
+        is named by its id, or with by=ansp_ref by the ANSP's reference;
+        404 when none.
+
+        ansp_version must rise on every accepted op: the same
+        (ansp_ref, ansp_version) pair with the same body bytes is 200
+        with the stored head and replay true and no new version; the
+        same pair with another op or body, and a lower one, are 409
+        ansp_version.
+        An Idempotency-Key header is ignored.
+
+        An extend carries ends_at and the feature again, its one period
+        ending at the new ends_at (refused otherwise): the published
+        period and ends_at are one truth, and the CISP never edits a
+        published feature, so the ANSP republishes it (docs/PLAN.md
+        section 15 Q36). Its window is held to 24 h from starts_at. The
+        feature may differ from the published one only in its period's
+        endDateTime: any other difference (identifier, geometry, layer,
+        type, texts, members) is 409 feature_changed. Every other op
+        carries neither.
+
+        Each accepted op is a new version of the restrictions dataset
+        with the matching reason (restriction_activated,
+        restriction_extended, restriction_ended, restriction_cancelled)
+        and a change record; an ended or cancelled restriction leaves
+        the current set and stays in history by version.
+      parameters:
+        - $ref: "#/components/parameters/RestrictionID"
+        - $ref: "#/components/parameters/RestrictionBy"
+        - $ref: "#/components/parameters/JWSSignature"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestrictionPatch"
+      responses:
+        "200":
+          description: Accepted as a new version (replay false), or the same pair again (replay true, no version).
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestrictionResult"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "415":
           $ref: "#/components/responses/Problem"
         "503":
           $ref: "#/components/responses/Problem"
@@ -818,6 +1096,41 @@ components:
       schema:
         type: string
 
+    JWSSignature:
+      name: X-JWS-Signature
+      in: header
+      required: false
+      description: |
+        RFC 7515 Appendix F detached JWS with RFC 7797 b64 false over
+        the exact body bytes (alg RS256, kid, iat, crit ["b64"]);
+        required by the server (403 signature when absent).
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Ignored. The idempotency key of a restriction is the body pair (ansp_ref, ansp_version).
+      schema:
+        type: string
+    RestrictionID:
+      name: id
+      in: path
+      required: true
+      description: The CISP's id (a ULID), or the ansp_ref with by=ansp_ref.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    RestrictionBy:
+      name: by
+      in: query
+      required: false
+      description: What id names.
+      schema:
+        type: string
+        enum: [id, ansp_ref]
+        default: id
   responses:
     Problem:
       description: An error, as RFC 9457 problem details.
@@ -992,6 +1305,16 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+    RestrictionReplay:
+      description: The same (ansp_ref, ansp_version) again; the stored head, replay true, no new version.
+      headers:
+        ETag:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RestrictionResult"
   schemas:
     Problem:
       type: object
@@ -1283,6 +1606,245 @@ components:
           items:
             type: string
 
+    RestrictionCreate:
+      type: object
+      description: |
+        cis/restriction/v1: the body of POST /v1/restrictions (spec 02
+        F2, 04 section 3.4). A closed schema: an unknown member is
+        refused, never ignored (a misspelt member must not read as an
+        absent one). The version member is ansp_version, never version.
+        The feature is the restriction as one ED-318 UASZone feature;
+        the CISP serves it as published plus
+        extendedProperties.cis_restriction (CisRestriction).
+      additionalProperties: false
+      required: [ansp_ref, ansp_version, uspace_airspace_id, state, starts_at, ends_at, feature]
+      properties:
+        ansp_ref:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: The ANSP's reference; with ansp_version the idempotency key.
+        ansp_version:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 2147483647
+          description: The ANSP-side version; rises on every accepted op.
+        uspace_airspace_id:
+          type: string
+          minLength: 1
+          maxLength: 7
+          description: The identifier of the current USPACE feature this restriction modifies.
+        state:
+          type: string
+          enum: [planned, active]
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        feature:
+          $ref: "#/components/schemas/RestrictionFeature"
+    RestrictionFeature:
+      type: object
+      description: |
+        One ED-318 UASZone feature (a Feature of
+        Schema_GeoZoneCollection) with reason DAR, type PROHIBITED,
+        REQ_AUTHORIZATION or CONDITIONAL, one limitedApplicability period
+        equal to [starts_at, ends_at] and no extendedProperties member
+        starting with cis_. The identifier is at most 7 characters (the
+        ANSP mints DAR plus 4 base-36); the CISP checks its length and
+        uniqueness only. Validated by uspace-core ed318.Parse.
+      x-go-type: json.RawMessage
+      required: [type, geometry, properties]
+      properties:
+        type:
+          type: string
+          const: Feature
+        geometry:
+          type: object
+        properties:
+          type: object
+          required: [identifier, type, reason, limitedApplicability]
+          properties:
+            identifier:
+              type: string
+              minLength: 1
+              maxLength: 7
+            type:
+              type: string
+              enum: [PROHIBITED, REQ_AUTHORIZATION, CONDITIONAL]
+            reason:
+              type: array
+              minItems: 1
+              items:
+                type: string
+            limitedApplicability:
+              type: array
+              minItems: 1
+              maxItems: 1
+              items:
+                type: object
+    RestrictionPatch:
+      type: object
+      description: |
+        The body of PATCH /v1/restrictions/{id}. A closed schema. ends_at
+        and feature belong to an extend (required there, refused
+        elsewhere).
+      additionalProperties: false
+      required: [op, ansp_version]
+      properties:
+        op:
+          type: string
+          enum: [activate, extend, end, cancel]
+        ansp_version:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 2147483647
+        ends_at:
+          type: string
+          format: date-time
+          description: The new ends_at of an extend.
+        feature:
+          $ref: "#/components/schemas/RestrictionFeature"
+    CisRestriction:
+      type: object
+      description: |
+        extendedProperties.cis_restriction of a served restriction
+        feature: the only member the CISP adds to a published feature
+        (docs/PLAN.md D4). ended_by is null while the restriction is
+        current (only planned and active restrictions are in the current
+        set; history by version holds the rest).
+      additionalProperties: false
+      required: [id, ansp_ref, ansp_version, state, starts_at, ends_at, ended_by, uspace_airspace_id]
+      properties:
+        id:
+          type: string
+        ansp_ref:
+          type: string
+        ansp_version:
+          type: integer
+          format: int64
+          minimum: 0
+        state:
+          type: string
+          enum: [planned, active, ended, cancelled]
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        ended_by:
+          type: [string, "null"]
+          enum: [ansp, expiry, null]
+        uspace_airspace_id:
+          type: string
+    RestrictionEvent:
+      type: object
+      required: [at, op, ansp_version, actor]
+      properties:
+        at:
+          type: string
+          format: date-time
+        op:
+          type: string
+          enum: [create, activate, extend, end, cancel, expire]
+        ansp_version:
+          type: integer
+          format: int64
+          minimum: 0
+        publication_id:
+          type: string
+          description: The version's publication.
+        actor:
+          type: string
+          description: The client id, or system for the expiry.
+    RestrictionHead:
+      type: object
+      description: A restriction's lifecycle head with its events, oldest first.
+      required: [id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at, created_at, updated_at, events]
+      properties:
+        id:
+          type: string
+        ansp_ref:
+          type: string
+        ansp_version:
+          type: integer
+          format: int64
+          minimum: 0
+        uspace_airspace_id:
+          type: string
+        feature_id:
+          type: string
+          maxLength: 7
+        state:
+          type: string
+          enum: [planned, active, ended, cancelled]
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        ended_by:
+          type: string
+          enum: [ansp, expiry]
+          description: Absent while the restriction is planned, active or cancelled.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_publisher:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/RestrictionEvent"
+    RestrictionResult:
+      type: object
+      description: An accepted op (replay false, a new version) or a replay of the same pair (replay true, the current version).
+      required: [restriction, dataset, version, etag, replay]
+      properties:
+        restriction:
+          $ref: "#/components/schemas/RestrictionHead"
+        dataset:
+          type: string
+          const: restrictions
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        etag:
+          type: string
+          examples: ['"restrictions:7"']
+        reason:
+          type: string
+          enum: [restriction_created, restriction_activated, restriction_extended, restriction_ended, restriction_cancelled]
+          description: The version's reason; absent on a replay.
+        replay:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    RestrictionList:
+      type: object
+      required: [restrictions]
+      properties:
+        restrictions:
+          type: array
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/RestrictionHead"
+        cis_publisher_stale_since:
+          type: [string, "null"]
+          format: date-time
+          description: Present only while the ANSP is stale; null when it has never been heard from.
     UsspList:
       type: object
       description: |
@@ -1493,7 +2055,10 @@ components:
         An ED-318 FeatureCollection as the CISP serves it: the features
         as published (canonical JSON), metadata.issued the version's
         received_at, and the top-level cis_dataset, cis_version and
-        cis_updated_at (docs/PLAN.md section 15 Q1).
+        cis_updated_at (docs/PLAN.md section 15 Q1). The restrictions
+        dataset carries cis_publisher_stale_since while the ANSP is
+        stale; such a body is signed at serve time (X-CIS-Signature over
+        the bytes served) and not cached (Cache-Control no-store).
       required: [type, features, cis_dataset, cis_version, cis_updated_at]
       properties:
         type:
@@ -1515,12 +2080,20 @@ components:
         cis_updated_at:
           type: string
           format: date-time
+        cis_publisher_stale_since:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            restrictions only, present only while the ANSP is stale: when
+            it became stale, or null when it has never been heard from.
+            Its restrictions stay as published (spec 02 F2).
     ZoneFeature:
       type: object
       description: |
         One ED-318 UASZone feature as published. The CISP adds only
         extendedProperties.cis_applicability (at and applies_at reads)
-        to its copy, never to the stored feature.
+        to its copy, never to the stored feature, and to a restriction
+        extendedProperties.cis_restriction (CisRestriction).
       required: [type, geometry, properties]
       properties:
         type:
@@ -1540,6 +2113,8 @@ components:
                 cis_applicability:
                   type: string
                   enum: [applies, not_applicable, unknown]
+                cis_restriction:
+                  $ref: "#/components/schemas/CisRestriction"
     ZoneFeatureCollection:
       type: object
       description: A plain FeatureCollection of features as published (the parts of a delta).
@@ -1800,3 +2375,55 @@ components:
           type: string
           description: CISP_MTLS_MODE; off is also a degraded line of the status (hard rule 4).
           enum: [required, off]
+        restrictions:
+          $ref: "#/components/schemas/RestrictionStatus"
+    RestrictionStatus:
+      type: object
+      description: |
+        The restrictions lifecycle as GET /v1/status reports it (WP-5):
+        how many restrictions are active, the expiry job's last run
+        (stale when older than CISP_RESTRICTION_EXPIRY_STALE_AFTER_S, 30
+        s: a dead ticker is an error line, never silence), and the
+        differences between the ANSP's last declared active_refs and the
+        active restrictions the CISP holds, which are listed and never
+        acted on.
+      required: [active, expiry]
+      properties:
+        active:
+          type: integer
+          format: int64
+          minimum: 0
+        expiry:
+          type: object
+          required: [stale, stale_after_s]
+          properties:
+            last_run_at:
+              type: string
+              format: date-time
+              description: Absent before the first run.
+            last_instance:
+              type: string
+            last_count:
+              type: integer
+              minimum: 0
+            stale:
+              type: boolean
+            stale_after_s:
+              type: integer
+              minimum: 1
+        ansp_stale_since:
+          type: [string, "null"]
+          format: date-time
+          description: Present only while the ANSP is stale; null when never heard from.
+        heartbeat_ref_unknown:
+          type: array
+          maxItems: 100
+          description: Declared active by the ANSP, not held as active here.
+          items:
+            type: string
+        heartbeat_ref_missing:
+          type: array
+          maxItems: 100
+          description: Held as active here, not declared by the ANSP.
+          items:
+            type: string

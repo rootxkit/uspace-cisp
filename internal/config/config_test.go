@@ -157,6 +157,9 @@ func TestDefaults(t *testing.T) {
 		{EnvMaxPublicationBytes, api.MaxPublicationBytes, int64(32 << 20)},
 		{EnvMaxSubscriptionsPerClient, api.MaxSubscriptionsPerClient, int64(20)},
 		{EnvBrandingFile, api.BrandingFile, ""},
+		{EnvMaxRestrictionBytes, api.MaxRestrictionBytes, int64(256 << 10)},
+		{EnvExpiryIntervalS, api.ExpiryInterval, 5 * time.Second},
+		{EnvExpiryStaleAfterS, api.ExpiryStaleAfter, 30 * time.Second},
 		{EnvDatabaseMaxConns, api.DatabaseMaxConns, int64(8)},
 		{EnvTimeseriesMaxConns, api.TimeseriesMaxConns, int64(2)},
 	}
@@ -320,6 +323,11 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvTrustedProxyCIDR, "172.18.0.0/16,caddy", "172.18.0.0/16, ::1/128", loadAPIErr},
 		{EnvMaxPublicationBytes, "1073741825", "1073741824", loadAPIErr},
 		{EnvMaxSubscriptionsPerClient, "twenty", "20", loadAPIErr},
+		{EnvMaxRestrictionBytes, "1023", "1024", loadAPIErr},
+		{EnvMaxRestrictionBytes, "16777217", "16777216", loadAPIErr},
+		{EnvExpiryIntervalS, "0", "1", loadAPIErr},
+		{EnvExpiryStaleAfterS, "0", "6", loadAPIErr},
+		{EnvExpiryStaleAfterS, "5", "3600", loadAPIErr},
 		{EnvDatabaseMaxConns, "0", "1", loadAPIErr},
 		{EnvTimeseriesMaxConns, "1001", "1000", loadAPIErr},
 		{EnvDatabaseMaxConns, "0", "8", loadDeliverErr},
@@ -487,5 +495,22 @@ func TestEnvExampleMatchesCatalogue(t *testing.T) {
 		if got[i].Name != v.Name || got[i].Default != v.Default {
 			t.Errorf("line %d: .env.example %s=%q, catalogue %s=%q", i, got[i].Name, got[i].Default, v.Name, v.Default)
 		}
+	}
+}
+
+// The expiry's staleness is above its tick: one that is not would read
+// every healthy tick as a dead ticker; the interval past a minute is
+// refused too. Each beside the accepted value (E-01).
+func TestExpiryStaleAboveInterval(t *testing.T) {
+	probs := problemsOf(t, loadAPIErr([]string{EnvExpiryIntervalS + "=30"}))
+	if _, ok := probs[EnvExpiryStaleAfterS]; !ok || len(probs) != 1 {
+		t.Errorf("interval 30 with stale 30: %v", probs)
+	}
+	if err := loadAPIErr([]string{EnvExpiryIntervalS + "=29"}); err != nil {
+		t.Errorf("interval 29: %v", err)
+	}
+	probs = problemsOf(t, loadAPIErr([]string{EnvExpiryIntervalS + "=61", EnvExpiryStaleAfterS + "=3600"}))
+	if _, ok := probs[EnvExpiryIntervalS]; !ok || len(probs) != 1 {
+		t.Errorf("interval 61: %v", probs)
 	}
 }

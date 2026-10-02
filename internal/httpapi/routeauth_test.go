@@ -27,6 +27,10 @@ func openRoutes() map[string]func(http.Handler) http.Handler {
 		"GET /v1/changes":                         passthrough,
 		"GET /public/v1/{dataset}":                passthrough,
 		"HEAD /public/v1/{dataset}":               passthrough,
+		"POST /v1/restrictions":                   passthrough,
+		"PATCH /v1/restrictions/{id}":             passthrough,
+		"GET /v1/restrictions/heads":              passthrough,
+		"GET /v1/restrictions/{id}":               passthrough,
 	}
 }
 

@@ -77,6 +77,34 @@ type PublishInput struct {
 	// (If-Match): checked under the dataset lock, so two publishers
 	// racing on one version cannot both win (ErrVersionMismatch).
 	ExpectedVersion *int64
+	// Before, when set, runs inside the transaction once the dataset is
+	// locked and before the diff: it reads and writes its own rows under
+	// the lock and returns the collection and the reason of the version
+	// (Collection, Rows and Reason of the input are then taken from it).
+	// An error rolls the whole transaction back and is returned as it is
+	// (the restrictions lifecycle, WP-5: the head, its event and the
+	// version commit together or not at all).
+	Before func(ctx context.Context, tx BeforeTx) (Prepared, error)
+}
+
+// BeforeTx is what PublishInput.Before is handed inside the transaction.
+type BeforeTx struct {
+	// Queries run in the publication's transaction.
+	Queries *relational.Queries
+	// Current is the dataset's current version under the lock; Version
+	// and PublicationID are what this transaction writes if it commits.
+	Current, Version int64
+	PublicationID    string
+	// Now is the store's clock for this transaction.
+	Now time.Time
+}
+
+// Prepared is what PublishInput.Before decides the version holds.
+type Prepared struct {
+	Collection *ed318.FeatureCollection
+	// Rows, when set, are publication.Rows(Collection); nil builds them.
+	Rows   []publication.FeatureRow
+	Reason publication.Reason
 }
 
 // PublishResult is what PublishTx committed (or, with ErrUnchanged, the
@@ -101,25 +129,25 @@ const (
 	stepEvent
 )
 
-func (in *PublishInput) validate() error {
-	switch {
-	case !in.Dataset.Valid():
+// validate checks the input; with Before set, the collection, rows and
+// reason are Before's and are checked once it has run (prepared).
+func (in *PublishInput) validate(prepared bool) error {
+	if !in.Dataset.Valid() {
 		return core.Fieldf("dataset", "%q is not a dataset", string(in.Dataset))
+	}
+	if in.Before != nil && !prepared {
+		return in.validateBody()
+	}
+	switch {
 	case !in.Reason.VersionReason():
 		return core.Fieldf("reason", "%q is not a version reason", string(in.Reason))
-	case len(in.Body) == 0:
-		return core.Fieldf("body", "is empty")
-	case in.ContentType == "":
-		return core.Fieldf("content_type", "is empty")
-	case in.PublisherClientID == "":
-		return core.Fieldf("publisher_client_id", "is empty")
 	case in.Dataset.Kind() == publication.KindED318 && in.Collection == nil:
 		return core.Fieldf("collection", "an ED-318 dataset needs the parsed collection")
 	case in.Dataset.Kind() == publication.KindUsspList && in.Collection != nil:
 		return core.Fieldf("collection", "ussp_list is not ED-318")
 	}
-	if len(in.Warnings) > 0 && !json.Valid(in.Warnings) {
-		return core.Fieldf("warnings", "not JSON")
+	if err := in.validateBody(); err != nil {
+		return err
 	}
 	if in.Rows != nil {
 		if in.Collection == nil || len(in.Rows) != len(in.Collection.Features) {
@@ -134,6 +162,34 @@ func (in *PublishInput) validate() error {
 	return nil
 }
 
+// validateBody checks what the publisher sent with the version.
+func (in *PublishInput) validateBody() error {
+	switch {
+	case len(in.Body) == 0:
+		return core.Fieldf("body", "is empty")
+	case in.ContentType == "":
+		return core.Fieldf("content_type", "is empty")
+	case in.PublisherClientID == "":
+		return core.Fieldf("publisher_client_id", "is empty")
+	}
+	if len(in.Warnings) > 0 && !json.Valid(in.Warnings) {
+		return core.Fieldf("warnings", "not JSON")
+	}
+	return nil
+}
+
+// rowsOf is the rows of the version: the given ones, or built from the
+// collection (none for ussp_list).
+func (in *PublishInput) rowsOf() ([]publication.FeatureRow, error) {
+	switch {
+	case in.Rows != nil:
+		return in.Rows, nil
+	case in.Collection != nil:
+		return publication.Rows(in.Collection)
+	}
+	return nil, nil
+}
+
 // PublishTx is the publication transaction every writer calls: lock the
 // dataset, insert the publication, its features with their ops, replace
 // features_current, insert the signed snapshot, the change record, the
@@ -143,7 +199,7 @@ func (in *PublishInput) validate() error {
 // version's and the dataset has one, nothing is written and the error
 // is ErrUnchanged with the current version in the result.
 func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (PublishResult, error) {
-	if err := in.validate(); err != nil {
+	if err := in.validate(false); err != nil {
 		return PublishResult{}, err
 	}
 	if signer == nil {
@@ -153,11 +209,8 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 		return PublishResult{}, ErrNoopSigner
 	}
 	var next []publication.FeatureRow
-	switch {
-	case in.Rows != nil:
-		next = in.Rows
-	case in.Collection != nil:
-		rows, err := publication.Rows(in.Collection)
+	if in.Before == nil {
+		rows, err := in.rowsOf()
 		if err != nil {
 			return PublishResult{}, err
 		}
@@ -199,6 +252,21 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 			res = PublishResult{Version: current, ETag: publication.ETag(in.Dataset, current)}
 			return ErrVersionMismatch
 		}
+		version := current + 1
+		pubID := newID(now)
+		if in.Before != nil {
+			p, err := in.Before(ctx, BeforeTx{Queries: q, Current: current, Version: version, PublicationID: pubID, Now: now})
+			if err != nil {
+				return err
+			}
+			in.Collection, in.Rows, in.Reason = p.Collection, p.Rows, p.Reason
+			if err := in.validate(true); err != nil {
+				return err
+			}
+			if next, err = in.rowsOf(); err != nil {
+				return err
+			}
+		}
 
 		var prev []publication.FeatureRow
 		if in.Collection != nil {
@@ -230,9 +298,6 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 				return ErrUnchanged
 			}
 		}
-		version := current + 1
-		pubID := newID(now)
-
 		// The previous form of what changed or went, for the change's box;
 		// read before features_current is replaced.
 		touchedPrev, err := s.previousRows(ctx, q, ds, append(append([]string{}, diff.Changed...), diff.Removed...))

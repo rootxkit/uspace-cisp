@@ -82,6 +82,13 @@ type API struct {
 	MaxPublicationBytes       int64
 	MaxSubscriptionsPerClient int64
 	BrandingFile              string
+	// MaxRestrictionBytes caps a restriction body (POST and PATCH
+	// /v1/restrictions; 256 KiB).
+	MaxRestrictionBytes int64
+	// ExpiryInterval is the restriction expiry's tick; ExpiryStaleAfter
+	// is how old its last run may be before the status line errs.
+	ExpiryInterval   time.Duration
+	ExpiryStaleAfter time.Duration
 }
 
 // Deliver is the configuration of cmd/deliver.
@@ -183,6 +190,9 @@ func LoadAPI(environ []string) (*API, error) {
 		MaxPublicationBytes:       e.integer(EnvMaxPublicationBytes),
 		MaxSubscriptionsPerClient: e.integer(EnvMaxSubscriptionsPerClient),
 		BrandingFile:              e.str(EnvBrandingFile),
+		MaxRestrictionBytes:       e.integer(EnvMaxRestrictionBytes),
+		ExpiryInterval:            e.seconds(EnvExpiryIntervalS),
+		ExpiryStaleAfter:          e.seconds(EnvExpiryStaleAfterS),
 	}
 	return c, finish(e, &c.Common, c.Validate)
 }
@@ -397,6 +407,13 @@ func (c *API) Validate() error {
 	}
 	p = intIn(p, EnvMaxPublicationBytes, c.MaxPublicationBytes, 1024, 1<<30)
 	p = intIn(p, EnvMaxSubscriptionsPerClient, c.MaxSubscriptionsPerClient, 1, 10_000)
+	p = intIn(p, EnvMaxRestrictionBytes, c.MaxRestrictionBytes, 1024, 16<<20)
+	p = durationIn(p, EnvExpiryIntervalS, c.ExpiryInterval, time.Second, time.Minute)
+	p = durationIn(p, EnvExpiryStaleAfterS, c.ExpiryStaleAfter, 2*time.Second, time.Hour)
+	if c.ExpiryStaleAfter <= c.ExpiryInterval {
+		p = append(p, core.Fieldf(EnvExpiryStaleAfterS, "%d s is not above %s (%d s): every healthy tick would read as a dead ticker",
+			int64(c.ExpiryStaleAfter/time.Second), EnvExpiryIntervalS, int64(c.ExpiryInterval/time.Second)))
+	}
 	return orNil(p)
 }
 

@@ -90,7 +90,7 @@ func TestPublishInputGivenRows(t *testing.T) {
 		{Properties: ed318.UASZone{Identifier: "A1"}}, {Properties: ed318.UASZone{Identifier: "B2"}},
 	}}
 	in.Rows = []publication.FeatureRow{{ID: "A1"}, {ID: "B2"}}
-	if err := in.validate(); err != nil {
+	if err := in.validate(false); err != nil {
 		t.Fatalf("matching rows refused: %v", err)
 	}
 	for name, rows := range map[string][]publication.FeatureRow{
@@ -100,13 +100,13 @@ func TestPublishInputGivenRows(t *testing.T) {
 	} {
 		in.Rows = rows
 		var fe *core.FieldError
-		if err := in.validate(); !errors.As(err, &fe) || fe.Field != "rows" {
+		if err := in.validate(false); !errors.As(err, &fe) || fe.Field != "rows" {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	ussp := validInput(t)
 	ussp.Dataset, ussp.Collection, ussp.Rows = publication.DatasetUSSPList, nil, []publication.FeatureRow{}
-	if err := ussp.validate(); err == nil {
+	if err := ussp.validate(false); err == nil {
 		t.Error("rows without a collection accepted")
 	}
 }

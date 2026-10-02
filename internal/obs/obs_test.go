@@ -284,3 +284,46 @@ func TestDegradationsKeepTheirSince(t *testing.T) {
 		t.Errorf("healthy: %+v", got)
 	}
 }
+
+// A warning raises the line to warning level, never to error; a degraded
+// component beside it still makes the line error; cleared, the line is
+// info again (E-01, E-02: each level read back).
+func TestStatusLineWarning(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(&buf, "api", slog.LevelInfo)
+	s := NewStatus("api", nil, t0)
+	ansp := s.Component("ansp")
+	ansp.SetWarning("ansp-01 stale since 2026-10-02T12:00:00Z")
+	if ansp.Warning() == "" || s.Degraded() {
+		t.Fatalf("warning %q, degraded %v", ansp.Warning(), s.Degraded())
+	}
+	s.Log(context.Background(), logger, t0)
+	s.Component("database").SetDegraded("unreachable")
+	s.Log(context.Background(), logger, t0)
+	s.Component("database").SetHealthy()
+	ansp.SetWarning("")
+	s.Log(context.Background(), logger, t0)
+
+	got := lines(t, &buf)
+	if len(got) != 3 {
+		t.Fatalf("got %d lines", len(got))
+	}
+	if got[0]["level"] != "WARN" {
+		t.Errorf("warned line level = %v", got[0]["level"])
+	}
+	if a, _ := got[0]["ansp"].(map[string]any); a["warning"] != "ansp-01 stale since 2026-10-02T12:00:00Z" {
+		t.Errorf("ansp group = %v", got[0]["ansp"])
+	}
+	if list, _ := got[0]["warnings"].([]any); len(list) != 1 || list[0] != "ansp" {
+		t.Errorf("warnings = %v", got[0]["warnings"])
+	}
+	if _, ok := got[0]["degraded"]; ok {
+		t.Errorf("a warning is listed as degraded: %v", got[0])
+	}
+	if got[1]["level"] != "ERROR" {
+		t.Errorf("warned and degraded line level = %v", got[1]["level"])
+	}
+	if got[2]["level"] != "INFO" {
+		t.Errorf("cleared line level = %v", got[2]["level"])
+	}
+}

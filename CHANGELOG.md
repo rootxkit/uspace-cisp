@@ -93,3 +93,30 @@ additively within `/v1`.
   `internal/applicability` (`ed318.Applies` at the feature's centroid,
   unknown kept); the dataset-first routes registered per dataset;
   `golang.org/x/time` for the token buckets.
+- WP-5 dynamic restrictions from the ANSP (F2): `POST /v1/restrictions`
+  and `PATCH /v1/restrictions/{id}` (`?by=ansp_ref`) behind the ANSP's
+  publish scope, client id, client certificate subject and detached
+  signature verified with the ANSP's own JWKS (256 KiB,
+  `CISP_MAX_RESTRICTION_BYTES`); the idempotency key is the body pair
+  `(ansp_ref, ansp_version)` (a replay is 200 and no version; a lower
+  version 409 `ansp_version`; `Idempotency-Key` ignored); the lifecycle
+  state machine of `internal/restriction` (planned, active, ended,
+  cancelled; the F3548 `Cstr*` window limits imported from core; zero
+  limits refuse); the DAR rules of `internal/dataset` (strict one-feature
+  parse, DAR reason, restricting types, one period equal to the window,
+  no daylight events, 1000 vertices, 10 000 km2 and intersection with a
+  current U-space airspace measured by PostGIS, identifiers checked for
+  length and uniqueness only); every accepted op a version of the
+  `restrictions` dataset with its reason and change record in the same
+  transaction as the head (`PublishTx` takes a `Before` hook); the
+  served feature stamped with `extendedProperties.cis_restriction`;
+  `GET /v1/restrictions/heads` and `GET /v1/restrictions/{id}` with
+  events; the expiry ticker (`CISP_RESTRICTION_EXPIRY_INTERVAL_S`,
+  leader-elected per run, `restrictions_expired`, `restrictions_active`,
+  last run in `job_runs` and `/v1/status`, an error line after
+  `CISP_RESTRICTION_EXPIRY_STALE_AFTER_S`); the ANSP's staleness as
+  `cis_publisher_stale_since` on the heads and the dataset and a
+  warning-level status line, and its heartbeat `active_refs` compared
+  with the active heads (counted and listed, never acted on);
+  migration `0008_restriction_jobs`; `schemas/cis/restriction/v1.json`;
+  a warning tier in the status line.

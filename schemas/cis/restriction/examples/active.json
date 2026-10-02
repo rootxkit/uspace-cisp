@@ -1,0 +1,27 @@
+{
+  "ansp_ref": "TBS-DAR-2026-0417",
+  "ansp_version": 1,
+  "uspace_airspace_id": "TSU001",
+  "state": "active",
+  "starts_at": "2026-10-02T12:00:00Z",
+  "ends_at": "2026-10-02T15:00:00Z",
+  "feature": {
+    "type": "Feature",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [[[44.80, 41.70], [44.82, 41.70], [44.82, 41.72], [44.80, 41.72], [44.80, 41.70]]],
+      "layer": {"lower": 0, "lowerReference": "AGL", "upper": 120, "upperReference": "AGL", "uom": "m"}
+    },
+    "properties": {
+      "identifier": "DAR0A1B",
+      "country": "GEO",
+      "type": "PROHIBITED",
+      "variant": "COMMON",
+      "reason": ["DAR", "EMERGENCY"],
+      "name": [{"lang": "en-GB", "text": "Emergency response, Vake"}],
+      "message": [{"lang": "en-GB", "text": "Closed to UAS for an emergency response"}],
+      "limitedApplicability": [{"startDateTime": "2026-10-02T12:00:00Z", "endDateTime": "2026-10-02T15:00:00Z"}],
+      "zoneAuthority": [{"name": [{"lang": "en-GB", "text": "Sakaeronavigatsia"}], "purpose": "NOTIFICATION"}]
+    }
+  }
+}

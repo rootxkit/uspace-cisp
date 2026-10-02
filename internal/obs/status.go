@@ -29,9 +29,9 @@ func NewRegistry() *prometheus.Registry {
 // Status is the one place a process's components count into. Every
 // counter and gauge is also a Prometheus metric (cisp_<name>_total and
 // cisp_<name>, labelled by component), and Log prints all of them in one
-// status line: at info when every component is healthy, at error when any
-// reports degraded (LESSONS E-09: silence is indistinguishable from
-// health).
+// status line: at info when every component is healthy, at warning when
+// one reports a warning and none is degraded, at error when any reports
+// degraded (LESSONS E-09: silence is indistinguishable from health).
 type Status struct {
 	process string
 	reg     prometheus.Registerer
@@ -148,8 +148,9 @@ func (s *Status) sortedComponents() []*Component {
 }
 
 // Log runs the probes and writes one status line: every component with
-// its counters, gauges and degraded reason. The line is at info when
-// nothing is degraded and at error when anything is.
+// its counters, gauges, warning and degraded reason. The line is at info
+// when nothing is degraded or warned, at warning when a component warns
+// and none is degraded, and at error when anything is degraded.
 func (s *Status) Log(ctx context.Context, logger *slog.Logger, now time.Time) {
 	s.mu.Lock()
 	probes := append([]func(context.Context){}, s.probes...)
@@ -164,18 +165,25 @@ func (s *Status) Log(ctx context.Context, logger *slog.Logger, now time.Time) {
 	s.mu.Unlock()
 
 	level := slog.LevelInfo
-	var degraded []string
+	var degraded, warned []string
 	attrs := []slog.Attr{slog.Int64("uptime_s", int64(now.Sub(s.started)/time.Second))}
 	for _, c := range comps {
-		group, reason := c.attrs()
+		group, reason, warning := c.attrs()
 		if reason != "" {
 			degraded = append(degraded, c.name)
+		}
+		if warning != "" {
+			warned = append(warned, c.name)
 		}
 		attrs = append(attrs, slog.Attr{Key: c.name, Value: slog.GroupValue(group...)})
 	}
 	if len(regErrors) > 0 {
 		degraded = append(degraded, "metrics")
 		attrs = append(attrs, slog.Any("metric_register_errors", regErrors))
+	}
+	if len(warned) > 0 {
+		level = slog.LevelWarn
+		attrs = append(attrs, slog.Any("warnings", warned))
 	}
 	if len(degraded) > 0 {
 		level = slog.LevelError
@@ -208,6 +216,9 @@ type Component struct {
 	degraded string
 	// since is when the component last went from healthy to degraded.
 	since time.Time
+	// warning is a condition worth a warning-level status line that is
+	// not a fault of this process (a silent publisher, say).
+	warning string
 }
 
 // Counter returns the named counter of this component, creating and
@@ -282,6 +293,22 @@ func (s *Status) Degradations() []Degradation {
 	return out
 }
 
+// SetWarning marks the component with a warning; an empty reason clears
+// it. A warning raises the status line to warning level, never to error,
+// and is independent of the degraded state.
+func (c *Component) SetWarning(reason string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.warning = reason
+}
+
+// Warning is the component's warning, or "".
+func (c *Component) Warning() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.warning
+}
+
 // SetHealthy clears the degraded state.
 func (c *Component) SetHealthy() { c.SetDegraded("") }
 
@@ -292,7 +319,7 @@ func (c *Component) DegradedReason() string {
 	return c.degraded
 }
 
-func (c *Component) attrs() ([]slog.Attr, string) {
+func (c *Component) attrs() ([]slog.Attr, string, string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	names := make([]string, 0, len(c.counters)+len(c.gauges))
@@ -312,10 +339,13 @@ func (c *Component) attrs() ([]slog.Attr, string) {
 			attrs = append(attrs, slog.Float64(n, g.Value()))
 		}
 	}
+	if c.warning != "" {
+		attrs = append(attrs, slog.String("warning", c.warning))
+	}
 	if c.degraded != "" {
 		attrs = append(attrs, slog.String("degraded", c.degraded))
 	}
-	return attrs, c.degraded
+	return attrs, c.degraded, c.warning
 }
 
 // Counter is a monotonic count shown in the status line and exported to

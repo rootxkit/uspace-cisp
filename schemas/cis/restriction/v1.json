@@ -1,0 +1,174 @@
+{
+  "$defs": {
+    "CisRestriction": {
+      "additionalProperties": false,
+      "description": "extendedProperties.cis_restriction of a served restriction\nfeature: the only member the CISP adds to a published feature\n(docs/PLAN.md D4). ended_by is null while the restriction is\ncurrent (only planned and active restrictions are in the current\nset; history by version holds the rest).\n",
+      "properties": {
+        "ansp_ref": {
+          "type": "string"
+        },
+        "ansp_version": {
+          "format": "int64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ended_by": {
+          "enum": [
+            "ansp",
+            "expiry",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ends_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "starts_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "planned",
+            "active",
+            "ended",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "uspace_airspace_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "ansp_ref",
+        "ansp_version",
+        "state",
+        "starts_at",
+        "ends_at",
+        "ended_by",
+        "uspace_airspace_id"
+      ],
+      "type": "object"
+    },
+    "RestrictionFeature": {
+      "description": "One ED-318 UASZone feature (a Feature of\nSchema_GeoZoneCollection) with reason DAR, type PROHIBITED,\nREQ_AUTHORIZATION or CONDITIONAL, one limitedApplicability period\nequal to [starts_at, ends_at] and no extendedProperties member\nstarting with cis_. The identifier is at most 7 characters (the\nANSP mints DAR plus 4 base-36); the CISP checks its length and\nuniqueness only. Validated by uspace-core ed318.Parse.\n",
+      "properties": {
+        "geometry": {
+          "type": "object"
+        },
+        "properties": {
+          "properties": {
+            "identifier": {
+              "maxLength": 7,
+              "minLength": 1,
+              "type": "string"
+            },
+            "limitedApplicability": {
+              "items": {
+                "type": "object"
+              },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "reason": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "type": {
+              "enum": [
+                "PROHIBITED",
+                "REQ_AUTHORIZATION",
+                "CONDITIONAL"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "identifier",
+            "type",
+            "reason",
+            "limitedApplicability"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "Feature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "geometry",
+        "properties"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.uspace.ge/cis/restriction/v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "cis/restriction/v1: the body of POST /v1/restrictions (spec 02\nF2, 04 section 3.4). A closed schema: an unknown member is\nrefused, never ignored (a misspelt member must not read as an\nabsent one). The version member is ansp_version, never version.\nThe feature is the restriction as one ED-318 UASZone feature;\nthe CISP serves it as published plus\nextendedProperties.cis_restriction (CisRestriction).\n",
+  "properties": {
+    "ansp_ref": {
+      "description": "The ANSP's reference; with ansp_version the idempotency key.",
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "ansp_version": {
+      "description": "The ANSP-side version; rises on every accepted op.",
+      "format": "int64",
+      "maximum": 2147483647,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ends_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "feature": {
+      "$ref": "#/$defs/RestrictionFeature"
+    },
+    "starts_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "planned",
+        "active"
+      ],
+      "type": "string"
+    },
+    "uspace_airspace_id": {
+      "description": "The identifier of the current USPACE feature this restriction modifies.",
+      "maxLength": 7,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ansp_ref",
+    "ansp_version",
+    "uspace_airspace_id",
+    "state",
+    "starts_at",
+    "ends_at",
+    "feature"
+  ],
+  "title": "cis/restriction/v1: a dynamic restriction from the ANSP (the POST /v1/restrictions body; $defs/CisRestriction is extendedProperties.cis_restriction of a served restriction)",
+  "type": "object"
+}

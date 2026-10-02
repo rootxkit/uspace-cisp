@@ -45,6 +45,9 @@ type Server struct {
 	// Status is what GET /v1/status reports (WP-4); nil reports the
 	// clock and nothing else.
 	Status *StatusReport
+	// Restrictions serves the restrictions tag (WP-5); nil (no database
+	// configured) answers its operations with 503.
+	Restrictions *Restrictions
 }
 
 var _ gen.StrictServerInterface = (*Server)(nil)

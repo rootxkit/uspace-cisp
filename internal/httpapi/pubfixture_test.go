@@ -47,6 +47,9 @@ const (
 	tokenIssuer   = "https://authority.example.test/"
 	tokenAudience = "uspace-cisp.example.test"
 	publisherKID  = "authority-sig-1"
+	anspKID       = "ansp-sig-1"
+	// restrictionMaxBytes is the restriction body cap of the harness.
+	restrictionMaxBytes = 256 << 10
 )
 
 // kin-openapi decodes application/json; a publication may also be
@@ -84,6 +87,8 @@ type fakeStore struct {
 	updated    map[publication.Dataset]time.Time
 	changes    []publication.Change
 	publishers []store.Publisher
+	// What the restrictions need (WP-5).
+	restr *fakeRestrictions
 }
 
 func newFakeStore() *fakeStore {
@@ -295,6 +300,10 @@ type pubHarness struct {
 	cache   *store.SnapshotCache
 	ring    *jws.KeyRing
 	limiter *RateLimiter
+	// The restrictions (WP-5) when the store serves them, and the ANSP's
+	// signing key.
+	rs         *Restrictions
+	anspSigner *rsa.PrivateKey
 }
 
 type harnessOption func(*Publications, *Server)
@@ -341,7 +350,17 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 	}
 	routes := pa.Routes()
 	routes["GET /v1/status"] = g.RequireScopes(auth.ScopeRead)
-	h := &pubHarness{t: t, iss: iss, signer: key, status: status, now: now}
+	anspKey := authtest.Key(t, "ansp-signing", 3072)
+	anspDV, err := jws.NewDetachedVerifier(ctx, jws.KeySource{Publisher: anspID, Keys: coreauth.IssuerConfig{Keys: authtest.PublicSet(t, map[string]*rsa.PrivateKey{anspKID: anspKey})}},
+		5*time.Minute, jws.Options{MaxPayloadBytes: maxBytes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	maps.Copy(routes, RestrictionAuth{Guard: g, ANSPSignature: jws.SignatureGuard{
+		Verifier: func() *jws.DetachedVerifier { return anspDV }, Problems: WriteProblem,
+		MaxBodyBytes: restrictionMaxBytes, Component: status.Component("signature"),
+	}}.Routes())
+	h := &pubHarness{t: t, iss: iss, signer: key, status: status, now: now, anspSigner: anspKey}
 	if st == nil {
 		h.fake = newFakeStore()
 		st = h.fake
@@ -360,6 +379,7 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 		Registry:   status, MTLSMode: config.MTLSRequired,
 	}}
 	h.withReads(st, server, status, logger)
+	h.withRestrictions(st, server, status, logger)
 	read := g.RequireScopes(auth.ScopeRead)
 	for _, op := range []string{"GET /v1/{dataset}", "HEAD /v1/{dataset}", "GET /v1/{dataset}/versions", "GET /v1/{dataset}/versions/{version}", "GET /v1/changes"} {
 		routes[op] = read
@@ -368,9 +388,13 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 	for _, o := range opts {
 		o(h.pubs, server)
 	}
+	caps := map[string]int64{PublicationRoute: maxBytes}
+	for _, r := range RestrictionWriteRoutes {
+		caps[r] = restrictionMaxBytes
+	}
 	router, err := NewRouter(server, Options{
 		Logger: logger, Status: status, RouteMiddleware: routes,
-		RouteBodyCaps: map[string]int64{PublicationRoute: maxBytes}, HandlerTimeout: time.Minute,
+		RouteBodyCaps: caps, HandlerTimeout: time.Minute,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -464,7 +488,7 @@ func conformPut(t testing.TB, req *http.Request, body []byte, rec *httptest.Resp
 // described.
 func conformResponse(t testing.TB, req *http.Request, rec *httptest.ResponseRecorder) {
 	t.Helper()
-	route, params, err := spec(t).FindRoute(req)
+	route, params, err := findRoute(t, req)
 	if err != nil {
 		t.Fatalf("not in api/openapi.yaml: %v", err)
 	}

@@ -112,6 +112,14 @@ type FeaturesCurrent struct {
 	HasLayers      bool
 }
 
+// The last run of each leader-elected api job (restriction_expiry), shared by the replicas.
+type JobRun struct {
+	Name         string
+	LastRunAt    time.Time
+	LastInstance string
+	LastCount    int32
+}
+
 // Every accepted version with the verbatim body and the publisher signature; insert-only, kept for ever (06 T7, 05 section 4).
 type Publication struct {
 	ID                 string
@@ -172,8 +180,10 @@ type Restriction struct {
 	UpdatedAt             time.Time
 	LastPublisherClientID string
 	SourceStaleSince      *time.Time
+	LastBodySha256        []byte
 }
 
+// Every lifecycle event of every restriction with its version's publication; insert-only.
 type RestrictionEvent struct {
 	RestrictionID string
 	At            time.Time

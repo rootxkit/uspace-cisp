@@ -22,6 +22,7 @@ var schemaExamples = map[string]string{
 	"UsspList":           "ussp_list",
 	"UspaceRequirements": "uspace_requirements",
 	"Change":             "change",
+	"RestrictionCreate":  "restriction",
 }
 
 func components(t *testing.T) openapi3.Schemas {
@@ -102,6 +103,18 @@ func goAccepts(t *testing.T, name string, raw []byte) string {
 		}
 		if m.Schema != bus.SchemaChange {
 			return "schema " + m.Schema
+		}
+		return ""
+	}
+	if name == "restriction" {
+		// The body parser and the DAR rules of POST /v1/restrictions.
+		body, probs := dataset.ParseRestrictionBody(raw)
+		if probs != nil {
+			return probs.Error()
+		}
+		w := dataset.RestrictionWindow{StartsAt: body.StartsAt, EndsAt: body.EndsAt}
+		if _, probs := dataset.ValidateRestriction(body.Feature, w, ed318.Limits{}); probs != nil {
+			return probs.Error()
 		}
 		return ""
 	}

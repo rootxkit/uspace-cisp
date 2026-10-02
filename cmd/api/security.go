@@ -132,7 +132,10 @@ func (s *security) retry(ctx context.Context, tick <-chan time.Time) {
 //
 // The reads (WP-4) take cis.read; the public reads take no token and go
 // through the per-client rate limiter (httpapi.PublicReadAuth), an
-// explicit entry like every other.
+// explicit entry like every other. The restrictions (WP-5) are
+// httpapi.RestrictionAuth's: the ANSP's publish scope, its client id and
+// client certificate, and its detached signature verified with the
+// ANSP's own JWKS on POST and PATCH; cis.read on the heads.
 func (s *security) routes(cfg *config.API, status *obs.Status, limiter *httpapi.RateLimiter) map[string]func(http.Handler) http.Handler {
 	read := s.guard.RequireScopes(auth.ScopeRead)
 	out := map[string]func(http.Handler) http.Handler{
@@ -155,6 +158,16 @@ func (s *security) routes(cfg *config.API, status *obs.Status, limiter *httpapi.
 		Component: status.Component("publishers"),
 	}
 	maps.Copy(out, pub.Routes())
+	restrictions := httpapi.RestrictionAuth{
+		Guard: s.guard,
+		ANSPSignature: jws.SignatureGuard{
+			Verifier:     s.verifier(auth.PublisherANSP),
+			Problems:     httpapi.WriteProblem,
+			MaxBodyBytes: cfg.MaxRestrictionBytes,
+			Component:    status.Component("signature"),
+		},
+	}
+	maps.Copy(out, restrictions.Routes())
 	return out
 }
 

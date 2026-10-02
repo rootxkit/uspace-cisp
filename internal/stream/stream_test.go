@@ -399,11 +399,14 @@ func TestSlowClientClosedWith1013(t *testing.T) {
 		hub.reserve()
 		hub.attach(c, nil, false, nil)
 	}
+	// Paced: each publish waits for the fast client to write it, so the
+	// fast client's buffer (4) never holds more than one frame and only
+	// the slow client, whose writer is blocked, overflows. A burst of
+	// more publishes than SendBuffer could overflow the fast client too.
 	for i := range 10 {
 		hub.Publish(change(int64(i+1), "zones", time.Now()), time.Now())
-		if i == 2 {
-			waitFor(t, "the fast client to drain", func() bool { return fast.count() >= 4 })
-		}
+		want := i + 2 // the status frame on attach, then i+1 changes
+		waitFor(t, "the fast client to drain", func() bool { return fast.count() == want })
 	}
 	waitFor(t, "the fast client's frames", func() bool { return fast.count() == 11 })
 	if st.Component(Component).Counter(CounterFramesDropped, "").Value() == 0 {

@@ -49,13 +49,20 @@ cispctl create-account --username <name> --role admin
 
 It prints the one-time password and the otpauth URL of the TOTP secret,
 each once: enrol the URL in an authenticator at once. Log in through
-the console (`POST /v1/console/session` with the username, the
-password and the six-digit code); the admin then creates the other
-accounts from the console. An admin always has MFA; the last active
-admin cannot be demoted or disabled.
+the console: the password first (`POST /v1/console/session` with the
+username and the password answers an MFA challenge), then the
+six-digit code (`POST /v1/console/session/mfa` with the challenge and
+the code answers the session); the web console does both through the
+BFF. The challenge lives 5 minutes, is used once and takes 5 wrong
+codes; past any of these the code step answers 401
+`challenge_invalid` and the user signs in again from the password. A
+client may still send the code with the password in one request. The
+admin then creates the other accounts from the console. An admin
+always has MFA; the last active admin cannot be demoted or disabled.
 
-A locked account (five failed attempts) opens again 15 minutes after
-the last failure; an admin can also reset its MFA (`PATCH
+A locked account (five failed attempts: wrong passwords and wrong or
+reused codes, in either step) opens again 15 minutes after the last
+failure; an admin can also reset its MFA (`PATCH
 /v1/console/accounts/{id}` with `reset_mfa`). Disabling an account or
 changing its role revokes its sessions on every replica within 10 s.
 

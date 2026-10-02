@@ -43,7 +43,9 @@ func openRoutes() map[string]func(http.Handler) http.Handler {
 	for route := range ConsoleRoles {
 		out[route] = passthrough
 	}
-	out[ConsoleLoginRoute] = passthrough
+	for _, route := range ConsoleLoginRoutes {
+		out[route] = passthrough
+	}
 	return out
 }
 

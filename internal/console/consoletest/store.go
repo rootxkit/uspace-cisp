@@ -21,15 +21,25 @@ type Store struct {
 	now      time.Time
 	accounts map[string]store.Account
 	sessions map[string]store.Session
-	events   []store.Event
-	touches  int
+	// challenges are the login_challenges rows by token hash.
+	challenges map[string]store.LoginChallenge
+	events     []store.Event
+	touches    int
 	// Fail, when set, is returned by every call (a database down).
 	Fail error
 }
 
 // New is an empty store whose clock reads now.
 func New(now time.Time) *Store {
-	return &Store{now: now.UTC(), accounts: map[string]store.Account{}, sessions: map[string]store.Session{}}
+	return &Store{now: now.UTC(), accounts: map[string]store.Account{}, sessions: map[string]store.Session{}, challenges: map[string]store.LoginChallenge{}}
+}
+
+// SetFail sets Fail under the store's lock (a database going down or
+// coming back while other goroutines use the store).
+func (s *Store) SetFail(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Fail = err
 }
 
 // Advance moves the store's clock (the database's) by d.
@@ -103,18 +113,78 @@ func (s *Store) Login(_ context.Context, username string, decide func(a *store.A
 	if err != nil {
 		return err
 	}
+	s.write(acc, "", out)
+	return out.Refusal
+}
+
+// ExchangeChallenge implements console.Store.
+func (s *Store) ExchangeChallenge(_ context.Context, tokenHash string, decide func(ch *store.LoginChallenge, a *store.Account, now time.Time) (store.LoginOutcome, error)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.Fail != nil {
+		return s.Fail
+	}
+	var ch *store.LoginChallenge
+	var acc *store.Account
+	if c, ok := s.challenges[tokenHash]; ok {
+		if a, ok := s.accounts[c.AccountID]; ok {
+			ch, acc = &c, &a
+		}
+	}
+	out, err := decide(ch, acc, s.now)
+	if err != nil {
+		return err
+	}
+	hash := ""
+	if ch != nil {
+		hash = ch.TokenHash
+	}
+	s.write(acc, hash, out)
+	return out.Refusal
+}
+
+// Challenges are the login_challenges rows, any order.
+func (s *Store) Challenges() []store.LoginChallenge {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]store.LoginChallenge, 0, len(s.challenges))
+	for _, c := range s.challenges {
+		out = append(out, c)
+	}
+	return out
+}
+
+// write applies a login's or an exchange's outcome (s.mu held).
+func (s *Store) write(acc *store.Account, challengeHash string, out store.LoginOutcome) {
 	if out.Update != nil && acc != nil {
 		a := s.accounts[acc.ID]
 		a.FailedLogins, a.LockedUntil, a.LastLoginAt = out.Update.FailedLogins, out.Update.LockedUntil, out.Update.LastLoginAt
 		a.PasswordHash, a.TOTPLastStep = out.Update.PasswordHash, out.Update.TOTPLastStep
 		s.accounts[acc.ID] = a
 	}
+	if c, ok := s.challenges[challengeHash]; ok {
+		if out.ChallengeAttempt {
+			c.Attempts++
+		}
+		if out.ChallengeUsed {
+			now := s.now
+			c.UsedAt = &now
+		}
+		s.challenges[challengeHash] = c
+	}
+	if nc := out.Challenge; nc != nil {
+		for h, c := range s.challenges {
+			if c.AccountID == nc.AccountID && (c.UsedAt != nil || !c.ExpiresAt.After(s.now)) {
+				delete(s.challenges, h)
+			}
+		}
+		s.challenges[nc.TokenHash] = store.LoginChallenge{TokenHash: nc.TokenHash, AccountID: nc.AccountID, CreatedAt: nc.CreatedAt, ExpiresAt: nc.ExpiresAt}
+	}
 	s.events = append(s.events, out.Events...)
 	if out.Session != nil {
 		ns := out.Session
 		s.sessions[ns.JTI] = store.Session{JTI: ns.JTI, AccountID: ns.AccountID, IssuedAt: ns.IssuedAt, ExpiresAt: ns.ExpiresAt, LastSeenAt: ns.IssuedAt}
 	}
-	return out.Refusal
 }
 
 // CreateAccount implements console.Store.

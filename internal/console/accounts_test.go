@@ -212,10 +212,11 @@ func TestLoginUnknownAndDisabled(t *testing.T) {
 	refusal(t, err, http.StatusUnauthorized, console.SlugInvalidCredentials)
 }
 
-// MFA: an admin always has it; without a code the login is
-// mfa_required and not a failure; a valid code logs in; the same code
-// again is totp_reused; a wrong code invalid_totp; the next step's code
-// is accepted (E-01 pairs).
+// MFA: an admin always has it; without a code the login is an MFA
+// challenge (the two-step sign-in, mfa_test.go) and not a failure; a
+// valid code logs in in one step; the same code again is totp_reused; a
+// wrong code invalid_totp; the next step's code is accepted (E-01
+// pairs).
 func TestLoginTOTP(t *testing.T) {
 	f := newFixture(t, cheap)
 	c := f.create(t, "chief", auth.RoleAdmin, false)
@@ -223,8 +224,10 @@ func TestLoginTOTP(t *testing.T) {
 		t.Fatalf("admin created without MFA: %+v", c)
 	}
 	secret := secretOf(t, c.TOTPURL)
-	_, err := f.login("chief", c.Password, nil)
-	refusal(t, err, http.StatusUnauthorized, console.SlugMFARequired)
+	res, err := f.login("chief", c.Password, nil)
+	if err != nil || res.Challenge == nil || res.Token != "" {
+		t.Fatalf("no code: %+v %v, want a challenge and no session", res, err)
+	}
 	if acc, _ := f.st.Get(c.Account.ID); acc.FailedLogins != 0 {
 		t.Errorf("a missing code counted as a failure: %d", acc.FailedLogins)
 	}

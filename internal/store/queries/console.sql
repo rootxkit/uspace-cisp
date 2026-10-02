@@ -186,3 +186,26 @@ UPDATE subscriptions SET status = 'suspended', suspended_reason = sqlc.arg(reaso
 UPDATE subscriptions SET status = 'pending_verification', suspended_reason = NULL,
     consecutive_failures = 0, failing_since = NULL
 WHERE id = $1;
+
+-- name: DeleteSpentLoginChallenges :execrows
+-- Before a new challenge: the account's used and expired ones go (E-10).
+DELETE FROM login_challenges
+WHERE account_id = sqlc.arg(account_id) AND (used_at IS NOT NULL OR expires_at <= sqlc.arg(now));
+
+-- name: InsertLoginChallenge :exec
+INSERT INTO login_challenges (token_hash, account_id, created_at, expires_at) VALUES ($1, $2, $3, $4);
+
+-- name: GetLoginChallenge :one
+-- The account a challenge is bound to, read before the account's row
+-- lock: the lock order is the account, then the challenge, as the
+-- password step takes them.
+SELECT token_hash, account_id, created_at, expires_at, attempts, used_at FROM login_challenges WHERE token_hash = $1;
+
+-- name: GetLoginChallengeForUpdate :one
+SELECT token_hash, account_id, created_at, expires_at, attempts, used_at FROM login_challenges WHERE token_hash = $1 FOR UPDATE;
+
+-- name: CountLoginChallengeAttempt :exec
+UPDATE login_challenges SET attempts = attempts + 1 WHERE token_hash = $1;
+
+-- name: UseLoginChallenge :exec
+UPDATE login_challenges SET used_at = sqlc.arg(used_at) WHERE token_hash = sqlc.arg(token_hash);

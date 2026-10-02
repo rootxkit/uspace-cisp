@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -97,20 +98,20 @@ func consoleOps(t *testing.T) []consoleOp {
 // Every console operation of the spec carries x-role, its description
 // names the role, and ConsoleRoles (what the router enforces) says the
 // same; every one is under /v1/console/ with security consoleSession
-// (the login has none).
+// (the login's two steps have none).
 func TestConsoleRolesMatchTheSpec(t *testing.T) {
 	ops := consoleOps(t)
-	if len(ops) != len(ConsoleRoles)+1 {
-		t.Fatalf("%d console operations in the spec, %d roles in the code (+ the login)", len(ops), len(ConsoleRoles))
+	if len(ops) != len(ConsoleRoles)+len(ConsoleLoginRoutes) {
+		t.Fatalf("%d console operations in the spec, %d roles in the code (+ the login's %d steps)", len(ops), len(ConsoleRoles), len(ConsoleLoginRoutes))
 	}
 	for _, op := range ops {
 		pattern := op.method + " " + op.path
 		if !strings.HasPrefix(op.path, "/v1/console/") {
 			t.Errorf("%s: a console operation outside /v1/console/", pattern)
 		}
-		if pattern == ConsoleLoginRoute {
+		if slices.Contains(ConsoleLoginRoutes, pattern) {
 			if op.role != "none" {
-				t.Errorf("login x-role %q", op.role)
+				t.Errorf("%s: login x-role %q", pattern, op.role)
 			}
 			continue
 		}
@@ -196,6 +197,8 @@ func TestConsoleRoleMatrix(t *testing.T) {
 			switch {
 			case pattern == ConsoleLoginRoute:
 				body = h.loginBody(t, h.consoleUser(t, auth.RoleViewer), 0)
+			case pattern == ConsoleMFARoute:
+				body = h.mfaBody(t, h.consoleUser(t, auth.RoleAdmin))
 			case pattern == "POST /v1/console/accounts":
 				body = map[string]any{"username": fmt.Sprintf("made-%d-%s", time.Now().UnixNano()%1e9, strings.ReplaceAll(c.name, " ", "-")), "role": "viewer"}
 			case pattern == "PATCH /v1/console/accounts/{id}":
@@ -213,10 +216,15 @@ func TestConsoleRoleMatrix(t *testing.T) {
 			if pattern == "DELETE /v1/console/session" && c.rank >= 0 {
 				tok, _ = h.consoleToken(t, auth.Roles[c.rank])
 			}
-			rec := h.consoleDo(t, h.consoleReq(op.method, path, tok, body))
+			req := h.consoleReq(op.method, path, tok, body)
+			if pattern == ConsoleMFARoute {
+				// Its own address: the login limiter counts both steps.
+				req.RemoteAddr = nextAddr()
+			}
+			rec := h.consoleDo(t, req)
 			var want string
 			switch {
-			case pattern == ConsoleLoginRoute:
+			case slices.Contains(ConsoleLoginRoutes, pattern):
 				want = "2xx"
 			case c.rank == -1:
 				want = "401"
@@ -289,10 +297,11 @@ func TestConsoleSessionOpensNoContentRoute(t *testing.T) {
 func TestConsoleLogin(t *testing.T) {
 	h := newPubHarness(t, nil)
 	u := h.consoleUser(t, auth.RoleAdmin)
-	// No TOTP: 401 mfa_required.
+	// No TOTP: 200 with an MFA challenge and no session (the two-step
+	// sign-in, TestConsoleLoginTwoSteps).
 	body := map[string]any{"username": u.username, "password": u.password}
 	rec := h.consoleDo(t, h.consoleReq(http.MethodPost, "/v1/console/session", "", body))
-	if rec.Code != http.StatusUnauthorized || decodeProblem(t, rec).Type != ProblemTypeBase+console.SlugMFARequired {
+	if rec.Code != http.StatusOK || decodeJSON[gen.ConsoleMFAChallenge](t, rec).MfaToken == "" {
 		t.Fatalf("no totp: %d %s", rec.Code, rec.Body.String())
 	}
 	good := h.loginBody(t, u, 0)

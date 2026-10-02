@@ -54,6 +54,34 @@ func (q *Queries) ConsoleSuspendSubscription(ctx context.Context, arg ConsoleSus
 	return err
 }
 
+const countLoginChallengeAttempt = `-- name: CountLoginChallengeAttempt :exec
+UPDATE login_challenges SET attempts = attempts + 1 WHERE token_hash = $1
+`
+
+func (q *Queries) CountLoginChallengeAttempt(ctx context.Context, tokenHash string) error {
+	_, err := q.db.Exec(ctx, countLoginChallengeAttempt, tokenHash)
+	return err
+}
+
+const deleteSpentLoginChallenges = `-- name: DeleteSpentLoginChallenges :execrows
+DELETE FROM login_challenges
+WHERE account_id = $1 AND (used_at IS NOT NULL OR expires_at <= $2)
+`
+
+type DeleteSpentLoginChallengesParams struct {
+	AccountID string
+	Now       time.Time
+}
+
+// Before a new challenge: the account's used and expired ones go (E-10).
+func (q *Queries) DeleteSpentLoginChallenges(ctx context.Context, arg DeleteSpentLoginChallengesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSpentLoginChallenges, arg.AccountID, arg.Now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deliverySummaries = `-- name: DeliverySummaries :many
 SELECT subscription_id, state, count(*)::bigint AS n
 FROM deliveries
@@ -209,6 +237,45 @@ func (q *Queries) GetAccountForUpdate(ctx context.Context, id string) (Account, 
 	return i, err
 }
 
+const getLoginChallenge = `-- name: GetLoginChallenge :one
+SELECT token_hash, account_id, created_at, expires_at, attempts, used_at FROM login_challenges WHERE token_hash = $1
+`
+
+// The account a challenge is bound to, read before the account's row
+// lock: the lock order is the account, then the challenge, as the
+// password step takes them.
+func (q *Queries) GetLoginChallenge(ctx context.Context, tokenHash string) (LoginChallenge, error) {
+	row := q.db.QueryRow(ctx, getLoginChallenge, tokenHash)
+	var i LoginChallenge
+	err := row.Scan(
+		&i.TokenHash,
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.Attempts,
+		&i.UsedAt,
+	)
+	return i, err
+}
+
+const getLoginChallengeForUpdate = `-- name: GetLoginChallengeForUpdate :one
+SELECT token_hash, account_id, created_at, expires_at, attempts, used_at FROM login_challenges WHERE token_hash = $1 FOR UPDATE
+`
+
+func (q *Queries) GetLoginChallengeForUpdate(ctx context.Context, tokenHash string) (LoginChallenge, error) {
+	row := q.db.QueryRow(ctx, getLoginChallengeForUpdate, tokenHash)
+	var i LoginChallenge
+	err := row.Scan(
+		&i.TokenHash,
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.Attempts,
+		&i.UsedAt,
+	)
+	return i, err
+}
+
 const getPublicationByID = `-- name: GetPublicationByID :one
 SELECT id, dataset, version, publisher_client_id, received_at, body, feature_count, added,
        changed, removed, supersedes_version, reason
@@ -322,6 +389,27 @@ func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) er
 		arg.MfaRequired,
 		arg.Status,
 		arg.CreatedAt,
+	)
+	return err
+}
+
+const insertLoginChallenge = `-- name: InsertLoginChallenge :exec
+INSERT INTO login_challenges (token_hash, account_id, created_at, expires_at) VALUES ($1, $2, $3, $4)
+`
+
+type InsertLoginChallengeParams struct {
+	TokenHash string
+	AccountID string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+func (q *Queries) InsertLoginChallenge(ctx context.Context, arg InsertLoginChallengeParams) error {
+	_, err := q.db.Exec(ctx, insertLoginChallenge,
+		arg.TokenHash,
+		arg.AccountID,
+		arg.CreatedAt,
+		arg.ExpiresAt,
 	)
 	return err
 }
@@ -841,5 +929,19 @@ func (q *Queries) UpdateAccountLogin(ctx context.Context, arg UpdateAccountLogin
 		arg.TotpLastStep,
 		arg.ID,
 	)
+	return err
+}
+
+const useLoginChallenge = `-- name: UseLoginChallenge :exec
+UPDATE login_challenges SET used_at = $1 WHERE token_hash = $2
+`
+
+type UseLoginChallengeParams struct {
+	UsedAt    *time.Time
+	TokenHash string
+}
+
+func (q *Queries) UseLoginChallenge(ctx context.Context, arg UseLoginChallengeParams) error {
+	_, err := q.db.Exec(ctx, useLoginChallenge, arg.UsedAt, arg.TokenHash)
 	return err
 }

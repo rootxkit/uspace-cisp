@@ -33,6 +33,11 @@ export default defineConfig({
         NEXT_PUBLIC_MAP_ZOOM: "10",
         // A short poll, so the HEAD fallback is seen within a test.
         CISP_WEB_POLL_INTERVAL_S: "2",
+        // test/mock-api.mjs stands in for Caddy, one trusted hop that sets
+        // X-Forwarded-Proto and -Host (the sign-in's Origin check).
+        CISP_WEB_TRUSTED_PROXY_HOPS: "1",
+        // Seals the MFA challenge cookie in this run only; a test value.
+        CISP_WEB_MFA_CHALLENGE_SECRET: "playwright-run-only-challenge-seal-key",
       },
     },
     {

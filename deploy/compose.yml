@@ -108,7 +108,8 @@ services:
   web:
     # The Next.js public map and console (WP-9): `--profile web`. It
     # renders and runs the three BFF routes; it holds no database URL, no
-    # NATS URL and no key, so it takes no env_file. Caddy routes /_bff/*
+    # NATS URL and no signing key, so it takes no env_file. Its one secret
+    # is the MFA challenge seal, from deploy/.env. Caddy routes /_bff/*
     # and every page here, /public/*, /v1/* and /basemap/* elsewhere.
     profiles: [web]
     image: ghcr.io/rootxkit/uspace-cisp-web:${CISP_IMAGE_TAG:?set CISP_IMAGE_TAG to a short SHA or tag}
@@ -126,6 +127,9 @@ services:
       CISP_WEB_TRUSTED_PROXY_HOPS: ${WEB_TRUSTED_PROXY_HOPS:-1}
       CISP_WEB_SESSION_MAX_AGE_S: ${WEB_SESSION_MAX_AGE_S:-43200}
       CISP_WEB_UPSTREAM_TIMEOUT_MS: ${WEB_UPSTREAM_TIMEOUT_MS:-10000}
+      # Seals the MFA challenge cookie between the two sign-in steps; at
+      # least 32 bytes. Empty, the BFF answers 503 naming it.
+      CISP_WEB_MFA_CHALLENGE_SECRET: ${WEB_MFA_CHALLENGE_SECRET:-}
       # Branding JSON inside the container (mount it read-only); empty
       # uses the code-name defaults.
       CISP_BRANDING_FILE: ${WEB_BRANDING_FILE:-}

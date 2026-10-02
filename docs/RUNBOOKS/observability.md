@@ -74,8 +74,9 @@ section 9) where it names one.
 | `cisp_bus_publish_skipped_total` | counter | `component` | Committed changes not published because no bus is configured. | — |
 | `cisp_change_bbox_unavailable_total` | counter | `component` | Changes committed without a bbox (the whole dataset is announced). | — |
 | `cisp_console_actions_total` | counter | `component` | Console actions written (accounts, subscriptions, retries, republications). | — |
-| `cisp_console_logins_refused_total` | counter | `component` | Console logins refused (wrong credentials, locked, TOTP). | a burst (password guessing) |
+| `cisp_console_logins_refused_total` | counter | `component` | Console logins refused (wrong credentials, locked, TOTP, challenge). | a burst (password guessing) |
 | `cisp_console_logins_total` | counter | `component` | Console sessions issued. | — |
+| `cisp_console_mfa_challenges_total` | counter | `component` | Console MFA challenges opened (passwords accepted for an account with MFA). | — |
 | `cisp_deliveries_delivered_total` | counter | `component` | Webhook delivery outcomes. | — |
 | `cisp_deliveries_due` | gauge | `component` | Deliveries due now. | — |
 | `cisp_deliveries_expired_total` | counter | `component` | Deliveries given up 24 h after their change. | any increase |

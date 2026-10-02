@@ -132,6 +132,16 @@ type JobRun struct {
 	LastCount    int32
 }
 
+// Single-use, expiring MFA challenges between the console's password and code steps, by the SHA-256 of the token.
+type LoginChallenge struct {
+	TokenHash string
+	AccountID string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	Attempts  int32
+	UsedAt    *time.Time
+}
+
 // Every accepted version with the verbatim body and the publisher signature; insert-only, kept for ever (06 T7, 05 section 4).
 type Publication struct {
 	ID                 string

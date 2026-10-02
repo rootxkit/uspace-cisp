@@ -206,6 +206,8 @@ type Component struct {
 	counters map[string]*Counter
 	gauges   map[string]*Gauge
 	degraded string
+	// since is when the component last went from healthy to degraded.
+	since time.Time
 }
 
 // Counter returns the named counter of this component, creating and
@@ -237,10 +239,47 @@ func (c *Component) Gauge(name, help string) *Gauge {
 
 // SetDegraded marks the component degraded with a reason; an empty
 // reason marks it healthy.
+// The since-time is kept while the component stays degraded, whatever
+// the reason becomes.
 func (c *Component) SetDegraded(reason string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	switch {
+	case reason == "":
+		c.since = time.Time{}
+	case c.degraded == "":
+		c.since = time.Now().UTC()
+	}
 	c.degraded = reason
+}
+
+// DegradedSince is the reason the component is degraded and since when;
+// "" and the zero time when it is healthy.
+func (c *Component) DegradedSince() (string, time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.degraded, c.since
+}
+
+// Degradation is one degraded component.
+type Degradation struct {
+	Component string
+	Reason    string
+	Since     time.Time
+}
+
+// Degradations is every degraded component, by name.
+func (s *Status) Degradations() []Degradation {
+	s.mu.Lock()
+	comps := s.sortedComponents()
+	s.mu.Unlock()
+	var out []Degradation
+	for _, c := range comps {
+		if reason, since := c.DegradedSince(); reason != "" {
+			out = append(out, Degradation{Component: c.name, Reason: reason, Since: since})
+		}
+	}
+	return out
 }
 
 // SetHealthy clears the degraded state.

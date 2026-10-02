@@ -21,6 +21,11 @@ vectors.log
 node_modules/
 web/.next/
 web/coverage/
+web/next-env.d.ts
+web/*.tsbuildinfo
+web/test-results/
+web/playwright-report/
+web/*.log
 
 # Editors and OS
 .idea/

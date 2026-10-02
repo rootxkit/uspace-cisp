@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@rootxkit/uspace-ui/styles/tokens.css";
+@import "@rootxkit/uspace-ui/styles/map.css";
+@import "@rootxkit/uspace-ui/fonts/fonts.css";
+@source "../node_modules/@rootxkit/uspace-ui/dist";
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--us-surface);
+  color: var(--us-text);
+}

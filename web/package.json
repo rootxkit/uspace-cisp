@@ -1,0 +1,44 @@
+{
+  "name": "uspace-cisp-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The CISP's public map and console: Next.js on uspace-ui. Renders, never judges.",
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "gen:api": "uspace-ui-gen-api ../api/openapi.yaml src/api/generated/openapi.d.ts",
+    "check:api": "uspace-ui-gen-api ../api/openapi.yaml src/api/generated/openapi.d.ts --check",
+    "lint": "eslint --max-warnings 0 .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "check:bundle": "node scripts/check-bundle-env.mjs .next",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@rootxkit/uspace-ui": "https://github.com/rootxkit/uspace-ui/releases/download/v0.1.0-rc.1/rootxkit-uspace-ui-0.1.0-rc.1.tgz",
+    "maplibre-gl": "5.24.0",
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.0",
+    "vitest": "4.1.11"
+  }
+}

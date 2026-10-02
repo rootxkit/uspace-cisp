@@ -344,6 +344,7 @@ type write struct {
 	header   string
 	kid      string
 	received time.Time
+	sum      [32]byte
 	attempt  store.Attempt
 }
 
@@ -362,7 +363,7 @@ func (rs *Restrictions) begin(ctx context.Context, signature *string) (write, er
 	received := rs.now()
 	sum := sha256.Sum256(v.body)
 	return write{
-		body: v.body, caller: caller, header: header, kid: sig.KID, received: received,
+		body: v.body, caller: caller, header: header, kid: sig.KID, received: received, sum: sum,
 		attempt: store.Attempt{
 			Dataset: publication.DatasetRestrictions, PublisherClientID: caller.ClientID, ReceivedAt: received,
 			Bytes: int64(len(v.body)), BodySHA256: sum[:],
@@ -467,7 +468,7 @@ func (rs *Restrictions) create(ctx context.Context, signature *string) (restrict
 	}
 	req := restriction.Request{
 		Op: restriction.OpCreate, AnspVersion: body.AnspVersion, State: restriction.State(body.State),
-		Now: w.received, Limits: rs.Limits,
+		Now: w.received, Limits: rs.Limits, BodySHA256: w.sum,
 	}
 	// A stored ansp_ref is a replay or a conflict: the transition alone
 	// answers it, whatever the feature says now.
@@ -667,7 +668,7 @@ func (rs *Restrictions) patch(ctx context.Context, ref string, byAnspRef bool, s
 	if err != nil {
 		return rs.failure(ctx, &w, err)
 	}
-	req := restriction.Request{Op: restriction.Op(p.Op), AnspVersion: p.AnspVersion, EndsAt: p.EndsAt, Now: w.received, Limits: rs.Limits}
+	req := restriction.Request{Op: restriction.Op(p.Op), AnspVersion: p.AnspVersion, EndsAt: p.EndsAt, Now: w.received, Limits: rs.Limits, BodySHA256: w.sum}
 	var acc *dataset.AcceptedRestriction
 	// The feature of a new extend is held to the rules with the new
 	// window; a replay or a conflict is the transition's to answer.

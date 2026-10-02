@@ -22,9 +22,10 @@
 //	Active     expire (time)         Ended      restriction_expired (ended_by expiry)
 //
 // The ANSP is the master of a restriction's state (D5): every accepted op
-// carries a strictly higher ansp_version. The same ansp_version is an
-// idempotent replay (the stored head, no reason, nothing written); a
-// lower one is refused naming ansp_version; anything on an Ended or
+// carries a strictly higher ansp_version. The same ansp_version with the
+// same body bytes is an idempotent replay (the stored head, no reason,
+// nothing written); the same ansp_version with another body, and a lower
+// one, are refused naming ansp_version; anything on an Ended or
 // Cancelled head, and any op the table does not list, is refused naming
 // state. A refusal is a *core.FieldError naming ansp_version or state
 // (the handler answers 409) or the request field at fault (400).

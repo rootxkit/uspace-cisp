@@ -81,6 +81,9 @@ type Head struct {
 	StartsAt, EndsAt time.Time
 	// EndedBy is ansp or expiry once Ended; nil otherwise.
 	EndedBy *string
+	// BodySHA256 is the hash of the body of the ANSP's op that set
+	// AnspVersion: the same version is a replay only with the same bytes.
+	BodySHA256 [32]byte
 }
 
 // Limits bound a restriction's window.
@@ -118,6 +121,8 @@ type Request struct {
 	State State
 	// EndsAt is an extend's new ends_at; any other op refuses it.
 	EndsAt *time.Time
+	// BodySHA256 is the hash of the request body as received.
+	BodySHA256 [32]byte
 	// Now is the instant of receipt.
 	Now    time.Time
 	Limits Limits
@@ -161,15 +166,17 @@ func Transition(h Head, r Request) (Head, publication.Reason, error) {
 		return create(h, r)
 	}
 	switch {
+	case r.AnspVersion == h.AnspVersion && r.BodySHA256 == h.BodySHA256:
+		return h, "", nil // replay: the pair is the idempotency key, the bytes the same
 	case r.AnspVersion == h.AnspVersion:
-		return h, "", nil // replay: the pair is the idempotency key
+		return h, "", core.Fieldf(FieldAnspVersion, "%d was accepted with another body; a new op needs a higher ansp_version", r.AnspVersion)
 	case r.AnspVersion < h.AnspVersion:
 		return h, "", core.Fieldf(FieldAnspVersion, "%d is below the stored %d; every accepted op raises it", r.AnspVersion, h.AnspVersion)
 	case h.State.Terminal():
 		return h, "", core.Fieldf(FieldState, "the restriction is %s; nothing changes it any more", h.State)
 	}
 	next := h
-	next.AnspVersion = r.AnspVersion
+	next.AnspVersion, next.BodySHA256 = r.AnspVersion, r.BodySHA256
 	switch {
 	case r.Op == OpActivate && h.State == StatePlanned:
 		next.State = StateActive
@@ -208,7 +215,7 @@ func create(h Head, r Request) (Head, publication.Reason, error) {
 	}
 	next := h
 	next.State = r.State
-	next.AnspVersion = r.AnspVersion
+	next.AnspVersion, next.BodySHA256 = r.AnspVersion, r.BodySHA256
 	next.StartsAt, next.EndsAt = h.StartsAt.UTC(), h.EndsAt.UTC()
 	next.EndedBy = nil
 	if r.State == StatePlanned {

@@ -98,6 +98,8 @@ func TestTransitionTable(t *testing.T) {
 		{name: "cancelled anything new is refused", h: head(StateCancelled), r: req(OpActivate, 4), field: FieldState},
 
 		{name: "same ansp_version replays", h: head(StateActive), r: req(OpEnd, 3), state: StateActive},
+		{name: "same ansp_version with another body is refused", h: head(StateActive), r: Request{Op: OpEnd, AnspVersion: 3, BodySHA256: [32]byte{1}, Now: t0, Limits: F3548Limits()}, field: FieldAnspVersion},
+		{name: "same ansp_version with another body on an ended head is refused", h: head(StateEnded), r: Request{Op: OpEnd, AnspVersion: 3, BodySHA256: [32]byte{1}, Now: t0, Limits: F3548Limits()}, field: FieldAnspVersion},
 		{name: "same ansp_version replays on an ended head", h: head(StateEnded), r: req(OpEnd, 3), state: StateEnded},
 		{name: "lower ansp_version is refused", h: head(StateActive), r: req(OpEnd, 2), field: FieldAnspVersion},
 		{name: "lower ansp_version on an ended head names ansp_version", h: head(StateEnded), r: req(OpEnd, 2), field: FieldAnspVersion},
@@ -371,5 +373,36 @@ func TestCurrentSet(t *testing.T) {
 	lost.FeatureID = "DARLOST"
 	if _, err := CurrentSet(stored, lost, nil); err == nil || !strings.Contains(err.Error(), "DARLOST") {
 		t.Errorf("lost feature: %v", err)
+	}
+}
+
+// An accepted op keeps its body's hash; the same version with those
+// bytes replays, with others it is a conflict (E-01).
+func TestTransitionBodyHash(t *testing.T) {
+	h := head(StatePlanned)
+	r := Request{Op: OpActivate, AnspVersion: 4, BodySHA256: [32]byte{7}, Now: t0, Limits: F3548Limits()}
+	next, reason, err := Transition(h, r)
+	if err != nil || reason != publication.ReasonRestrictionActivated || next.BodySHA256 != r.BodySHA256 {
+		t.Fatalf("%+v %q %v", next, reason, err)
+	}
+	if again, reason, err := Transition(next, r); err != nil || reason != "" || again != next {
+		t.Errorf("byte-identical replay: %q %v", reason, err)
+	}
+	r.BodySHA256 = [32]byte{8}
+	if _, _, err := Transition(next, r); err == nil || field(t, err) != FieldAnspVersion {
+		t.Errorf("another body: %v", err)
+	}
+	r.Op = OpCancel
+	if _, _, err := Transition(next, r); err == nil || field(t, err) != FieldAnspVersion {
+		t.Errorf("another op: %v", err)
+	}
+	// The expiry keeps the hash of the ANSP's last op.
+	next.State, next.EndsAt = StateActive, t0
+	if ended, ok := Expire(next, t0); !ok || ended.BodySHA256 != [32]byte{7} {
+		t.Errorf("expiry lost the hash: %+v", ended)
+	}
+	created, _, err := Transition(fresh(t0, t0.Add(time.Hour)), Request{Op: OpCreate, AnspVersion: 1, State: StateActive, BodySHA256: [32]byte{9}, Now: t0, Limits: F3548Limits()})
+	if err != nil || created.BodySHA256 != [32]byte{9} {
+		t.Errorf("create: %+v %v", created, err)
 	}
 }

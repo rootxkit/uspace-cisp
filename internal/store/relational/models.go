@@ -180,6 +180,7 @@ type Restriction struct {
 	UpdatedAt             time.Time
 	LastPublisherClientID string
 	SourceStaleSince      *time.Time
+	LastBodySha256        []byte
 }
 
 // Every lifecycle event of every restriction with its version's publication; insert-only.

@@ -384,10 +384,11 @@ paths:
         refused is 403 signature, before anything else is read.
 
         Idempotency: the key is the body pair (ansp_ref, ansp_version),
-        never a header. The same pair again is 200 with the stored head
-        and replay true, and makes no new version (a retry storm from a
-        degraded ANSP cannot flood subscribers); a lower ansp_version for
-        the ansp_ref is 409 ansp_version. An Idempotency-Key header, if
+        never a header. The same pair with the same body bytes again is
+        200 with the stored head and replay true, and makes no new
+        version (a retry storm from a degraded ANSP cannot flood
+        subscribers); the same pair with another body, and a lower
+        ansp_version for the ansp_ref, are 409 ansp_version. An Idempotency-Key header, if
         the ANSP's planner sends one, is ignored: nothing depends on it,
         and two different values on the same pair still replay.
 
@@ -570,8 +571,10 @@ paths:
         404 when none.
 
         ansp_version must rise on every accepted op: the same
-        (ansp_ref, ansp_version) pair is 200 with the stored head and
-        replay true and no new version; a lower one is 409 ansp_version.
+        (ansp_ref, ansp_version) pair with the same body bytes is 200
+        with the stored head and replay true and no new version; the
+        same pair with another op or body, and a lower one, are 409
+        ansp_version.
         An Idempotency-Key header is ignored.
 
         An extend carries ends_at and the feature again, its one period

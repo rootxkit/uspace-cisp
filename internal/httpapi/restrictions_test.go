@@ -167,6 +167,20 @@ func TestRestrictionReplay(t *testing.T) {
 	if got := h.counter("restrictions", CounterRestrictionsReplayed); got != 9 {
 		t.Errorf("replays counted %d", got)
 	}
+	// The same ansp_version with another body is 409, never a replay:
+	// another op, and the create with another window.
+	version := h.restrictionsVersion()
+	for name, rec := range map[string]*httptest.ResponseRecorder{
+		"another op":     h.patchRestriction(id, doc{"op": "cancel", "ansp_version": 3}),
+		"another create": h.postRestriction(createDoc("NOTAM-R", 1, "active", "DARR001", starts, ends.Add(time.Minute))),
+	} {
+		if rec.Code != http.StatusConflict || !strings.HasSuffix(decodeProblem(t, rec).Type, "/"+SlugAnspVersion) {
+			t.Errorf("%s = %d %s", name, rec.Code, rec.Body.String())
+		}
+	}
+	if h.restrictionsVersion() != version {
+		t.Error("a conflicting body wrote")
+	}
 }
 
 // 409 ansp_version for a lower version and 409 state for an op the state

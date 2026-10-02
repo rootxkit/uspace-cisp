@@ -231,7 +231,7 @@ func writeHead(ctx context.Context, q *relational.Queries, stored *RestrictionRe
 			ID: h.ID, AnspRef: h.AnspRef, AnspVersion: int32(h.AnspVersion),
 			UspaceAirspaceID: h.UspaceAirspaceID, FeatureID: h.FeatureID, State: string(h.State),
 			StartsAt: h.StartsAt.UTC(), EndsAt: h.EndsAt.UTC(), EndedBy: h.EndedBy,
-			CreatedAt: now, UpdatedAt: now, LastPublisherClientID: publisher,
+			CreatedAt: now, UpdatedAt: now, LastPublisherClientID: publisher, LastBodySha256: h.BodySHA256[:],
 		}); err != nil {
 			return fmt.Errorf("insert restriction: %w", err)
 		}
@@ -240,6 +240,7 @@ func writeHead(ctx context.Context, q *relational.Queries, stored *RestrictionRe
 	n, err := q.UpdateRestriction(ctx, relational.UpdateRestrictionParams{
 		ID: h.ID, AnspVersion: int32(h.AnspVersion), State: string(h.State),
 		EndsAt: h.EndsAt.UTC(), EndedBy: h.EndedBy, UpdatedAt: now, LastPublisherClientID: publisher,
+		LastBodySha256: h.BodySHA256[:],
 	})
 	if err != nil {
 		return fmt.Errorf("update restriction: %w", err)
@@ -251,11 +252,13 @@ func writeHead(ctx context.Context, q *relational.Queries, stored *RestrictionRe
 }
 
 func recordOf(r relational.GetRestrictionByIDRow) RestrictionRecord {
+	var sum [32]byte
+	copy(sum[:], r.LastBodySha256)
 	return RestrictionRecord{
 		Head: restriction.Head{
 			ID: r.ID, AnspRef: r.AnspRef, AnspVersion: int64(r.AnspVersion), UspaceAirspaceID: r.UspaceAirspaceID,
 			FeatureID: r.FeatureID, State: restriction.State(r.State), StartsAt: r.StartsAt.UTC(), EndsAt: r.EndsAt.UTC(),
-			EndedBy: r.EndedBy,
+			EndedBy: r.EndedBy, BodySHA256: sum,
 		},
 		CreatedAt: r.CreatedAt.UTC(), UpdatedAt: r.UpdatedAt.UTC(), LastPublisherClientID: r.LastPublisherClientID,
 	}

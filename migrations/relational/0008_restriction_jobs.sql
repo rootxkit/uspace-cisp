@@ -13,6 +13,12 @@
 -- rewritten. restrictions itself is the mutable lifecycle head.
 
 -- +goose Up
+-- The hash of the body of the ANSP op that set ansp_version: the same
+-- ansp_version is a replay only with the same bytes; another body under
+-- it is a conflict (409), never a silent replay.
+ALTER TABLE restrictions
+    ADD COLUMN last_body_sha256 bytea CHECK (last_body_sha256 IS NULL OR length(last_body_sha256) = 32);
+
 CREATE TABLE job_runs (
     name          text        PRIMARY KEY,
     last_run_at   timestamptz NOT NULL,
@@ -30,3 +36,4 @@ COMMENT ON TABLE restriction_events IS 'Every lifecycle event of every restricti
 GRANT UPDATE, DELETE, TRUNCATE ON restriction_events TO cisp_api;
 COMMENT ON TABLE restriction_events IS NULL;
 DROP TABLE job_runs;
+ALTER TABLE restrictions DROP COLUMN last_body_sha256;

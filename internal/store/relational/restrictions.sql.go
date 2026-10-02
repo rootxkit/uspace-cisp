@@ -41,7 +41,7 @@ func (q *Queries) GetJobRun(ctx context.Context, name string) (JobRun, error) {
 
 const getRestrictionByAnspRef = `-- name: GetRestrictionByAnspRef :one
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE ansp_ref = $1
 `
@@ -59,6 +59,7 @@ type GetRestrictionByAnspRefRow struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	LastPublisherClientID string
+	LastBodySha256        []byte
 }
 
 func (q *Queries) GetRestrictionByAnspRef(ctx context.Context, anspRef string) (GetRestrictionByAnspRefRow, error) {
@@ -77,13 +78,14 @@ func (q *Queries) GetRestrictionByAnspRef(ctx context.Context, anspRef string) (
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastPublisherClientID,
+		&i.LastBodySha256,
 	)
 	return i, err
 }
 
 const getRestrictionByFeatureID = `-- name: GetRestrictionByFeatureID :one
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE feature_id = $1
 `
@@ -101,6 +103,7 @@ type GetRestrictionByFeatureIDRow struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	LastPublisherClientID string
+	LastBodySha256        []byte
 }
 
 func (q *Queries) GetRestrictionByFeatureID(ctx context.Context, featureID string) (GetRestrictionByFeatureIDRow, error) {
@@ -119,6 +122,7 @@ func (q *Queries) GetRestrictionByFeatureID(ctx context.Context, featureID strin
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastPublisherClientID,
+		&i.LastBodySha256,
 	)
 	return i, err
 }
@@ -126,7 +130,7 @@ func (q *Queries) GetRestrictionByFeatureID(ctx context.Context, featureID strin
 const getRestrictionByID = `-- name: GetRestrictionByID :one
 
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE id = $1
 `
@@ -144,6 +148,7 @@ type GetRestrictionByIDRow struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	LastPublisherClientID string
+	LastBodySha256        []byte
 }
 
 // WP-5: dynamic restrictions (docs/WORKPACKAGES/WP-5.md): the lifecycle
@@ -165,6 +170,7 @@ func (q *Queries) GetRestrictionByID(ctx context.Context, id string) (GetRestric
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastPublisherClientID,
+		&i.LastBodySha256,
 	)
 	return i, err
 }
@@ -172,8 +178,8 @@ func (q *Queries) GetRestrictionByID(ctx context.Context, id string) (GetRestric
 const insertRestriction = `-- name: InsertRestriction :exec
 INSERT INTO restrictions (
     id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-    ended_by, created_at, updated_at, last_publisher_client_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 `
 
 type InsertRestrictionParams struct {
@@ -189,6 +195,7 @@ type InsertRestrictionParams struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	LastPublisherClientID string
+	LastBodySha256        []byte
 }
 
 func (q *Queries) InsertRestriction(ctx context.Context, arg InsertRestrictionParams) error {
@@ -205,6 +212,7 @@ func (q *Queries) InsertRestriction(ctx context.Context, arg InsertRestrictionPa
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.LastPublisherClientID,
+		arg.LastBodySha256,
 	)
 	return err
 }
@@ -374,7 +382,7 @@ func (q *Queries) ListRestrictionEvents(ctx context.Context, ids []string) ([]Re
 
 const listRestrictions = `-- name: ListRestrictions :many
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE ($1::text IS NULL OR state = $1::text)
   AND ($2::text IS NULL OR uspace_airspace_id = $2::text)
@@ -404,6 +412,7 @@ type ListRestrictionsRow struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	LastPublisherClientID string
+	LastBodySha256        []byte
 }
 
 // The heads, newest window first, filtered by state, by U-space airspace
@@ -435,6 +444,7 @@ func (q *Queries) ListRestrictions(ctx context.Context, arg ListRestrictionsPara
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.LastPublisherClientID,
+			&i.LastBodySha256,
 		); err != nil {
 			return nil, err
 		}
@@ -487,8 +497,9 @@ const updateRestriction = `-- name: UpdateRestriction :execrows
 UPDATE restrictions
 SET ansp_version = $1, state = $2, ends_at = $3,
     ended_by = $4, updated_at = $5,
-    last_publisher_client_id = $6
-WHERE id = $7
+    last_publisher_client_id = $6,
+    last_body_sha256 = $7
+WHERE id = $8
 `
 
 type UpdateRestrictionParams struct {
@@ -498,6 +509,7 @@ type UpdateRestrictionParams struct {
 	EndedBy               *string
 	UpdatedAt             time.Time
 	LastPublisherClientID string
+	LastBodySha256        []byte
 	ID                    string
 }
 
@@ -509,6 +521,7 @@ func (q *Queries) UpdateRestriction(ctx context.Context, arg UpdateRestrictionPa
 		arg.EndedBy,
 		arg.UpdatedAt,
 		arg.LastPublisherClientID,
+		arg.LastBodySha256,
 		arg.ID,
 	)
 	if err != nil {

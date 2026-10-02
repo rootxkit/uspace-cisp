@@ -4,33 +4,34 @@
 
 -- name: GetRestrictionByID :one
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE id = $1;
 
 -- name: GetRestrictionByAnspRef :one
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE ansp_ref = $1;
 
 -- name: GetRestrictionByFeatureID :one
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE feature_id = $1;
 
 -- name: InsertRestriction :exec
 INSERT INTO restrictions (
     id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-    ended_by, created_at, updated_at, last_publisher_client_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+    ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
 
 -- name: UpdateRestriction :execrows
 UPDATE restrictions
 SET ansp_version = sqlc.arg(ansp_version), state = sqlc.arg(state), ends_at = sqlc.arg(ends_at),
     ended_by = sqlc.narg(ended_by), updated_at = sqlc.arg(updated_at),
-    last_publisher_client_id = sqlc.arg(last_publisher_client_id)
+    last_publisher_client_id = sqlc.arg(last_publisher_client_id),
+    last_body_sha256 = sqlc.arg(last_body_sha256)
 WHERE id = sqlc.arg(id);
 
 -- name: InsertRestrictionEvent :exec
@@ -48,7 +49,7 @@ ORDER BY restriction_id, at, ansp_version;
 -- The heads, newest window first, filtered by state, by U-space airspace
 -- and by an instant inside the window [starts_at, ends_at).
 SELECT id, ansp_ref, ansp_version, uspace_airspace_id, feature_id, state, starts_at, ends_at,
-       ended_by, created_at, updated_at, last_publisher_client_id
+       ended_by, created_at, updated_at, last_publisher_client_id, last_body_sha256
 FROM restrictions
 WHERE (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
   AND (sqlc.narg(airspace)::text IS NULL OR uspace_airspace_id = sqlc.narg(airspace)::text)

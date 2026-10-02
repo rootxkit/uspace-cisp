@@ -147,6 +147,11 @@ func TestRestrictionLifecycleOnPostgres(t *testing.T) {
 				t.Fatalf("op %d replay %q = %d %+v", i, key, again.Code, r)
 			}
 		}
+		// The same version with another body is 409, never a replay.
+		other := doc{"op": "cancel", "ansp_version": op.body["ansp_version"]}
+		if conflict := h.patchRestriction(id, other); conflict.Code != http.StatusConflict || datasetVersion(t, st) != res.Version {
+			t.Fatalf("op %d with another body = %d %s", i, conflict.Code, conflict.Body.String())
+		}
 		if i == 1 {
 			_, served := h.servedRestrictions("")
 			if m := served[fid]; m.State != restriction.StateActive || m.ID != id || m.AnspVersion != 2 {

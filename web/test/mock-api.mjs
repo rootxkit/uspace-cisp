@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // The Playwright fixture server: a stand-in for the deployment's Caddy in
 // front of `next start`. It answers the CISP's public surface from
-// fixtures (GET and HEAD /public/v1/*, WS /v1/stream) and passes every
-// other request to Next.js, so the browser sees one origin, as in a
-// deployment.
+// fixtures (GET and HEAD /public/v1/*, WS /v1/stream) and the console's
+// sign-in and `me` (POST /v1/console/session, POST
+// /v1/console/session/mfa, GET /v1/console/me) in the shapes of
+// api/openapi.yaml, and passes every other request to Next.js with the
+// X-Forwarded-* headers Caddy sets, so the browser sees one origin, as in
+// a deployment. The BFF reaches the console endpoints here too
+// (CISP_API_INTERNAL_URL).
 //
 //   MOCK_PORT=3000 MOCK_UPSTREAM=http://127.0.0.1:3100 node test/mock-api.mjs
 //
@@ -19,6 +23,10 @@
 //   POST /__mock/reset                    stream on, every dataset served at version 1
 //   POST /__mock/state {stream?, unavailable?: [dataset], publisherStaleSince?, outlines?}
 //   POST /__mock/bump {dataset}           a new version of one dataset
+//   GET  /__mock/console                  the console requests answered
+//
+// Console accounts (test data, not credentials of anything): admin1 has
+// MFA and the fixed code MOCK_TOTP_CODE; viewer1 has none.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
@@ -125,6 +133,77 @@ function verdict(id, at) {
   return "applies";
 }
 
+// The console's sign-in, as the CISP answers it (Q41 (3)): the password
+// step of an account with MFA is 200 {mfa_token, expires_at}; the code
+// step spends the challenge for a session. Test values only.
+const MOCK_TOTP_CODE = "246810";
+const CONSOLE_ACCOUNTS = {
+  admin1: { password: "admin1-test-password", role: "admin", mfa: true },
+  viewer1: { password: "viewer1-test-password", role: "viewer", mfa: false },
+};
+const CHALLENGE_TTL_MS = 300_000;
+let consoleState;
+const consoleRequests = [];
+
+function resetConsole() {
+  consoleState = { challenges: new Map(), sessions: new Map(), next: 0 };
+  consoleRequests.length = 0;
+}
+
+function consoleAccount(username) {
+  const a = CONSOLE_ACCOUNTS[username];
+  return {
+    id: `acc-${username}`,
+    username,
+    role: a.role,
+    status: "active",
+    mfa_required: a.mfa,
+    mfa_enrolled: a.mfa,
+    created_at: UPDATED_AT,
+    failed_logins: 0,
+  };
+}
+
+function issueSession(res, username) {
+  const token = `mock-session-${++consoleState.next}`;
+  const expiresAt = new Date(Date.now() + 3600_000).toISOString();
+  consoleState.sessions.set(token, username);
+  json(res, 201, { token, expires_at: expiresAt, account: consoleAccount(username) });
+}
+
+async function consoleApi(req, res, path) {
+  const body = req.method === "POST" ? await readJson(req) : {};
+  consoleRequests.push({ method: req.method, path, keys: Object.keys(body).sort() });
+  if (req.method === "POST" && path === "/v1/console/session") {
+    const a = CONSOLE_ACCOUNTS[body.username];
+    if (a === undefined || a.password !== body.password) {
+      return problem(res, 401, "invalid_credentials", "Unauthorized");
+    }
+    if (!a.mfa) return issueSession(res, body.username);
+    const token = `mock-challenge-${++consoleState.next}`;
+    const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
+    consoleState.challenges.set(token, { username: body.username, expiresAt, used: false });
+    return json(res, 200, { mfa_token: token, expires_at: expiresAt.toISOString() });
+  }
+  if (req.method === "POST" && path === "/v1/console/session/mfa") {
+    const ch = consoleState.challenges.get(body.mfa_token);
+    if (ch === undefined || ch.used || ch.expiresAt.getTime() <= Date.now()) {
+      return problem(res, 401, "challenge_invalid", "Unauthorized");
+    }
+    if (body.code !== MOCK_TOTP_CODE) return problem(res, 401, "invalid_totp", "Unauthorized");
+    ch.used = true;
+    return issueSession(res, ch.username);
+  }
+  if (req.method === "GET" && path === "/v1/console/me") {
+    const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
+    const username = token === undefined ? undefined : consoleState.sessions.get(token);
+    if (username === undefined) return problem(res, 401, "unauthenticated", "Unauthorized");
+    const now = new Date().toISOString();
+    return json(res, 200, { account: consoleAccount(username), session: { jti: token, issued_at: now, expires_at: now } });
+  }
+  return problem(res, 404, "not_found", "Not found");
+}
+
 let state;
 function reset() {
   state = {
@@ -137,6 +216,7 @@ function reset() {
   };
 }
 reset();
+resetConsole();
 const requests = [];
 const clients = new Set();
 
@@ -240,9 +320,11 @@ function readJson(req) {
 async function control(req, res, path) {
   if (path === "/__mock/health") return json(res, 200, { ok: true });
   if (path === "/__mock/requests") return json(res, 200, requests);
+  if (path === "/__mock/console") return json(res, 200, consoleRequests);
   const input = await readJson(req);
   if (path === "/__mock/reset") {
     reset();
+    resetConsole();
     requests.length = 0;
     for (const c of clients) c.destroy();
   } else if (path === "/__mock/state") {
@@ -268,7 +350,14 @@ function passToNext(req, res) {
       port: UPSTREAM.port,
       method: req.method,
       path: req.url,
-      headers: { ...req.headers, "x-forwarded-for": req.socket.remoteAddress ?? "127.0.0.1" },
+      // What Caddy sets: the BFF trusts one hop (CISP_WEB_TRUSTED_PROXY_HOPS)
+      // and checks a sign-in's Origin against this scheme and host.
+      headers: {
+        ...req.headers,
+        "x-forwarded-for": req.socket.remoteAddress ?? "127.0.0.1",
+        "x-forwarded-proto": "http",
+        "x-forwarded-host": req.headers.host ?? `127.0.0.1:${PORT}`,
+      },
     },
     (up) => {
       res.writeHead(up.statusCode ?? 502, up.headers);
@@ -364,6 +453,10 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://mock");
   if (url.pathname.startsWith("/__mock/")) {
     void control(req, res, url.pathname);
+    return;
+  }
+  if (url.pathname.startsWith("/v1/console/")) {
+    void consoleApi(req, res, url.pathname);
     return;
   }
   const m = /^\/public\/v1\/([a-z_]+)$/.exec(url.pathname);

@@ -5,10 +5,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
-import { createBff, type BffConfig } from "./handlers";
+import { configFromEnv, configProblem, createBff, type BffConfig } from "./handlers";
 
 const ORIGIN = "https://cisp.test";
 const API = "http://api.internal:8080";
+// A test value built at run time, not a secret.
+const MFA_SECRET = "t".repeat(32);
 
 interface Call {
   url: string;
@@ -34,7 +36,7 @@ function mockApi(answer: (c: Call) => Response) {
 }
 
 function bffWith(f: typeof fetch) {
-  const cfg: BffConfig = { apiBase: API, sessionMaxAgeS: 43200, timeoutMs: 2000, fetch: f };
+  const cfg: BffConfig = { apiBase: API, sessionMaxAgeS: 43200, timeoutMs: 2000, mfaChallengeSecret: MFA_SECRET, fetch: f };
   return createBff(cfg);
 }
 
@@ -110,6 +112,98 @@ describe("login", () => {
     const res = await bffWith(api.fetch).login(login({ origin: "https://evil.test" }));
     expect(res.status).toBe(403);
     expect(api.calls).toHaveLength(0);
+  });
+});
+
+describe("two-step sign-in (MFA)", () => {
+  const CHALLENGE = { mfa_token: "challenge-token-abc", expires_at: new Date(Date.now() + 300_000).toISOString() };
+  const step = (body: Record<string, string>, cookie?: string) =>
+    req("/_bff/login", {
+      method: "POST",
+      headers: { origin: ORIGIN, "content-type": "application/json", ...(cookie === undefined ? {} : { cookie }) },
+      body: JSON.stringify(body),
+    });
+  /** The `name=value` of a Set-Cookie line, for the next request. */
+  const pair = (line: string | undefined) => (line ?? "").split(";")[0] ?? "";
+
+  it("seals the API's challenge into uspace_mfa and exchanges it with the code at POST /v1/console/session/mfa", async () => {
+    const api = mockApi((c) =>
+      c.url.endsWith("/v1/console/session/mfa") ? Response.json(SESSION, { status: 201 }) : Response.json(CHALLENGE, { status: 200 }),
+    );
+    const bff = bffWith(api.fetch);
+    const first = await bff.login(step({ username: "admin1", password: "pw" }));
+    expect(first.status).toBe(200);
+    expect(await first.json()).toEqual({ status: "mfa_required" });
+    const mfa = setCookies(first).get("uspace_mfa") ?? "";
+    expect(mfa).toMatch(/HttpOnly/i);
+    expect(mfa).toMatch(/Path=\/_bff/i);
+    expect(mfa).toMatch(/SameSite=Strict/i);
+    // Sealed: the challenge itself is not in the cookie, nor a session.
+    expect(mfa).not.toContain(CHALLENGE.mfa_token);
+    expect(setCookies(first).has("uspace_session")).toBe(false);
+    expect(api.calls[0]?.url).toBe(`${API}/v1/console/session`);
+
+    const second = await bff.login(step({ username: "admin1", otp: "123456" }, pair(mfa)));
+    expect(second.status).toBe(200);
+    expect(api.calls).toHaveLength(2);
+    expect(api.calls[1]?.method).toBe("POST");
+    expect(api.calls[1]?.url).toBe(`${API}/v1/console/session/mfa`);
+    expect(JSON.parse(api.calls[1]?.body ?? "{}")).toEqual({ mfa_token: CHALLENGE.mfa_token, code: "123456" });
+    const cookies = setCookies(second);
+    expect(cookies.get("uspace_session") ?? "").toContain(`uspace_session=${SESSION.token}`);
+    expect(cookies.get("uspace_mfa") ?? "").toMatch(/Max-Age=0/i);
+  });
+
+  it("passes a wrong code's 401 through and keeps the challenge cookie", async () => {
+    const api = mockApi((c) =>
+      c.url.endsWith("/v1/console/session/mfa")
+        ? Response.json(
+            { type: "https://schemas.uspace.ge/problems/invalid_totp", title: "Unauthorized", status: 401 },
+            { status: 401, headers: { "content-type": "application/problem+json" } },
+          )
+        : Response.json(CHALLENGE, { status: 200 }),
+    );
+    const bff = bffWith(api.fetch);
+    const first = await bff.login(step({ username: "admin1", password: "pw" }));
+    const res = await bff.login(step({ username: "admin1", otp: "000000" }, pair(setCookies(first).get("uspace_mfa"))));
+    expect(res.status).toBe(401);
+    expect(setCookies(res).size).toBe(0);
+  });
+
+  it("refuses the code step without the password step's cookie, before calling the API", async () => {
+    const api = mockApi(() => Response.json(SESSION, { status: 201 }));
+    const res = await bffWith(api.fetch).login(step({ username: "admin1", otp: "123456" }));
+    expect(res.status).toBe(401);
+    expect(api.calls).toHaveLength(0);
+  });
+});
+
+describe("configuration", () => {
+  const keys = ["CISP_API_INTERNAL_URL", "CISP_WEB_MFA_CHALLENGE_SECRET"] as const;
+  function withEnv(env: Partial<Record<(typeof keys)[number], string>>, run: () => void) {
+    try {
+      for (const k of keys) vi.stubEnv(k, env[k]);
+      run();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  }
+
+  it("names a missing or short MFA challenge secret, and accepts one of 32 bytes", () => {
+    withEnv({ CISP_API_INTERNAL_URL: API }, () => {
+      expect(configProblem()).toMatch(/CISP_WEB_MFA_CHALLENGE_SECRET/);
+      expect(configFromEnv()).toBeNull();
+    });
+    withEnv({ CISP_API_INTERNAL_URL: API, CISP_WEB_MFA_CHALLENGE_SECRET: "t".repeat(31) }, () => {
+      expect(configProblem()).toMatch(/CISP_WEB_MFA_CHALLENGE_SECRET/);
+    });
+    withEnv({ CISP_API_INTERNAL_URL: API, CISP_WEB_MFA_CHALLENGE_SECRET: MFA_SECRET }, () => {
+      expect(configProblem()).toBeNull();
+      expect(configFromEnv()?.mfaChallengeSecret).toBe(MFA_SECRET);
+    });
+    withEnv({ CISP_WEB_MFA_CHALLENGE_SECRET: MFA_SECRET }, () => {
+      expect(configProblem()).toMatch(/CISP_API_INTERNAL_URL/);
+    });
   });
 });
 

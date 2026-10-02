@@ -71,6 +71,7 @@ once in CI):
 | `CISP_WEB_SESSION_MAX_AGE_S` | ceiling of the session cookie's `Max-Age` (43200); the API's `expires_at` shortens it |
 | `CISP_WEB_UPSTREAM_TIMEOUT_MS` | timeout of each BFF call to the API (10000) |
 | `CISP_WEB_TRUSTED_PROXY_HOPS` | reverse proxies in front of Next.js that append to `X-Forwarded-For` (1 behind Caddy) |
+| `CISP_WEB_MFA_CHALLENGE_SECRET` | seals the MFA challenge between the two sign-in steps in the `uspace_mfa` cookie (the kit's `mfaChallengeSecret`); at least 32 bytes from the deployment's secret store (`openssl rand -base64 32`); unset or shorter, every `/_bff/*` route answers 503 naming it |
 | `NEXT_PUBLIC_MAP_CENTER`, `NEXT_PUBLIC_MAP_ZOOM` | the public map's first view, `"lng,lat"` and a zoom; unset, the page names the variable instead of choosing a place |
 | `CISP_WEB_POLL_INTERVAL_S` | the public map's `HEAD` poll period while the stream is not live (60) |
 

@@ -6,6 +6,11 @@
 // - login: the kit's `login`, posting {username, password} to
 //   POST /v1/console/session and setting `uspace_session` (HttpOnly,
 //   Secure, SameSite=Strict) and the `uspace_csrf` double-submit cookie.
+//   For an account with MFA the API answers an MFA challenge instead
+//   (docs/PLAN.md §15 Q41 (3)); the kit seals it into the `uspace_mfa`
+//   cookie (HttpOnly, Path=/_bff) under CISP_WEB_MFA_CHALLENGE_SECRET,
+//   and the browser's second request {username, otp} becomes
+//   POST /v1/console/session/mfa {mfa_token, code}.
 // - proxy: the kit's `proxy`, forwarding /_bff/api/v1/console/* with the
 //   session cookie as the bearer; unsafe methods need X-CSRF-Token equal
 //   to the CSRF cookie.
@@ -23,6 +28,7 @@ import {
   checkCsrf,
   clearSession,
   forward,
+  MIN_CHALLENGE_SECRET_BYTES,
   readSessionToken,
   type BffHandlers,
   type SessionCookieOptions,
@@ -31,6 +37,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 /** The console API's session resource: login (POST) and logout (DELETE). */
 export const CONSOLE_SESSION_PATH = "/v1/console/session";
+
+/** The login's second step: the MFA challenge and a TOTP code. */
+export const CONSOLE_MFA_PATH = "/v1/console/session/mfa";
 
 /** What the proxy may reach: the console API and nothing else. */
 export const PROXY_ALLOW_PATHS: RegExp[] = [/^\/v1\/console\/[^/]/];
@@ -44,6 +53,12 @@ export interface BffConfig {
   timeoutMs: number;
   /** Reverse proxies in front of Next.js (CISP_WEB_TRUSTED_PROXY_HOPS). */
   trustedProxyHops?: number;
+  /**
+   * Seals the MFA challenge cookie between the two sign-in steps
+   * (CISP_WEB_MFA_CHALLENGE_SECRET, at least 32 bytes; a secret, never
+   * in the repository).
+   */
+  mfaChallengeSecret: string;
   fetch?: typeof fetch;
 }
 
@@ -76,6 +91,8 @@ export function createBff(cfg: BffConfig): Bff {
   const kit: BffHandlers = bffHandlers({
     apiBase: cfg.apiBase,
     apiLoginPath: CONSOLE_SESSION_PATH,
+    apiMfaPath: CONSOLE_MFA_PATH,
+    mfaChallengeSecret: cfg.mfaChallengeSecret,
     session,
     allowPaths: PROXY_ALLOW_PATHS,
     ...common,
@@ -114,13 +131,29 @@ function positiveInt(name: string, fallback: number): number {
   return n;
 }
 
+/**
+ * What the environment lacks for the BFF, naming the variable, or null
+ * when it is complete. Without it every BFF route answers 503 naming it
+ * (fail closed: no sign-in path without the MFA step).
+ */
+export function configProblem(): string | null {
+  const apiBase = process.env["CISP_API_INTERNAL_URL"];
+  if (apiBase === undefined || apiBase === "") return "CISP_API_INTERNAL_URL is not set";
+  const secret = process.env["CISP_WEB_MFA_CHALLENGE_SECRET"] ?? "";
+  if (new TextEncoder().encode(secret).length < MIN_CHALLENGE_SECRET_BYTES) {
+    return `CISP_WEB_MFA_CHALLENGE_SECRET is not set or shorter than ${MIN_CHALLENGE_SECRET_BYTES} bytes`;
+  }
+  return null;
+}
+
 /** The configuration from the environment, read at the first request. */
 export function configFromEnv(): BffConfig | null {
-  const apiBase = process.env["CISP_API_INTERNAL_URL"];
-  if (apiBase === undefined || apiBase === "") return null;
+  if (configProblem() !== null) return null;
+  const apiBase = process.env["CISP_API_INTERNAL_URL"] ?? "";
   const hops = process.env["CISP_WEB_TRUSTED_PROXY_HOPS"];
   return {
     apiBase,
+    mfaChallengeSecret: process.env["CISP_WEB_MFA_CHALLENGE_SECRET"] ?? "",
     // Display-side ceiling only: the API's session lifetime (<= 12 h)
     // shortens it through expires_at.
     sessionMaxAgeS: positiveInt("CISP_WEB_SESSION_MAX_AGE_S", 12 * 3600),
@@ -131,17 +164,19 @@ export function configFromEnv(): BffConfig | null {
 
 let cached: Bff | null = null;
 
-function unconfigured(): Promise<Response> {
-  return Promise.resolve(
-    problem(503, "bff_unavailable", "Console unavailable", "CISP_API_INTERNAL_URL is not set"),
-  );
+function unconfigured(detail: string): Handler {
+  return () => Promise.resolve(problem(503, "bff_unavailable", "Console unavailable", detail));
 }
 
 /** The handlers for this process, built lazily (the build has no environment). */
 export function bff(): Bff {
   if (cached !== null) return cached;
+  const missing = configProblem();
   const cfg = configFromEnv();
-  if (cfg === null) return { login: unconfigured, logout: unconfigured, proxy: unconfigured };
+  if (missing !== null || cfg === null) {
+    const off = unconfigured(missing ?? "the BFF is not configured");
+    return { login: off, logout: off, proxy: off };
+  }
   cached = createBff(cfg);
   return cached;
 }

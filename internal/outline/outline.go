@@ -5,9 +5,9 @@
 // It is a drawing, never a judgement: consumers judge a circle as a
 // circle through uspace-core (zones, ed318.ToZones), and nothing in the
 // CISP tests a position against the outline. Every vertex is placed on
-// the geodesic circle by uspace-core's geodesy: a tangent-plane first
-// guess (geodesy.LocalOffsetM) refined until geodesy.Inverse (Vincenty on
-// WGS84) puts it at the published radius on its azimuth.
+// the geodesic circle by uspace-core's direct geodesic solver,
+// geodesy.Destination (Vincenty on WGS84, the counterpart of
+// geodesy.Inverse to under 0.1 mm): the CISP solves nothing itself.
 //
 // Pure: no I/O, no logging, no global state.
 package outline
@@ -32,27 +32,20 @@ const Member = "cis_display_geometry"
 const Vertices = 64
 
 const (
-	// toleranceM is how close to its target (radius and azimuth, as an
-	// offset on the ground) a vertex must come before it is placed.
-	toleranceM = 1e-4
-	// maxSteps bounds the refinement; a circle that does not settle is
-	// an error, never a guess.
-	maxSteps = 30
-	// maxRadiusM bounds the circles drawn: the tangent-plane first guess
-	// and its correction are made for zone sizes, not continents.
+	// maxRadiusM bounds the circles drawn: a display outline is made for
+	// zone sizes, not continents.
 	maxRadiusM = 1_000_000
-	// maxAbsLatDeg keeps the centre off the poles, where a degree of
-	// longitude has no length.
+	// maxAbsLatDeg keeps the centre off the poles, where the outline's
+	// azimuths lose their meaning.
 	maxAbsLatDeg = 89
 	// decimals is the precision of a written position: 1e-8 degree,
 	// about a millimetre.
 	decimals = 1e8
-	// stepDeg is the offset used to read the local metres per degree.
-	stepDeg = 1e-3
 )
 
-// ErrNoConvergence is returned when a vertex does not settle on the circle.
-var ErrNoConvergence = errors.New("outline: a vertex did not settle on the circle")
+// ErrNotDrawable is returned when core's solver gives no valid position
+// for a vertex; the circle is then not drawn, never guessed.
+var ErrNotDrawable = errors.New("outline: a vertex has no valid position")
 
 // Ring is the closed ring of n vertices on the geodesic circle about
 // centre: counterclockwise (RFC 7946 section 3.1.6), starting due north,
@@ -68,12 +61,11 @@ func Ring(centre core.LatLon, radiusM float64, n int) ([]core.LatLon, error) {
 	case n < 3:
 		return nil, core.Fieldf("vertices", "%d is fewer than 3", n)
 	}
-	mLat, mLon := metresPerDegree(centre)
 	ring := make([]core.LatLon, 0, n+1)
 	for k := range n {
 		// Counterclockwise: azimuths decrease from north through west.
 		azDeg := math.Mod(360-360*float64(k)/float64(n), 360)
-		p, err := vertex(centre, radiusM, azDeg, mLat, mLon)
+		p, err := vertex(centre, radiusM, azDeg)
 		if err != nil {
 			return nil, err
 		}
@@ -82,37 +74,17 @@ func Ring(centre core.LatLon, radiusM float64, n int) ([]core.LatLon, error) {
 	return append(ring, ring[0]), nil
 }
 
-// metresPerDegree reads the local scale at p from geodesy.LocalOffsetM.
-func metresPerDegree(p core.LatLon) (perDegLat, perDegLon float64) {
-	north, _ := geodesy.LocalOffsetM(p, core.LatLon{LatDeg: p.LatDeg + stepDeg, LonDeg: p.LonDeg})
-	_, east := geodesy.LocalOffsetM(p, core.LatLon{LatDeg: p.LatDeg, LonDeg: p.LonDeg + stepDeg})
-	return north / stepDeg, east / stepDeg
-}
-
-// vertex is the point at radiusM from centre on azimuth azDeg: refined
-// until the geodesic from centre (geodesy.Inverse) ends within toleranceM
-// of the target offset, then rounded to the written precision.
-func vertex(centre core.LatLon, radiusM, azDeg, mLat, mLon float64) (core.LatLon, error) {
-	az := azDeg * math.Pi / 180
-	wantN, wantE := radiusM*math.Cos(az), radiusM*math.Sin(az)
-	p := core.LatLon{LatDeg: centre.LatDeg + wantN/mLat, LonDeg: core.WrapLonDeg(centre.LonDeg + wantE/mLon)}
-	for range maxSteps {
-		d, bearing, _, err := geodesy.Inverse(centre, p)
-		if err != nil {
-			return core.LatLon{}, fmt.Errorf("outline: azimuth %v: %w", azDeg, err)
-		}
-		b := bearing * math.Pi / 180
-		errN, errE := wantN-d*math.Cos(b), wantE-d*math.Sin(b)
-		if math.Hypot(errN, errE) < toleranceM {
-			return core.LatLon{
-				LatDeg: math.Round(p.LatDeg*decimals) / decimals,
-				LonDeg: math.Round(p.LonDeg*decimals) / decimals,
-			}, nil
-		}
-		pLat, pLon := metresPerDegree(p)
-		p = core.LatLon{LatDeg: p.LatDeg + errN/pLat, LonDeg: core.WrapLonDeg(p.LonDeg + errE/pLon)}
+// vertex is the point at radiusM from centre on azimuth azDeg, from
+// geodesy.Destination, rounded to the written precision.
+func vertex(centre core.LatLon, radiusM, azDeg float64) (core.LatLon, error) {
+	p := geodesy.Destination(centre, azDeg, radiusM)
+	if !p.Valid() {
+		return core.LatLon{}, fmt.Errorf("%w (azimuth %v)", ErrNotDrawable, azDeg)
 	}
-	return core.LatLon{}, fmt.Errorf("%w (azimuth %v)", ErrNoConvergence, azDeg)
+	return core.LatLon{
+		LatDeg: math.Round(p.LatDeg*decimals) / decimals,
+		LonDeg: math.Round(p.LonDeg*decimals) / decimals,
+	}, nil
 }
 
 // geoJSON is a written geometry: a Polygon, or a GeometryCollection of

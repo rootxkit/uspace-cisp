@@ -334,7 +334,7 @@ func validInput(t *testing.T) PublishInput {
 // Every refusal beside the acceptance that differs in one thing (E-01);
 // validation runs before any database access.
 func TestPublishInputValidation(t *testing.T) {
-	if err := func() error { in := validInput(t); return in.validate() }(); err != nil {
+	if err := func() error { in := validInput(t); return in.validate(false) }(); err != nil {
 		t.Fatalf("valid input refused: %v", err)
 	}
 	cases := []struct {
@@ -354,13 +354,13 @@ func TestPublishInputValidation(t *testing.T) {
 		in := validInput(t)
 		c.edit(&in)
 		var fe *core.FieldError
-		if err := in.validate(); !errors.As(err, &fe) || fe.Field != c.field {
+		if err := in.validate(false); !errors.As(err, &fe) || fe.Field != c.field {
 			t.Errorf("%s: got %v", c.field, err)
 		}
 	}
 	ussp := validInput(t)
 	ussp.Dataset, ussp.Collection = publication.DatasetUSSPList, nil
-	if err := ussp.validate(); err != nil {
+	if err := ussp.validate(false); err != nil {
 		t.Errorf("ussp_list without a collection refused: %v", err)
 	}
 }

@@ -25,7 +25,7 @@ func TestMigrateBothTrees(t *testing.T) {
 		tree, last, versions string
 		down                 string
 	}{
-		{"relational", "0007_publisher_heartbeat.sql", "1, 2, 3, 4, 5, 6, 7", "6"},
+		{"relational", "0008_restriction_jobs.sql", "1, 2, 3, 4, 5, 6, 7, 8", "7"},
 		{"timeseries", "0002_delivery_attempts.sql", "1, 2", "1"},
 	} {
 		t.Run(c.tree, func(t *testing.T) {

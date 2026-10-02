@@ -27,10 +27,14 @@ var exports = []struct {
 	component string
 	name      string
 	title     string
+	// extra are components carried under $defs although the root does
+	// not reference them (a schema that names two shapes).
+	extra []string
 }{
-	{"UsspList", "ussp_list", "cis/ussp_list/v1: the national list of certified USSPs"},
-	{"UspaceRequirements", "uspace_requirements", "cis/uspace_requirements/v1: the Art. 3(4) requirements of a U-space airspace"},
-	{"Change", "change", "cis/change/v1: one change record of the change feed, the webhooks and the stream"},
+	{"UsspList", "ussp_list", "cis/ussp_list/v1: the national list of certified USSPs", nil},
+	{"UspaceRequirements", "uspace_requirements", "cis/uspace_requirements/v1: the Art. 3(4) requirements of a U-space airspace", nil},
+	{"Change", "change", "cis/change/v1: one change record of the change feed, the webhooks and the stream", nil},
+	{"RestrictionCreate", "restriction", "cis/restriction/v1: a dynamic restriction from the ANSP (the POST /v1/restrictions body; $defs/CisRestriction is extendedProperties.cis_restriction of a served restriction)", []string{"CisRestriction"}},
 }
 
 const (
@@ -66,8 +70,14 @@ func run() error {
 			return fmt.Errorf("component %s not found", e.component)
 		}
 		defs := map[string]any{}
-		if err := collect(root, schemas, defs, map[string]bool{e.component: true}); err != nil {
+		seen := map[string]bool{e.component: true}
+		if err := collect(root, schemas, defs, seen); err != nil {
 			return fmt.Errorf("%s: %w", e.component, err)
+		}
+		for _, name := range e.extra {
+			if err := collect(map[string]any{"$ref": refPrefix + name}, schemas, defs, seen); err != nil {
+				return fmt.Errorf("%s: %w", e.component, err)
+			}
 		}
 		out := map[string]any{}
 		for k, v := range rewrite(root).(map[string]any) {

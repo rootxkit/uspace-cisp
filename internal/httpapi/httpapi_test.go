@@ -26,12 +26,16 @@ import (
 
 	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
+	"github.com/rootxkit/uspace-cisp/internal/publication"
 )
 
 var (
 	specOnce   sync.Once
 	specRouter routers.Router
-	errSpec    error
+	// specDatasetFirst routes the dataset-first operations alone
+	// (/v1/{dataset}..., /public/v1/{dataset}).
+	specDatasetFirst routers.Router
+	errSpec          error
 )
 
 // spec loads api/openapi.yaml once; every handler test validates its
@@ -49,12 +53,39 @@ func spec(t testing.TB) routers.Router {
 			errSpec = err
 			return
 		}
-		specRouter, errSpec = legacy.NewRouter(doc)
+		if specRouter, errSpec = legacy.NewRouter(doc); errSpec != nil {
+			return
+		}
+		first := *doc
+		first.Paths = openapi3.NewPaths()
+		for path, item := range doc.Paths.Map() {
+			for _, prefix := range datasetFirst {
+				if path == prefix || strings.HasPrefix(path, prefix+"/") {
+					first.Paths.Set(path, item)
+				}
+			}
+		}
+		specDatasetFirst, errSpec = legacy.NewRouter(&first)
 	})
 	if errSpec != nil {
 		t.Fatalf("api/openapi.yaml: %v", errSpec)
 	}
 	return specRouter
+}
+
+// findRoute finds the operation of req as the server's router does:
+// the dataset-first operations are registered once per dataset (Q34), so
+// for a request naming a dataset in that segment they are more specific
+// than a templated path of another tag (GET /v1/restrictions/versions is
+// the versions of restrictions, not the restriction "versions"). The
+// spec's own router prefers literal segments and would pick the other.
+func findRoute(t testing.TB, req *http.Request) (*routers.Route, map[string]string, error) {
+	t.Helper()
+	all := spec(t)
+	if route, params, err := specDatasetFirst.FindRoute(req); err == nil && publication.Dataset(params["dataset"]).Valid() {
+		return route, params, nil
+	}
+	return all.FindRoute(req)
 }
 
 // conform fails the test when req or the recorded response is not what
@@ -68,7 +99,7 @@ func conform(t testing.TB, req *http.Request, rec *httptest.ResponseRecorder) {
 
 func conformErr(t testing.TB, req *http.Request, rec *httptest.ResponseRecorder) error {
 	t.Helper()
-	route, params, err := spec(t).FindRoute(req)
+	route, params, err := findRoute(t, req)
 	if err != nil {
 		return fmt.Errorf("not in api/openapi.yaml: %w", err)
 	}

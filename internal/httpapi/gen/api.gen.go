@@ -111,6 +111,51 @@ func (e ChangeSchema) Valid() bool {
 	}
 }
 
+// Defines values for CisRestrictionEndedBy.
+const (
+	CisRestrictionEndedByAnsp        CisRestrictionEndedBy = "ansp"
+	CisRestrictionEndedByExpiry      CisRestrictionEndedBy = "expiry"
+	CisRestrictionEndedByLessThannil CisRestrictionEndedBy = "<nil>"
+)
+
+// Valid indicates whether the value is a known member of the CisRestrictionEndedBy enum.
+func (e CisRestrictionEndedBy) Valid() bool {
+	switch e {
+	case CisRestrictionEndedByAnsp:
+		return true
+	case CisRestrictionEndedByExpiry:
+		return true
+	case CisRestrictionEndedByLessThannil:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CisRestrictionState.
+const (
+	CisRestrictionStateActive    CisRestrictionState = "active"
+	CisRestrictionStateCancelled CisRestrictionState = "cancelled"
+	CisRestrictionStateEnded     CisRestrictionState = "ended"
+	CisRestrictionStatePlanned   CisRestrictionState = "planned"
+)
+
+// Valid indicates whether the value is a known member of the CisRestrictionState enum.
+func (e CisRestrictionState) Valid() bool {
+	switch e {
+	case CisRestrictionStateActive:
+		return true
+	case CisRestrictionStateCancelled:
+		return true
+	case CisRestrictionStateEnded:
+		return true
+	case CisRestrictionStatePlanned:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DatasetCollectionCisDataset.
 const (
 	DatasetCollectionCisDatasetRestrictions   DatasetCollectionCisDataset = "restrictions"
@@ -402,6 +447,162 @@ func (e ReadinessStatus) Valid() bool {
 	}
 }
 
+// Defines values for RestrictionCreateState.
+const (
+	RestrictionCreateStateActive  RestrictionCreateState = "active"
+	RestrictionCreateStatePlanned RestrictionCreateState = "planned"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionCreateState enum.
+func (e RestrictionCreateState) Valid() bool {
+	switch e {
+	case RestrictionCreateStateActive:
+		return true
+	case RestrictionCreateStatePlanned:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RestrictionEventOp.
+const (
+	RestrictionEventOpActivate RestrictionEventOp = "activate"
+	RestrictionEventOpCancel   RestrictionEventOp = "cancel"
+	RestrictionEventOpCreate   RestrictionEventOp = "create"
+	RestrictionEventOpEnd      RestrictionEventOp = "end"
+	RestrictionEventOpExpire   RestrictionEventOp = "expire"
+	RestrictionEventOpExtend   RestrictionEventOp = "extend"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionEventOp enum.
+func (e RestrictionEventOp) Valid() bool {
+	switch e {
+	case RestrictionEventOpActivate:
+		return true
+	case RestrictionEventOpCancel:
+		return true
+	case RestrictionEventOpCreate:
+		return true
+	case RestrictionEventOpEnd:
+		return true
+	case RestrictionEventOpExpire:
+		return true
+	case RestrictionEventOpExtend:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RestrictionHeadEndedBy.
+const (
+	RestrictionHeadEndedByAnsp   RestrictionHeadEndedBy = "ansp"
+	RestrictionHeadEndedByExpiry RestrictionHeadEndedBy = "expiry"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionHeadEndedBy enum.
+func (e RestrictionHeadEndedBy) Valid() bool {
+	switch e {
+	case RestrictionHeadEndedByAnsp:
+		return true
+	case RestrictionHeadEndedByExpiry:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RestrictionHeadState.
+const (
+	RestrictionHeadStateActive    RestrictionHeadState = "active"
+	RestrictionHeadStateCancelled RestrictionHeadState = "cancelled"
+	RestrictionHeadStateEnded     RestrictionHeadState = "ended"
+	RestrictionHeadStatePlanned   RestrictionHeadState = "planned"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionHeadState enum.
+func (e RestrictionHeadState) Valid() bool {
+	switch e {
+	case RestrictionHeadStateActive:
+		return true
+	case RestrictionHeadStateCancelled:
+		return true
+	case RestrictionHeadStateEnded:
+		return true
+	case RestrictionHeadStatePlanned:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RestrictionPatchOp.
+const (
+	RestrictionPatchOpActivate RestrictionPatchOp = "activate"
+	RestrictionPatchOpCancel   RestrictionPatchOp = "cancel"
+	RestrictionPatchOpEnd      RestrictionPatchOp = "end"
+	RestrictionPatchOpExtend   RestrictionPatchOp = "extend"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionPatchOp enum.
+func (e RestrictionPatchOp) Valid() bool {
+	switch e {
+	case RestrictionPatchOpActivate:
+		return true
+	case RestrictionPatchOpCancel:
+		return true
+	case RestrictionPatchOpEnd:
+		return true
+	case RestrictionPatchOpExtend:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RestrictionResultDataset.
+const (
+	RestrictionResultDatasetRestrictions RestrictionResultDataset = "restrictions"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionResultDataset enum.
+func (e RestrictionResultDataset) Valid() bool {
+	switch e {
+	case RestrictionResultDatasetRestrictions:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RestrictionResultReason.
+const (
+	RestrictionResultReasonRestrictionActivated RestrictionResultReason = "restriction_activated"
+	RestrictionResultReasonRestrictionCancelled RestrictionResultReason = "restriction_cancelled"
+	RestrictionResultReasonRestrictionCreated   RestrictionResultReason = "restriction_created"
+	RestrictionResultReasonRestrictionEnded     RestrictionResultReason = "restriction_ended"
+	RestrictionResultReasonRestrictionExtended  RestrictionResultReason = "restriction_extended"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionResultReason enum.
+func (e RestrictionResultReason) Valid() bool {
+	switch e {
+	case RestrictionResultReasonRestrictionActivated:
+		return true
+	case RestrictionResultReasonRestrictionCancelled:
+		return true
+	case RestrictionResultReasonRestrictionCreated:
+		return true
+	case RestrictionResultReasonRestrictionEnded:
+		return true
+	case RestrictionResultReasonRestrictionExtended:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StatusDegradedComponent.
 const (
 	Database StatusDegradedComponent = "database"
@@ -443,16 +644,16 @@ func (e StatusMtlsMode) Valid() bool {
 
 // Defines values for StatusPublishersKind.
 const (
-	Ansp      StatusPublishersKind = "ansp"
-	Authority StatusPublishersKind = "authority"
+	StatusPublishersKindAnsp      StatusPublishersKind = "ansp"
+	StatusPublishersKindAuthority StatusPublishersKind = "authority"
 )
 
 // Valid indicates whether the value is a known member of the StatusPublishersKind enum.
 func (e StatusPublishersKind) Valid() bool {
 	switch e {
-	case Ansp:
+	case StatusPublishersKindAnsp:
 		return true
-	case Authority:
+	case StatusPublishersKindAuthority:
 		return true
 	default:
 		return false
@@ -645,6 +846,24 @@ func (e DatasetPath) Valid() bool {
 	}
 }
 
+// Defines values for RestrictionBy.
+const (
+	RestrictionByAnspRef RestrictionBy = "ansp_ref"
+	RestrictionById      RestrictionBy = "id"
+)
+
+// Valid indicates whether the value is a known member of the RestrictionBy enum.
+func (e RestrictionBy) Valid() bool {
+	switch e {
+	case RestrictionByAnspRef:
+		return true
+	case RestrictionById:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetPublicDatasetParamsDataset.
 const (
 	GetPublicDatasetParamsDatasetRestrictions   GetPublicDatasetParamsDataset = "restrictions"
@@ -780,6 +999,66 @@ func (e ListPublicationAttemptsParamsDataset) Valid() bool {
 	case ListPublicationAttemptsParamsDatasetUsspList:
 		return true
 	case ListPublicationAttemptsParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListRestrictionsParamsState.
+const (
+	ListRestrictionsParamsStateActive    ListRestrictionsParamsState = "active"
+	ListRestrictionsParamsStateCancelled ListRestrictionsParamsState = "cancelled"
+	ListRestrictionsParamsStateEnded     ListRestrictionsParamsState = "ended"
+	ListRestrictionsParamsStatePlanned   ListRestrictionsParamsState = "planned"
+)
+
+// Valid indicates whether the value is a known member of the ListRestrictionsParamsState enum.
+func (e ListRestrictionsParamsState) Valid() bool {
+	switch e {
+	case ListRestrictionsParamsStateActive:
+		return true
+	case ListRestrictionsParamsStateCancelled:
+		return true
+	case ListRestrictionsParamsStateEnded:
+		return true
+	case ListRestrictionsParamsStatePlanned:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetRestrictionParamsBy.
+const (
+	GetRestrictionParamsByAnspRef GetRestrictionParamsBy = "ansp_ref"
+	GetRestrictionParamsById      GetRestrictionParamsBy = "id"
+)
+
+// Valid indicates whether the value is a known member of the GetRestrictionParamsBy enum.
+func (e GetRestrictionParamsBy) Valid() bool {
+	switch e {
+	case GetRestrictionParamsByAnspRef:
+		return true
+	case GetRestrictionParamsById:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchRestrictionParamsBy.
+const (
+	PatchRestrictionParamsByAnspRef PatchRestrictionParamsBy = "ansp_ref"
+	PatchRestrictionParamsById      PatchRestrictionParamsBy = "id"
+)
+
+// Valid indicates whether the value is a known member of the PatchRestrictionParamsBy enum.
+func (e PatchRestrictionParamsBy) Valid() bool {
+	switch e {
+	case PatchRestrictionParamsByAnspRef:
+		return true
+	case PatchRestrictionParamsById:
 		return true
 	default:
 		return false
@@ -934,17 +1213,47 @@ type ChangeList struct {
 	Next int64 `json:"next"`
 }
 
+// CisRestriction extendedProperties.cis_restriction of a served restriction
+// feature: the only member the CISP adds to a published feature
+// (docs/PLAN.md D4). ended_by is null while the restriction is
+// current (only planned and active restrictions are in the current
+// set; history by version holds the rest).
+type CisRestriction struct {
+	AnspRef          string                 `json:"ansp_ref"`
+	AnspVersion      int64                  `json:"ansp_version"`
+	EndedBy          *CisRestrictionEndedBy `json:"ended_by"`
+	EndsAt           time.Time              `json:"ends_at"`
+	Id               string                 `json:"id"`
+	StartsAt         time.Time              `json:"starts_at"`
+	State            CisRestrictionState    `json:"state"`
+	UspaceAirspaceId string                 `json:"uspace_airspace_id"`
+}
+
+// CisRestrictionEndedBy defines model for CisRestriction.EndedBy.
+type CisRestrictionEndedBy string
+
+// CisRestrictionState defines model for CisRestriction.State.
+type CisRestrictionState string
+
 // DatasetCollection An ED-318 FeatureCollection as the CISP serves it: the features
 // as published (canonical JSON), metadata.issued the version's
 // received_at, and the top-level cis_dataset, cis_version and
-// cis_updated_at (docs/PLAN.md section 15 Q1).
+// cis_updated_at (docs/PLAN.md section 15 Q1). The restrictions
+// dataset carries cis_publisher_stale_since while the ANSP is
+// stale; such a body is signed at serve time (X-CIS-Signature over
+// the bytes served) and not cached (Cache-Control no-store).
 type DatasetCollection struct {
-	CisDataset   DatasetCollectionCisDataset `json:"cis_dataset"`
-	CisUpdatedAt time.Time                   `json:"cis_updated_at"`
-	CisVersion   int64                       `json:"cis_version"`
-	Features     []ZoneFeature               `json:"features"`
-	Metadata     *map[string]interface{}     `json:"metadata,omitempty"`
-	Type         DatasetCollectionType       `json:"type"`
+	CisDataset DatasetCollectionCisDataset `json:"cis_dataset"`
+
+	// CisPublisherStaleSince restrictions only, present only while the ANSP is stale: when
+	// it became stale, or null when it has never been heard from.
+	// Its restrictions stay as published (spec 02 F2).
+	CisPublisherStaleSince *time.Time              `json:"cis_publisher_stale_since,omitempty"`
+	CisUpdatedAt           time.Time               `json:"cis_updated_at"`
+	CisVersion             int64                   `json:"cis_version"`
+	Features               []ZoneFeature           `json:"features"`
+	Metadata               *map[string]interface{} `json:"metadata,omitempty"`
+	Type                   DatasetCollectionType   `json:"type"`
 }
 
 // DatasetCollectionCisDataset defines model for DatasetCollection.CisDataset.
@@ -1205,6 +1514,170 @@ type Readiness struct {
 // ReadinessStatus defines model for Readiness.Status.
 type ReadinessStatus string
 
+// RestrictionCreate cis/restriction/v1: the body of POST /v1/restrictions (spec 02
+// F2, 04 section 3.4). A closed schema: an unknown member is
+// refused, never ignored (a misspelt member must not read as an
+// absent one). The version member is ansp_version, never version.
+// The feature is the restriction as one ED-318 UASZone feature;
+// the CISP serves it as published plus
+// extendedProperties.cis_restriction (CisRestriction).
+type RestrictionCreate struct {
+	// AnspRef The ANSP's reference; with ansp_version the idempotency key.
+	AnspRef string `json:"ansp_ref"`
+
+	// AnspVersion The ANSP-side version; rises on every accepted op.
+	AnspVersion int64     `json:"ansp_version"`
+	EndsAt      time.Time `json:"ends_at"`
+
+	// Feature One ED-318 UASZone feature (a Feature of
+	// Schema_GeoZoneCollection) with reason DAR, type PROHIBITED,
+	// REQ_AUTHORIZATION or CONDITIONAL, one limitedApplicability period
+	// equal to [starts_at, ends_at] and no extendedProperties member
+	// starting with cis_. The identifier is at most 7 characters (the
+	// ANSP mints DAR plus 4 base-36); the CISP checks its length and
+	// uniqueness only. Validated by uspace-core ed318.Parse.
+	Feature  RestrictionFeature     `json:"feature"`
+	StartsAt time.Time              `json:"starts_at"`
+	State    RestrictionCreateState `json:"state"`
+
+	// UspaceAirspaceId The identifier of the current USPACE feature this restriction modifies.
+	UspaceAirspaceId string `json:"uspace_airspace_id"`
+}
+
+// RestrictionCreateState defines model for RestrictionCreate.State.
+type RestrictionCreateState string
+
+// RestrictionEvent defines model for RestrictionEvent.
+type RestrictionEvent struct {
+	// Actor The client id, or system for the expiry.
+	Actor       string             `json:"actor"`
+	AnspVersion int64              `json:"ansp_version"`
+	At          time.Time          `json:"at"`
+	Op          RestrictionEventOp `json:"op"`
+
+	// PublicationId The version's publication.
+	PublicationId *string `json:"publication_id,omitempty"`
+}
+
+// RestrictionEventOp defines model for RestrictionEvent.Op.
+type RestrictionEventOp string
+
+// RestrictionFeature One ED-318 UASZone feature (a Feature of
+// Schema_GeoZoneCollection) with reason DAR, type PROHIBITED,
+// REQ_AUTHORIZATION or CONDITIONAL, one limitedApplicability period
+// equal to [starts_at, ends_at] and no extendedProperties member
+// starting with cis_. The identifier is at most 7 characters (the
+// ANSP mints DAR plus 4 base-36); the CISP checks its length and
+// uniqueness only. Validated by uspace-core ed318.Parse.
+type RestrictionFeature = json.RawMessage
+
+// RestrictionHead A restriction's lifecycle head with its events, oldest first.
+type RestrictionHead struct {
+	AnspRef     string    `json:"ansp_ref"`
+	AnspVersion int64     `json:"ansp_version"`
+	CreatedAt   time.Time `json:"created_at"`
+
+	// EndedBy Absent while the restriction is planned, active or cancelled.
+	EndedBy          *RestrictionHeadEndedBy `json:"ended_by,omitempty"`
+	EndsAt           time.Time               `json:"ends_at"`
+	Events           []RestrictionEvent      `json:"events"`
+	FeatureId        string                  `json:"feature_id"`
+	Id               string                  `json:"id"`
+	LastPublisher    *string                 `json:"last_publisher,omitempty"`
+	StartsAt         time.Time               `json:"starts_at"`
+	State            RestrictionHeadState    `json:"state"`
+	UpdatedAt        time.Time               `json:"updated_at"`
+	UspaceAirspaceId string                  `json:"uspace_airspace_id"`
+}
+
+// RestrictionHeadEndedBy Absent while the restriction is planned, active or cancelled.
+type RestrictionHeadEndedBy string
+
+// RestrictionHeadState defines model for RestrictionHead.State.
+type RestrictionHeadState string
+
+// RestrictionList defines model for RestrictionList.
+type RestrictionList struct {
+	// CisPublisherStaleSince Present only while the ANSP is stale; null when it has never been heard from.
+	CisPublisherStaleSince *time.Time        `json:"cis_publisher_stale_since,omitempty"`
+	Restrictions           []RestrictionHead `json:"restrictions"`
+}
+
+// RestrictionPatch The body of PATCH /v1/restrictions/{id}. A closed schema. ends_at
+// and feature belong to an extend (required there, refused
+// elsewhere).
+type RestrictionPatch struct {
+	AnspVersion int64 `json:"ansp_version"`
+
+	// EndsAt The new ends_at of an extend.
+	EndsAt *time.Time `json:"ends_at,omitempty"`
+
+	// Feature One ED-318 UASZone feature (a Feature of
+	// Schema_GeoZoneCollection) with reason DAR, type PROHIBITED,
+	// REQ_AUTHORIZATION or CONDITIONAL, one limitedApplicability period
+	// equal to [starts_at, ends_at] and no extendedProperties member
+	// starting with cis_. The identifier is at most 7 characters (the
+	// ANSP mints DAR plus 4 base-36); the CISP checks its length and
+	// uniqueness only. Validated by uspace-core ed318.Parse.
+	Feature *RestrictionFeature `json:"feature,omitempty"`
+	Op      RestrictionPatchOp  `json:"op"`
+}
+
+// RestrictionPatchOp defines model for RestrictionPatch.Op.
+type RestrictionPatchOp string
+
+// RestrictionResult An accepted op (replay false, a new version) or a replay of the same pair (replay true, the current version).
+type RestrictionResult struct {
+	Dataset RestrictionResultDataset `json:"dataset"`
+
+	// Etag Examples: "restrictions:7"
+	Etag string `json:"etag"`
+
+	// Reason The version's reason; absent on a replay.
+	Reason *RestrictionResultReason `json:"reason,omitempty"`
+	Replay bool                     `json:"replay"`
+
+	// Restriction A restriction's lifecycle head with its events, oldest first.
+	Restriction RestrictionHead `json:"restriction"`
+	Version     int64           `json:"version"`
+	Warnings    *[]Warning      `json:"warnings,omitempty"`
+}
+
+// RestrictionResultDataset defines model for RestrictionResult.Dataset.
+type RestrictionResultDataset string
+
+// RestrictionResultReason The version's reason; absent on a replay.
+type RestrictionResultReason string
+
+// RestrictionStatus The restrictions lifecycle as GET /v1/status reports it (WP-5):
+// how many restrictions are active, the expiry job's last run
+// (stale when older than CISP_RESTRICTION_EXPIRY_STALE_AFTER_S, 30
+// s: a dead ticker is an error line, never silence), and the
+// differences between the ANSP's last declared active_refs and the
+// active restrictions the CISP holds, which are listed and never
+// acted on.
+type RestrictionStatus struct {
+	Active int64 `json:"active"`
+
+	// AnspStaleSince Present only while the ANSP is stale; null when never heard from.
+	AnspStaleSince *time.Time `json:"ansp_stale_since,omitempty"`
+	Expiry         struct {
+		LastCount    *int    `json:"last_count,omitempty"`
+		LastInstance *string `json:"last_instance,omitempty"`
+
+		// LastRunAt Absent before the first run.
+		LastRunAt   *time.Time `json:"last_run_at,omitempty"`
+		Stale       bool       `json:"stale"`
+		StaleAfterS int        `json:"stale_after_s"`
+	} `json:"expiry"`
+
+	// HeartbeatRefMissing Held as active here, not declared by the ANSP.
+	HeartbeatRefMissing *[]string `json:"heartbeat_ref_missing,omitempty"`
+
+	// HeartbeatRefUnknown Declared active by the ANSP, not held as active here.
+	HeartbeatRefUnknown *[]string `json:"heartbeat_ref_unknown,omitempty"`
+}
+
 // ServicePerformance Art. 3(4)(c) service performance; the three named members are required, others pass.
 type ServicePerformance struct {
 	CisLatencyS float64 `json:"cis_latency_s"`
@@ -1240,6 +1713,15 @@ type Status struct {
 		// StaleSince When the publisher became stale (its last heartbeat plus stale_after_s).
 		StaleSince *time.Time `json:"stale_since,omitempty"`
 	} `json:"publishers"`
+
+	// Restrictions The restrictions lifecycle as GET /v1/status reports it (WP-5):
+	// how many restrictions are active, the expiry job's last run
+	// (stale when older than CISP_RESTRICTION_EXPIRY_STALE_AFTER_S, 30
+	// s: a dead ticker is an error line, never silence), and the
+	// differences between the ANSP's last declared active_refs and the
+	// active restrictions the CISP holds, which are listed and never
+	// acted on.
+	Restrictions *RestrictionStatus `json:"restrictions,omitempty"`
 }
 
 // StatusDegradedComponent defines model for Status.Degraded.Component.
@@ -1358,12 +1840,20 @@ type Warning struct {
 
 // ZoneFeature One ED-318 UASZone feature as published. The CISP adds only
 // extendedProperties.cis_applicability (at and applies_at reads)
-// to its copy, never to the stored feature.
+// to its copy, never to the stored feature, and to a restriction
+// extendedProperties.cis_restriction (CisRestriction).
 type ZoneFeature struct {
 	Geometry   map[string]interface{} `json:"geometry"`
 	Properties struct {
 		ExtendedProperties *struct {
 			CisApplicability *ZoneFeaturePropertiesExtendedPropertiesCisApplicability `json:"cis_applicability,omitempty"`
+
+			// CisRestriction extendedProperties.cis_restriction of a served restriction
+			// feature: the only member the CISP adds to a published feature
+			// (docs/PLAN.md D4). ended_by is null while the restriction is
+			// current (only planned and active restrictions are in the current
+			// set; history by version holds the rest).
+			CisRestriction *CisRestriction `json:"cis_restriction,omitempty"`
 		} `json:"extendedProperties,omitempty"`
 		Identifier string `json:"identifier"`
 	} `json:"properties"`
@@ -1400,13 +1890,28 @@ type BBox = string
 // DatasetPath defines model for DatasetPath.
 type DatasetPath string
 
+// IdempotencyKey defines model for IdempotencyKey.
+type IdempotencyKey = string
+
 // IfNoneMatch Examples: "zones:4"
 type IfNoneMatch = string
+
+// JWSSignature defines model for JWSSignature.
+type JWSSignature = string
+
+// RestrictionBy defines model for RestrictionBy.
+type RestrictionBy string
+
+// RestrictionID defines model for RestrictionID.
+type RestrictionID = string
 
 // DatasetApplicationGeoPlusJSON An ED-318 FeatureCollection as the CISP serves it: the features
 // as published (canonical JSON), metadata.issued the version's
 // received_at, and the top-level cis_dataset, cis_version and
-// cis_updated_at (docs/PLAN.md section 15 Q1).
+// cis_updated_at (docs/PLAN.md section 15 Q1). The restrictions
+// dataset carries cis_publisher_stale_since while the ANSP is
+// stale; such a body is signed at serve time (X-CIS-Signature over
+// the bytes served) and not cached (Cache-Control no-store).
 type DatasetApplicationGeoPlusJSON = DatasetCollection
 
 // DatasetApplicationJSON The application/json read of a dataset, the USSP list or a delta.
@@ -1419,7 +1924,10 @@ type PreconditionFailed = Problem
 // PublicDatasetApplicationGeoPlusJSON An ED-318 FeatureCollection as the CISP serves it: the features
 // as published (canonical JSON), metadata.issued the version's
 // received_at, and the top-level cis_dataset, cis_version and
-// cis_updated_at (docs/PLAN.md section 15 Q1).
+// cis_updated_at (docs/PLAN.md section 15 Q1). The restrictions
+// dataset carries cis_publisher_stale_since while the ANSP is
+// stale; such a body is signed at serve time (X-CIS-Signature over
+// the bytes served) and not cached (Cache-Control no-store).
 type PublicDatasetApplicationGeoPlusJSON = DatasetCollection
 
 // PublicDatasetApplicationJSON The USSP list on the public read: cis/ussp_list/v1 without each
@@ -1430,6 +1938,9 @@ type PublicDatasetApplicationJSON = PublicUsspList
 // RateLimited The ecosystem-wide error body (RFC 9457), the same shape as
 // uspace-lab schemas/common/problem/v1.
 type RateLimited = Problem
+
+// RestrictionReplay An accepted op (replay false, a new version) or a replay of the same pair (replay true, the current version).
+type RestrictionReplay = RestrictionResult
 
 // Unavailable The ecosystem-wide error body (RFC 9457), the same shape as
 // uspace-lab schemas/common/problem/v1.
@@ -1513,6 +2024,58 @@ type ListPublicationAttemptsParams struct {
 // ListPublicationAttemptsParamsDataset defines parameters for ListPublicationAttempts.
 type ListPublicationAttemptsParamsDataset string
 
+// CreateRestrictionParams defines parameters for CreateRestriction.
+type CreateRestrictionParams struct {
+	// XJWSSignature RFC 7515 Appendix F detached JWS with RFC 7797 b64 false over
+	// the exact body bytes (alg RS256, kid, iat, crit ["b64"]);
+	// required by the server (403 signature when absent).
+	XJWSSignature *JWSSignature `json:"X-JWS-Signature,omitempty"`
+
+	// IdempotencyKey Ignored. The idempotency key of a restriction is the body pair (ansp_ref, ansp_version).
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListRestrictionsParams defines parameters for ListRestrictions.
+type ListRestrictionsParams struct {
+	State *ListRestrictionsParamsState `form:"state,omitempty" json:"state,omitempty"`
+
+	// Airspace The uspace_airspace_id.
+	Airspace *string `form:"airspace,omitempty" json:"airspace,omitempty"`
+
+	// At RFC 3339 instant with an offset inside the window.
+	At    *string `form:"at,omitempty" json:"at,omitempty"`
+	Limit *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListRestrictionsParamsState defines parameters for ListRestrictions.
+type ListRestrictionsParamsState string
+
+// GetRestrictionParams defines parameters for GetRestriction.
+type GetRestrictionParams struct {
+	// By What id names.
+	By *GetRestrictionParamsBy `form:"by,omitempty" json:"by,omitempty"`
+}
+
+// GetRestrictionParamsBy defines parameters for GetRestriction.
+type GetRestrictionParamsBy string
+
+// PatchRestrictionParams defines parameters for PatchRestriction.
+type PatchRestrictionParams struct {
+	// By What id names.
+	By *PatchRestrictionParamsBy `form:"by,omitempty" json:"by,omitempty"`
+
+	// XJWSSignature RFC 7515 Appendix F detached JWS with RFC 7797 b64 false over
+	// the exact body bytes (alg RS256, kid, iat, crit ["b64"]);
+	// required by the server (403 signature when absent).
+	XJWSSignature *JWSSignature `json:"X-JWS-Signature,omitempty"`
+
+	// IdempotencyKey Ignored. The idempotency key of a restriction is the body pair (ansp_ref, ansp_version).
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// PatchRestrictionParamsBy defines parameters for PatchRestriction.
+type PatchRestrictionParamsBy string
+
 // GetDatasetParams defines parameters for GetDataset.
 type GetDatasetParams struct {
 	// Bbox minlng,minlat,maxlng,maxlat in WGS84 degrees; a prefilter on the
@@ -1571,6 +2134,12 @@ type PutPublicationJSONRequestBody = PublicationBody
 
 // PostPublisherHeartbeatJSONRequestBody defines body for PostPublisherHeartbeat for application/json ContentType.
 type PostPublisherHeartbeatJSONRequestBody = PublisherHeartbeat
+
+// CreateRestrictionJSONRequestBody defines body for CreateRestriction for application/json ContentType.
+type CreateRestrictionJSONRequestBody = RestrictionCreate
+
+// PatchRestrictionJSONRequestBody defines body for PatchRestriction for application/json ContentType.
+type PatchRestrictionJSONRequestBody = RestrictionPatch
 
 // AsUsspList returns the union data inside the DatasetDocument as a UsspList
 func (t DatasetDocument) AsUsspList() (UsspList, error) {
@@ -1666,6 +2235,18 @@ type ServerInterface interface {
 	// PostPublisherHeartbeat Publisher heartbeat (every 15 s)
 	// (POST /v1/publishers/heartbeat)
 	PostPublisherHeartbeat(w http.ResponseWriter, r *http.Request)
+	// CreateRestriction Create a dynamic restriction (F2)
+	// (POST /v1/restrictions)
+	CreateRestriction(w http.ResponseWriter, r *http.Request, params CreateRestrictionParams)
+	// ListRestrictions The restriction heads, with their events
+	// (GET /v1/restrictions/heads)
+	ListRestrictions(w http.ResponseWriter, r *http.Request, params ListRestrictionsParams)
+	// GetRestriction One restriction head with its events
+	// (GET /v1/restrictions/{id})
+	GetRestriction(w http.ResponseWriter, r *http.Request, id RestrictionID, params GetRestrictionParams)
+	// PatchRestriction Activate, extend, end or cancel a restriction (F2)
+	// (PATCH /v1/restrictions/{id})
+	PatchRestriction(w http.ResponseWriter, r *http.Request, id RestrictionID, params PatchRestrictionParams)
 	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(w http.ResponseWriter, r *http.Request)
@@ -2171,6 +2752,262 @@ func (siw *ServerInterfaceWrapper) PostPublisherHeartbeat(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// CreateRestriction operation middleware
+func (siw *ServerInterfaceWrapper) CreateRestriction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateRestrictionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-JWS-Signature" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-JWS-Signature")]; found {
+		var XJWSSignature JWSSignature
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-JWS-Signature", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-JWS-Signature", valueList[0], &XJWSSignature, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-JWS-Signature", Err: err})
+			return
+		}
+
+		params.XJWSSignature = &XJWSSignature
+
+	}
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRestriction(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRestrictions operation middleware
+func (siw *ServerInterfaceWrapper) ListRestrictions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRestrictionsParams
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "airspace" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "airspace", r.URL.Query(), &params.Airspace, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "airspace"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "airspace", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRestrictions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRestriction operation middleware
+func (siw *ServerInterfaceWrapper) GetRestriction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id RestrictionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRestrictionParams
+
+	// ------------- Optional query parameter "by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "by", r.URL.Query(), &params.By, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "by", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRestriction(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchRestriction operation middleware
+func (siw *ServerInterfaceWrapper) PatchRestriction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id RestrictionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PatchRestrictionParams
+
+	// ------------- Optional query parameter "by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "by", r.URL.Query(), &params.By, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "by", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-JWS-Signature" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-JWS-Signature")]; found {
+		var XJWSSignature JWSSignature
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-JWS-Signature", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-JWS-Signature", valueList[0], &XJWSSignature, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-JWS-Signature", Err: err})
+			return
+		}
+
+		params.XJWSSignature = &XJWSSignature
+
+	}
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchRestriction(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -2597,6 +3434,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/publications/{dataset}", wrapper.PutPublication)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/publications/{dataset}/attempts", wrapper.ListPublicationAttempts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/publishers/heartbeat", wrapper.PostPublisherHeartbeat)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/restrictions", wrapper.CreateRestriction)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/restrictions/heads", wrapper.ListRestrictions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/restrictions/{id}", wrapper.GetRestriction)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/restrictions/{id}", wrapper.PatchRestriction)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}", wrapper.GetDataset)
 	m.HandleFunc(http.MethodHead+" "+options.BaseURL+"/v1/{dataset}", wrapper.HeadDataset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions", wrapper.ListDatasetVersions)
@@ -2696,6 +3537,15 @@ type RateLimitedApplicationProblemPlusJSONResponse struct {
 	Body Problem
 
 	Headers RateLimitedResponseHeaders
+}
+
+type RestrictionReplayResponseHeaders struct {
+	ETag *string
+}
+type RestrictionReplayJSONResponse struct {
+	Body RestrictionResult
+
+	Headers RestrictionReplayResponseHeaders
 }
 
 type UnavailableResponseHeaders struct {
@@ -3834,6 +4684,533 @@ func (response PostPublisherHeartbeatdefaultApplicationProblemPlusJSONResponse) 
 	return err
 }
 
+type CreateRestrictionRequestObject struct {
+	Params CreateRestrictionParams
+	Body   *CreateRestrictionJSONRequestBody
+}
+
+type CreateRestrictionResponseObject interface {
+	VisitCreateRestrictionResponse(w http.ResponseWriter) error
+}
+
+type CreateRestriction200JSONResponse struct{ RestrictionReplayJSONResponse }
+
+func (response CreateRestriction200JSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateRestriction201JSONResponse struct {
+	Body    RestrictionResult
+	Headers CreateRestriction201ResponseHeaders
+}
+
+func (response CreateRestriction201JSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateRestriction400ApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction401ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateRestriction401ApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction403ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateRestriction403ApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateRestriction409ApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction413ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateRestriction413ApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction415ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateRestriction415ApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestriction503ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateRestriction503ApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRestrictiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateRestrictiondefaultApplicationProblemPlusJSONResponse) VisitCreateRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRestrictionsRequestObject struct {
+	Params ListRestrictionsParams
+}
+
+type ListRestrictionsResponseObject interface {
+	VisitListRestrictionsResponse(w http.ResponseWriter) error
+}
+
+type ListRestrictions200JSONResponse RestrictionList
+
+func (response ListRestrictions200JSONResponse) VisitListRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRestrictions400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListRestrictions400ApplicationProblemPlusJSONResponse) VisitListRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRestrictions401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListRestrictions401ApplicationProblemPlusJSONResponse) VisitListRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRestrictions403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListRestrictions403ApplicationProblemPlusJSONResponse) VisitListRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRestrictions503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListRestrictions503ApplicationProblemPlusJSONResponse) VisitListRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRestrictionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListRestrictionsdefaultApplicationProblemPlusJSONResponse) VisitListRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRestrictionRequestObject struct {
+	Id     RestrictionID `json:"id"`
+	Params GetRestrictionParams
+}
+
+type GetRestrictionResponseObject interface {
+	VisitGetRestrictionResponse(w http.ResponseWriter) error
+}
+
+type GetRestriction200JSONResponse RestrictionHead
+
+func (response GetRestriction200JSONResponse) VisitGetRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRestriction401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetRestriction401ApplicationProblemPlusJSONResponse) VisitGetRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRestriction403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetRestriction403ApplicationProblemPlusJSONResponse) VisitGetRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRestriction404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetRestriction404ApplicationProblemPlusJSONResponse) VisitGetRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRestriction503ApplicationProblemPlusJSONResponse Problem
+
+func (response GetRestriction503ApplicationProblemPlusJSONResponse) VisitGetRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRestrictiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetRestrictiondefaultApplicationProblemPlusJSONResponse) VisitGetRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestrictionRequestObject struct {
+	Id     RestrictionID `json:"id"`
+	Params PatchRestrictionParams
+	Body   *PatchRestrictionJSONRequestBody
+}
+
+type PatchRestrictionResponseObject interface {
+	VisitPatchRestrictionResponse(w http.ResponseWriter) error
+}
+
+type PatchRestriction200ResponseHeaders struct {
+	ETag *string
+}
+
+type PatchRestriction200JSONResponse struct {
+	Body    RestrictionResult
+	Headers PatchRestriction200ResponseHeaders
+}
+
+func (response PatchRestriction200JSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response PatchRestriction400ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction401ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchRestriction401ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction403ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchRestriction403ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction404ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchRestriction404ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction409ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchRestriction409ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction413ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchRestriction413ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction415ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchRestriction415ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestriction503ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchRestriction503ApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchRestrictiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PatchRestrictiondefaultApplicationProblemPlusJSONResponse) VisitPatchRestrictionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetStatusRequestObject struct {
 }
 
@@ -4615,6 +5992,18 @@ type StrictServerInterface interface {
 	// PostPublisherHeartbeat Publisher heartbeat (every 15 s)
 	// (POST /v1/publishers/heartbeat)
 	PostPublisherHeartbeat(ctx context.Context, request PostPublisherHeartbeatRequestObject) (PostPublisherHeartbeatResponseObject, error)
+	// CreateRestriction Create a dynamic restriction (F2)
+	// (POST /v1/restrictions)
+	CreateRestriction(ctx context.Context, request CreateRestrictionRequestObject) (CreateRestrictionResponseObject, error)
+	// ListRestrictions The restriction heads, with their events
+	// (GET /v1/restrictions/heads)
+	ListRestrictions(ctx context.Context, request ListRestrictionsRequestObject) (ListRestrictionsResponseObject, error)
+	// GetRestriction One restriction head with its events
+	// (GET /v1/restrictions/{id})
+	GetRestriction(ctx context.Context, request GetRestrictionRequestObject) (GetRestrictionResponseObject, error)
+	// PatchRestriction Activate, extend, end or cancel a restriction (F2)
+	// (PATCH /v1/restrictions/{id})
+	PatchRestriction(ctx context.Context, request PatchRestrictionRequestObject) (PatchRestrictionResponseObject, error)
 	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(ctx context.Context, request GetStatusRequestObject) (GetStatusResponseObject, error)
@@ -4950,6 +6339,126 @@ func (sh *strictHandler) PostPublisherHeartbeat(w http.ResponseWriter, r *http.R
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostPublisherHeartbeatResponseObject); ok {
 		if err := validResponse.VisitPostPublisherHeartbeatResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRestriction operation middleware
+func (sh *strictHandler) CreateRestriction(w http.ResponseWriter, r *http.Request, params CreateRestrictionParams) {
+	var request CreateRestrictionRequestObject
+
+	request.Params = params
+
+	var body CreateRestrictionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRestriction(ctx, request.(CreateRestrictionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRestriction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRestrictionResponseObject); ok {
+		if err := validResponse.VisitCreateRestrictionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRestrictions operation middleware
+func (sh *strictHandler) ListRestrictions(w http.ResponseWriter, r *http.Request, params ListRestrictionsParams) {
+	var request ListRestrictionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRestrictions(ctx, request.(ListRestrictionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRestrictions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRestrictionsResponseObject); ok {
+		if err := validResponse.VisitListRestrictionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRestriction operation middleware
+func (sh *strictHandler) GetRestriction(w http.ResponseWriter, r *http.Request, id RestrictionID, params GetRestrictionParams) {
+	var request GetRestrictionRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRestriction(ctx, request.(GetRestrictionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRestriction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRestrictionResponseObject); ok {
+		if err := validResponse.VisitGetRestrictionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchRestriction operation middleware
+func (sh *strictHandler) PatchRestriction(w http.ResponseWriter, r *http.Request, id RestrictionID, params PatchRestrictionParams) {
+	var request PatchRestrictionRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body PatchRestrictionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchRestriction(ctx, request.(PatchRestrictionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchRestriction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchRestrictionResponseObject); ok {
+		if err := validResponse.VisitPatchRestrictionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

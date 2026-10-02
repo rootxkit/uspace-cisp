@@ -66,6 +66,9 @@ const (
 	EnvAllowPrivateCallbacks     = "CISP_ALLOW_PRIVATE_CALLBACKS"
 	EnvAllowInsecureCallbacks    = "CISP_ALLOW_INSECURE_CALLBACKS"
 	EnvBrandingFile              = "CISP_BRANDING_FILE"
+	EnvMaxRestrictionBytes       = "CISP_MAX_RESTRICTION_BYTES"
+	EnvExpiryIntervalS           = "CISP_RESTRICTION_EXPIRY_INTERVAL_S"
+	EnvExpiryStaleAfterS         = "CISP_RESTRICTION_EXPIRY_STALE_AFTER_S"
 )
 
 // Catalogue is every CISP_* variable with its default, in the order
@@ -116,6 +119,9 @@ var Catalogue = []Var{
 	{Name: EnvMaxPublicationBytes, Default: "33554432"},
 	{Name: EnvMaxSubscriptionsPerClient, Default: "20"},
 	{Name: EnvBrandingFile, Default: ""},
+	{Name: EnvMaxRestrictionBytes, Default: "262144"},
+	{Name: EnvExpiryIntervalS, Default: "5"},
+	{Name: EnvExpiryStaleAfterS, Default: "30"},
 
 	// deliver.
 	{Name: EnvDeliverHTTPAddr, Default: ":8081"},

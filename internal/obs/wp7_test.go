@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -111,6 +113,9 @@ func TestMirrorCounters(t *testing.T) {
 // held and counted, the one after the interval goes through with the
 // count. The key set is bounded (E-10): past it the least recently used
 // is forgotten, and comes back as a first line.
+// onceRuns makes the package Once's key unique per run of TestThrottle.
+var onceRuns atomic.Int64
+
 func TestThrottle(t *testing.T) {
 	now := time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC)
 	var mu sync.Mutex
@@ -137,8 +142,14 @@ func TestThrottle(t *testing.T) {
 	if ok, _ := th.Once("a", time.Minute); !ok {
 		t.Error("a forgotten key was held back")
 	}
-	if ok, _ := Once("obs-test-"+t.Name(), time.Hour); !ok {
+	// The package Once is process-wide and outlives a run under
+	// -count=N, so each run takes a key no earlier run has used.
+	key := fmt.Sprintf("obs-test-%s-%d", t.Name(), onceRuns.Add(1))
+	if ok, _ := Once(key, time.Hour); !ok {
 		t.Error("the package Once held back a first line")
+	}
+	if ok, _ := Once(key, time.Hour); ok {
+		t.Error("the package Once let a second line through within the interval")
 	}
 	if NewThrottle(0, nil).maxKeys != DefaultThrottleKeys {
 		t.Error("default bound")

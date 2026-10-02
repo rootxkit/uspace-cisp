@@ -28,6 +28,8 @@ type security struct {
 	machine *auth.MachineVerifier
 	guard   *auth.Guard
 	keys    *jws.KeyRing
+	// console holds the session issuer and the TOTP sealer (WP-8).
+	console consoleKeys
 	// publishers holds the detached verifiers of the authority and, when
 	// CISP_ANSP_JWKS_URL is set, the ANSP, for the publication routes
 	// (WP-3, WP-5).
@@ -44,7 +46,17 @@ func startSecurity(ctx context.Context, cfg *config.API, status *obs.Status, log
 	if err != nil {
 		return nil, err
 	}
-	machine, err := auth.NewMachineVerifier(ctx, auth.MachineConfigFrom(cfg, cache, jwksComp))
+	consoleKeys, err := loadConsoleKeys(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("console: %w", err)
+	}
+	mc := auth.MachineConfigFrom(cfg, cache, jwksComp)
+	if consoleKeys.issuer != nil {
+		// D10: one verifier; the console issuer is allow-listed beside the
+		// ecosystem's with the session key's static key set.
+		mc.Issuers = append(mc.Issuers, consoleKeys.issuer.Source())
+	}
+	machine, err := auth.NewMachineVerifier(ctx, mc)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +64,7 @@ func startSecurity(ctx context.Context, cfg *config.API, status *obs.Status, log
 	if err != nil {
 		return nil, err
 	}
-	sec := &security{machine: machine, guard: guard, publishers: map[auth.Publisher]*auth.Reloading[jws.DetachedVerifier]{}}
+	sec := &security{machine: machine, guard: guard, console: consoleKeys, publishers: map[auth.Publisher]*auth.Reloading[jws.DetachedVerifier]{}}
 
 	pubs := []struct {
 		p        auth.Publisher

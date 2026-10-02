@@ -9,10 +9,11 @@ import (
 )
 
 type Account struct {
-	ID            string
-	Username      string
-	PasswordHash  string
-	Role          string
+	ID           string
+	Username     string
+	PasswordHash string
+	Role         string
+	// TOTP secret, AES-256-GCM under a key of CISP_SECRETS_KEY_FILE: 8-byte key id || 12-byte nonce || ciphertext, the key id and the account id as associated data.
 	TotpSecretEnc []byte
 	MfaRequired   bool
 	Status        string
@@ -20,6 +21,8 @@ type Account struct {
 	LastLoginAt   *time.Time
 	FailedLogins  int32
 	LockedUntil   *time.Time
+	// RFC 6238 step of the last accepted TOTP code; a code at or below it is a replay.
+	TotpLastStep *int64
 }
 
 // The change feed and the outbox (D6): id is the cursor; written in the publication transaction. Insert-only.
@@ -208,6 +211,8 @@ type Session struct {
 	IssuedAt  time.Time
 	ExpiresAt time.Time
 	RevokedAt *time.Time
+	// Last use of the session (database clock), written at most once a minute; idle past the timeout ends it.
+	LastSeenAt time.Time
 }
 
 // The unfiltered GET /v1/{dataset} body of each version, gzip, with the CISP compact detached JWS over the uncompressed body.

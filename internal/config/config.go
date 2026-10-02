@@ -69,7 +69,13 @@ type API struct {
 	SigningKeyPrevFile string
 	SigningKIDPrev     string
 	SessionKeyFile     string
-	SecretsKey         string
+	// SecretsKeyFile holds the keys sealing console TOTP secrets, one
+	// per line, the sealing key first (internal/console.LoadSealer reads
+	// it at start).
+	SecretsKeyFile string
+	// ConsoleIssuer is the iss of console session tokens; the shared
+	// verifier allow-lists it with the session key's static key set.
+	ConsoleIssuer string
 
 	// PublisherSignatureMaxSkew bounds how far the iat of a publisher's
 	// detached signature may be from now, either way.
@@ -156,7 +162,7 @@ type Ctl struct {
 	SigningKeyPrevFile string
 	SigningKIDPrev     string
 	SessionKeyFile     string
-	SecretsKey         string
+	SecretsKeyFile     string
 }
 
 func loadCommon(e *env) Common {
@@ -206,7 +212,8 @@ func LoadAPI(environ []string) (*API, error) {
 		SigningKeyPrevFile: e.str(EnvSigningKeyPrevFile),
 		SigningKIDPrev:     e.str(EnvSigningKIDPrev),
 		SessionKeyFile:     e.str(EnvSessionKeyFile),
-		SecretsKey:         e.str(EnvSecretsKey),
+		SecretsKeyFile:     e.str(EnvSecretsKeyFile),
+		ConsoleIssuer:      e.str(EnvConsoleIssuer),
 
 		PublisherSignatureMaxSkew: e.seconds(EnvPublisherSigMaxSkewS),
 
@@ -278,7 +285,7 @@ func LoadCtl(environ []string) (*Ctl, error) {
 		SigningKeyPrevFile: e.str(EnvSigningKeyPrevFile),
 		SigningKIDPrev:     e.str(EnvSigningKIDPrev),
 		SessionKeyFile:     e.str(EnvSessionKeyFile),
-		SecretsKey:         e.str(EnvSecretsKey),
+		SecretsKeyFile:     e.str(EnvSecretsKeyFile),
 	}
 	return c, finish(e, &c.Common, c.Validate)
 }
@@ -434,6 +441,7 @@ func (c *API) Validate() error {
 		p = append(p, core.Fieldf(EnvMTLSMode, "%q is not one of required, off", c.MTLSMode))
 	}
 	p = signingKeysOK(p, c.SigningKeyFile, c.SigningKID, c.SigningKeyPrevFile, c.SigningKIDPrev)
+	p = consoleOK(p, c)
 	p = durationIn(p, EnvPublisherSigMaxSkewS, c.PublisherSignatureMaxSkew, time.Second, time.Hour)
 	p = urlOK(p, EnvPublicBaseURL, c.PublicBaseURL, "http", "https")
 	p = urlOK(p, EnvIssuerURL, c.IssuerURL, "http", "https")
@@ -469,6 +477,42 @@ func (c *API) Validate() error {
 		}
 	}
 	return orNil(p)
+}
+
+// consoleOK checks the console's variables. The console is configured
+// when any of CISP_SESSION_KEY_FILE, CISP_CONSOLE_ISSUER and
+// CISP_SECRETS_KEY_FILE is set: then all three and CISP_DATABASE_URL
+// are required (a console with a session key but no secrets key file
+// refuses to start, naming the variable). The keys in the file are
+// checked when it is read at start; the console issuer is another
+// issuer than the ecosystem's.
+func consoleOK(p FieldErrors, c *API) FieldErrors {
+	if c.ConsoleConfigured() {
+		p = requiredFor(p, EnvSessionKeyFile, c.SessionKeyFile, "the console signs its sessions with it")
+		p = requiredFor(p, EnvConsoleIssuer, c.ConsoleIssuer, "the console's session tokens carry it as iss")
+		p = requiredFor(p, EnvSecretsKeyFile, c.SecretsKeyFile, "console TOTP secrets are encrypted at rest under its keys (one per line, 32 random bytes in standard base64 or hex: openssl rand -base64 32)")
+		p = requiredFor(p, EnvDatabaseURL, c.DatabaseURL, "the console's accounts and sessions live in the database")
+	}
+	p = urlOK(p, EnvConsoleIssuer, c.ConsoleIssuer, "http", "https")
+	if c.ConsoleIssuer != "" && (c.ConsoleIssuer == c.TokenIssuer || c.ConsoleIssuer == c.LabIssuer) {
+		p = append(p, core.Fieldf(EnvConsoleIssuer, "equals an ecosystem issuer; console sessions need an issuer of their own"))
+	}
+	return p
+}
+
+// ConsoleConfigured reports whether any console variable is set (the
+// api then serves the console, and Validate requires them all).
+func (c *API) ConsoleConfigured() bool {
+	return c.SessionKeyFile != "" || c.ConsoleIssuer != "" || c.SecretsKeyFile != ""
+}
+
+// requiredFor reports an empty value of a variable required here, and
+// why.
+func requiredFor(p FieldErrors, name, value, why string) FieldErrors {
+	if value == "" {
+		return append(p, core.Fieldf(name, "not set; the console is configured and needs it: %s", why))
+	}
+	return p
 }
 
 // originOK accepts an http or https origin: a scheme, a host, an

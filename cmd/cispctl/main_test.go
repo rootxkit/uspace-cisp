@@ -28,7 +28,9 @@ func TestVersion(t *testing.T) {
 func TestConfigCheckOK(t *testing.T) {
 	code, out, errOut := runCtl([]string{"config", "check"}, []string{
 		"CISP_DATABASE_URL=postgres://cisp_api:hunter2-pw@db/cisp",
-		"CISP_SECRETS_KEY=very-secret-key-material",
+		"CISP_SECRETS_KEY_FILE=/run/keys/secrets.key",
+		"CISP_SESSION_KEY_FILE=/run/keys/session.pem",
+		"CISP_CONSOLE_ISSUER=https://uspace-cisp.example.test/console",
 		"CISP_TOKEN_ISSUER=https://authority.example.test/",
 		"CISP_TOKEN_JWKS_URL=https://authority.example.test/.well-known/jwks.json",
 		"CISP_AUDIENCES=uspace-cisp.example.test",
@@ -42,7 +44,7 @@ func TestConfigCheckOK(t *testing.T) {
 	if code != exitOK || !strings.Contains(out, "config check: ok") {
 		t.Fatalf("config check = %d %q %q", code, out, errOut)
 	}
-	for _, want := range []string{"CISP_HTTP_ADDR=:8080", "CISP_DELIVER_HTTP_ADDR=:8081", "CISP_DATABASE_URL=postgres://cisp_api:***@db/cisp", "CISP_SECRETS_KEY=***"} {
+	for _, want := range []string{"CISP_HTTP_ADDR=:8080", "CISP_DELIVER_HTTP_ADDR=:8081", "CISP_DATABASE_URL=postgres://cisp_api:***@db/cisp", "CISP_SECRETS_KEY_FILE=/run/keys/secrets.key"} {
 		if !strings.Contains(out, want+"\n") {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}

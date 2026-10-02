@@ -73,6 +73,9 @@ section 9) where it names one.
 | `cisp_bus_publish_failed_total` | counter | `component` | Committed changes whose bus publish failed (deliver's scan covers them). | any increase |
 | `cisp_bus_publish_skipped_total` | counter | `component` | Committed changes not published because no bus is configured. | — |
 | `cisp_change_bbox_unavailable_total` | counter | `component` | Changes committed without a bbox (the whole dataset is announced). | — |
+| `cisp_console_actions_total` | counter | `component` | Console actions written (accounts, subscriptions, retries, republications). | — |
+| `cisp_console_logins_refused_total` | counter | `component` | Console logins refused (wrong credentials, locked, TOTP). | a burst (password guessing) |
+| `cisp_console_logins_total` | counter | `component` | Console sessions issued. | — |
 | `cisp_deliveries_delivered_total` | counter | `component` | Webhook delivery outcomes. | — |
 | `cisp_deliveries_due` | gauge | `component` | Deliveries due now. | — |
 | `cisp_deliveries_expired_total` | counter | `component` | Deliveries given up 24 h after their change. | any increase |
@@ -139,6 +142,15 @@ section 9) where it names one.
 | `cisp_restrictions_expired_total` | counter | `component` | Dynamic restrictions. | — |
 | `cisp_restrictions_refused_total` | counter | `component` | Dynamic restrictions. | — |
 | `cisp_restrictions_replayed_total` | counter | `component` | Dynamic restrictions. | — |
+| `cisp_session_accepted_total` | counter | `component` | Console sessions verified on a console route. | — |
+| `cisp_session_check_failed_total` | counter | `component` | Console requests refused 503 because the revocation list could not be read or a session's use could not be recorded (fail closed). | any increase |
+| `cisp_session_rejected_idle_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
+| `cisp_session_rejected_not_session_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
+| `cisp_session_rejected_realm_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
+| `cisp_session_rejected_revoked_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
+| `cisp_session_rejected_role_too_low_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
+| `cisp_session_rejected_role_total` | counter | `component` | Console sessions refused by the console's rules (component console_auth). | — |
+| `cisp_session_revocation_cache_bypassed_total` | counter | `component` | Session checks that asked the database because the revocation cache was full or stale. | sustained increase |
 | `cisp_signature_accepted_total` | counter | `component` | Publisher body signatures by outcome. | — |
 | `cisp_signature_cache_evicted_total` | counter | `component` | Version signatures evicted from the bounded cache. | — |
 | `cisp_signature_rejected_algorithm_total` | counter | `component` | Publisher body signatures by outcome. | — |

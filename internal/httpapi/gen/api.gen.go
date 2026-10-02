@@ -141,6 +141,126 @@ func (e CisRestrictionState) Valid() bool {
 	}
 }
 
+// Defines values for ConsoleAccountStatus.
+const (
+	ConsoleAccountStatusActive   ConsoleAccountStatus = "active"
+	ConsoleAccountStatusDisabled ConsoleAccountStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleAccountStatus enum.
+func (e ConsoleAccountStatus) Valid() bool {
+	switch e {
+	case ConsoleAccountStatusActive:
+		return true
+	case ConsoleAccountStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleAccountPatchStatus.
+const (
+	ConsoleAccountPatchStatusActive   ConsoleAccountPatchStatus = "active"
+	ConsoleAccountPatchStatusDisabled ConsoleAccountPatchStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleAccountPatchStatus enum.
+func (e ConsoleAccountPatchStatus) Valid() bool {
+	switch e {
+	case ConsoleAccountPatchStatusActive:
+		return true
+	case ConsoleAccountPatchStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleAuditEventActorType.
+const (
+	ConsoleAuditEventActorTypeAccount ConsoleAuditEventActorType = "account"
+	ConsoleAuditEventActorTypeClient  ConsoleAuditEventActorType = "client"
+	ConsoleAuditEventActorTypeSystem  ConsoleAuditEventActorType = "system"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleAuditEventActorType enum.
+func (e ConsoleAuditEventActorType) Valid() bool {
+	switch e {
+	case ConsoleAuditEventActorTypeAccount:
+		return true
+	case ConsoleAuditEventActorTypeClient:
+		return true
+	case ConsoleAuditEventActorTypeSystem:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsolePathChangeOp.
+const (
+	ConsolePathChangeOpAdded   ConsolePathChangeOp = "added"
+	ConsolePathChangeOpChanged ConsolePathChangeOp = "changed"
+	ConsolePathChangeOpRemoved ConsolePathChangeOp = "removed"
+)
+
+// Valid indicates whether the value is a known member of the ConsolePathChangeOp enum.
+func (e ConsolePathChangeOp) Valid() bool {
+	switch e {
+	case ConsolePathChangeOpAdded:
+		return true
+	case ConsolePathChangeOpChanged:
+		return true
+	case ConsolePathChangeOpRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsolePublicationDiffFeaturesOp.
+const (
+	ConsolePublicationDiffFeaturesOpAdded   ConsolePublicationDiffFeaturesOp = "added"
+	ConsolePublicationDiffFeaturesOpChanged ConsolePublicationDiffFeaturesOp = "changed"
+	ConsolePublicationDiffFeaturesOpRemoved ConsolePublicationDiffFeaturesOp = "removed"
+)
+
+// Valid indicates whether the value is a known member of the ConsolePublicationDiffFeaturesOp enum.
+func (e ConsolePublicationDiffFeaturesOp) Valid() bool {
+	switch e {
+	case ConsolePublicationDiffFeaturesOpAdded:
+		return true
+	case ConsolePublicationDiffFeaturesOpChanged:
+		return true
+	case ConsolePublicationDiffFeaturesOpRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleRole.
+const (
+	Admin          ConsoleRole = "admin"
+	PublisherAdmin ConsoleRole = "publisher_admin"
+	Viewer         ConsoleRole = "viewer"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleRole enum.
+func (e ConsoleRole) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case PublisherAdmin:
+		return true
+	case Viewer:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DatasetCollectionCisDataset.
 const (
 	DatasetCollectionCisDatasetRestrictions   DatasetCollectionCisDataset = "restrictions"
@@ -752,13 +872,13 @@ func (e StreamFrameSchema) Valid() bool {
 
 // Defines values for StreamFrameTimeSource.
 const (
-	System StreamFrameTimeSource = "system"
+	StreamFrameTimeSourceSystem StreamFrameTimeSource = "system"
 )
 
 // Valid indicates whether the value is a known member of the StreamFrameTimeSource enum.
 func (e StreamFrameTimeSource) Valid() bool {
 	switch e {
-	case System:
+	case StreamFrameTimeSourceSystem:
 		return true
 	default:
 		return false
@@ -1137,6 +1257,78 @@ func (e ListChangesParamsDataset) Valid() bool {
 	}
 }
 
+// Defines values for ListConsolePublicationsParamsDataset.
+const (
+	ListConsolePublicationsParamsDatasetRestrictions   ListConsolePublicationsParamsDataset = "restrictions"
+	ListConsolePublicationsParamsDatasetUspaceAirspace ListConsolePublicationsParamsDataset = "uspace_airspace"
+	ListConsolePublicationsParamsDatasetUsspList       ListConsolePublicationsParamsDataset = "ussp_list"
+	ListConsolePublicationsParamsDatasetZones          ListConsolePublicationsParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the ListConsolePublicationsParamsDataset enum.
+func (e ListConsolePublicationsParamsDataset) Valid() bool {
+	switch e {
+	case ListConsolePublicationsParamsDatasetRestrictions:
+		return true
+	case ListConsolePublicationsParamsDatasetUspaceAirspace:
+		return true
+	case ListConsolePublicationsParamsDatasetUsspList:
+		return true
+	case ListConsolePublicationsParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListConsoleRestrictionsParamsState.
+const (
+	ListConsoleRestrictionsParamsStateActive    ListConsoleRestrictionsParamsState = "active"
+	ListConsoleRestrictionsParamsStateCancelled ListConsoleRestrictionsParamsState = "cancelled"
+	ListConsoleRestrictionsParamsStateEnded     ListConsoleRestrictionsParamsState = "ended"
+	ListConsoleRestrictionsParamsStatePlanned   ListConsoleRestrictionsParamsState = "planned"
+)
+
+// Valid indicates whether the value is a known member of the ListConsoleRestrictionsParamsState enum.
+func (e ListConsoleRestrictionsParamsState) Valid() bool {
+	switch e {
+	case ListConsoleRestrictionsParamsStateActive:
+		return true
+	case ListConsoleRestrictionsParamsStateCancelled:
+		return true
+	case ListConsoleRestrictionsParamsStateEnded:
+		return true
+	case ListConsoleRestrictionsParamsStatePlanned:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListConsoleSubscriptionsParamsStatus.
+const (
+	ListConsoleSubscriptionsParamsStatusActive              ListConsoleSubscriptionsParamsStatus = "active"
+	ListConsoleSubscriptionsParamsStatusDeleted             ListConsoleSubscriptionsParamsStatus = "deleted"
+	ListConsoleSubscriptionsParamsStatusPendingVerification ListConsoleSubscriptionsParamsStatus = "pending_verification"
+	ListConsoleSubscriptionsParamsStatusSuspended           ListConsoleSubscriptionsParamsStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the ListConsoleSubscriptionsParamsStatus enum.
+func (e ListConsoleSubscriptionsParamsStatus) Valid() bool {
+	switch e {
+	case ListConsoleSubscriptionsParamsStatusActive:
+		return true
+	case ListConsoleSubscriptionsParamsStatusDeleted:
+		return true
+	case ListConsoleSubscriptionsParamsStatusPendingVerification:
+		return true
+	case ListConsoleSubscriptionsParamsStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListPublicationsParamsDataset.
 const (
 	ListPublicationsParamsDatasetRestrictions   ListPublicationsParamsDataset = "restrictions"
@@ -1449,6 +1641,225 @@ type CisRestrictionEndedBy string
 
 // CisRestrictionState defines model for CisRestriction.State.
 type CisRestrictionState string
+
+// ConsoleAccount A console account; never its password hash or TOTP secret.
+type ConsoleAccount struct {
+	CreatedAt    time.Time  `json:"created_at"`
+	FailedLogins int        `json:"failed_logins"`
+	Id           string     `json:"id"`
+	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+	LockedUntil  *time.Time `json:"locked_until,omitempty"`
+
+	// MfaEnrolled A TOTP secret is set.
+	MfaEnrolled bool                 `json:"mfa_enrolled"`
+	MfaRequired bool                 `json:"mfa_required"`
+	Role        ConsoleRole          `json:"role"`
+	Status      ConsoleAccountStatus `json:"status"`
+	Username    string               `json:"username"`
+}
+
+// ConsoleAccountStatus defines model for ConsoleAccount.Status.
+type ConsoleAccountStatus string
+
+// ConsoleAccountCreate defines model for ConsoleAccountCreate.
+type ConsoleAccountCreate struct {
+	// MfaRequired Forced true for admin.
+	MfaRequired *bool       `json:"mfa_required,omitempty"`
+	Role        ConsoleRole `json:"role"`
+	Username    string      `json:"username"`
+}
+
+// ConsoleAccountCreated defines model for ConsoleAccountCreated.
+type ConsoleAccountCreated struct {
+	// Account A console account; never its password hash or TOTP secret.
+	Account ConsoleAccount `json:"account"`
+
+	// InitialPassword The one-time initial password, shown once.
+	InitialPassword string `json:"initial_password"`
+
+	// TotpUri The otpauth URL of the new TOTP secret, shown once; present when MFA is required.
+	TotpUri *string `json:"totp_uri,omitempty"`
+}
+
+// ConsoleAccountList defines model for ConsoleAccountList.
+type ConsoleAccountList struct {
+	Accounts []ConsoleAccount `json:"accounts"`
+}
+
+// ConsoleAccountPatch defines model for ConsoleAccountPatch.
+type ConsoleAccountPatch struct {
+	ResetMfa *bool                      `json:"reset_mfa,omitempty"`
+	Role     *ConsoleRole               `json:"role,omitempty"`
+	Status   *ConsoleAccountPatchStatus `json:"status,omitempty"`
+}
+
+// ConsoleAccountPatchStatus defines model for ConsoleAccountPatch.Status.
+type ConsoleAccountPatchStatus string
+
+// ConsoleAccountPatched defines model for ConsoleAccountPatched.
+type ConsoleAccountPatched struct {
+	// Account A console account; never its password hash or TOTP secret.
+	Account         ConsoleAccount `json:"account"`
+	SessionsRevoked int            `json:"sessions_revoked"`
+
+	// TotpUri The otpauth URL of a new TOTP secret, shown once.
+	TotpUri *string `json:"totp_uri,omitempty"`
+}
+
+// ConsoleActionReason defines model for ConsoleActionReason.
+type ConsoleActionReason struct {
+	// Reason Why; kept in the audit row.
+	Reason string `json:"reason"`
+}
+
+// ConsoleAuditEvent defines model for ConsoleAuditEvent.
+type ConsoleAuditEvent struct {
+	ActorId    string                     `json:"actor_id"`
+	ActorType  ConsoleAuditEventActorType `json:"actor_type"`
+	EntityId   string                     `json:"entity_id"`
+	EntityType string                     `json:"entity_type"`
+	EventType  string                     `json:"event_type"`
+
+	// Hash Lower-case hex SHA-256 over prev_hash and the row's canonical fields.
+	Hash    string                 `json:"hash"`
+	Id      int64                  `json:"id"`
+	Payload map[string]interface{} `json:"payload"`
+
+	// PrevHash Lower-case hex; absent for the chain's first row.
+	PrevHash *string   `json:"prev_hash,omitempty"`
+	Ts       time.Time `json:"ts"`
+}
+
+// ConsoleAuditEventActorType defines model for ConsoleAuditEvent.ActorType.
+type ConsoleAuditEventActorType string
+
+// ConsoleAuditList defines model for ConsoleAuditList.
+type ConsoleAuditList struct {
+	Events []ConsoleAuditEvent `json:"events"`
+
+	// NextBeforeId Pass as before_id for the next page; absent on the last page.
+	NextBeforeId *int64 `json:"next_before_id,omitempty"`
+}
+
+// ConsoleLogin defines model for ConsoleLogin.
+type ConsoleLogin struct {
+	Password string `json:"password"`
+
+	// Totp The six-digit TOTP code; required for an account with mfa_required.
+	Totp     *string `json:"totp,omitempty"`
+	Username string  `json:"username"`
+}
+
+// ConsoleMe defines model for ConsoleMe.
+type ConsoleMe struct {
+	// Account A console account; never its password hash or TOTP secret.
+	Account ConsoleAccount `json:"account"`
+	Session struct {
+		ExpiresAt time.Time `json:"expires_at"`
+		IssuedAt  time.Time `json:"issued_at"`
+		Jti       string    `json:"jti"`
+	} `json:"session"`
+}
+
+// ConsolePathChange defines model for ConsolePathChange.
+type ConsolePathChange struct {
+	Op ConsolePathChangeOp `json:"op"`
+
+	// Path A JSON Pointer (RFC 6901) into the feature (or the USSP list).
+	Path string `json:"path"`
+}
+
+// ConsolePathChangeOp defines model for ConsolePathChange.Op.
+type ConsolePathChangeOp string
+
+// ConsolePublicationDiff defines model for ConsolePublicationDiff.
+type ConsolePublicationDiff struct {
+	// BodyPaths For the USSP list, the paths of its body that changed.
+	BodyPaths          *[]ConsolePathChange `json:"body_paths,omitempty"`
+	BodyPathsTruncated *bool                `json:"body_paths_truncated,omitempty"`
+	Features           []struct {
+		FeatureId      string                           `json:"feature_id"`
+		Op             ConsolePublicationDiffFeaturesOp `json:"op"`
+		Paths          *[]ConsolePathChange             `json:"paths,omitempty"`
+		PathsTruncated *bool                            `json:"paths_truncated,omitempty"`
+	} `json:"features"`
+
+	// PreviousVersion The version diffed against; absent for a first version.
+	PreviousVersion *int64                    `json:"previous_version,omitempty"`
+	Publication     ConsolePublicationVersion `json:"publication"`
+
+	// Truncated More features changed than limit.
+	Truncated bool `json:"truncated"`
+}
+
+// ConsolePublicationDiffFeaturesOp defines model for ConsolePublicationDiff.Features.Op.
+type ConsolePublicationDiffFeaturesOp string
+
+// ConsolePublicationList defines model for ConsolePublicationList.
+type ConsolePublicationList struct {
+	Dataset string `json:"dataset"`
+
+	// NextBefore Pass as before for the next page; absent on the last page.
+	NextBefore *int64                      `json:"next_before,omitempty"`
+	Versions   []ConsolePublicationVersion `json:"versions"`
+}
+
+// ConsolePublicationVersion defines model for ConsolePublicationVersion.
+type ConsolePublicationVersion struct {
+	Added             int       `json:"added"`
+	Changed           int       `json:"changed"`
+	Dataset           string    `json:"dataset"`
+	FeatureCount      int       `json:"feature_count"`
+	Id                string    `json:"id"`
+	Publisher         string    `json:"publisher"`
+	Reason            string    `json:"reason"`
+	ReceivedAt        time.Time `json:"received_at"`
+	Removed           int       `json:"removed"`
+	SupersedesVersion *int64    `json:"supersedes_version,omitempty"`
+	Version           int64     `json:"version"`
+}
+
+// ConsoleRole defines model for ConsoleRole.
+type ConsoleRole string
+
+// ConsoleSession defines model for ConsoleSession.
+type ConsoleSession struct {
+	// Account A console account; never its password hash or TOTP secret.
+	Account   ConsoleAccount `json:"account"`
+	ExpiresAt time.Time      `json:"expires_at"`
+
+	// Token The session JWT (shown once); the BFF keeps it in the uspace_session cookie.
+	Token string `json:"token"`
+}
+
+// ConsoleStatus defines model for ConsoleStatus.
+type ConsoleStatus struct {
+	// Counters This instance's counters since start, by component.name.
+	Counters map[string]int64 `json:"counters"`
+
+	// Status The status document (docs/PLAN.md section 6.3).
+	Status Status `json:"status"`
+}
+
+// ConsoleSubscription defines model for ConsoleSubscription.
+type ConsoleSubscription struct {
+	// Deliveries The subscription's deliveries per state.
+	Deliveries struct {
+		Delivered  int64 `json:"delivered"`
+		Delivering int64 `json:"delivering"`
+		Expired    int64 `json:"expired"`
+		Failed     int64 `json:"failed"`
+		Queued     int64 `json:"queued"`
+	} `json:"deliveries"`
+	Subscription Subscription `json:"subscription"`
+}
+
+// ConsoleSubscriptionList defines model for ConsoleSubscriptionList.
+type ConsoleSubscriptionList struct {
+	// NextAfter Pass as after for the next page; absent on the last page.
+	NextAfter     *string               `json:"next_after,omitempty"`
+	Subscriptions []ConsoleSubscription `json:"subscriptions"`
+}
 
 // DatasetCollection An ED-318 FeatureCollection as the CISP serves it: the features
 // as published (canonical JSON), metadata.issued the version's
@@ -2281,6 +2692,12 @@ type At = string
 // BBox Examples: 44.70,41.65,44.90,41.80
 type BBox = string
 
+// ConsoleAccountID defines model for ConsoleAccountID.
+type ConsoleAccountID = string
+
+// ConsolePublicationID defines model for ConsolePublicationID.
+type ConsolePublicationID = string
+
 // DatasetPath defines model for DatasetPath.
 type DatasetPath string
 
@@ -2313,6 +2730,10 @@ type DatasetApplicationGeoPlusJSON = DatasetCollection
 
 // DatasetApplicationJSON The application/json read of a dataset, the USSP list or a delta.
 type DatasetApplicationJSON = DatasetDocument
+
+// Locked The ecosystem-wide error body (RFC 9457), the same shape as
+// uspace-lab schemas/common/problem/v1.
+type Locked = Problem
 
 // PreconditionFailed The ecosystem-wide error body (RFC 9457), the same shape as
 // uspace-lab schemas/common/problem/v1.
@@ -2385,6 +2806,62 @@ type ListChangesParams struct {
 
 // ListChangesParamsDataset defines parameters for ListChanges.
 type ListChangesParamsDataset string
+
+// ListConsoleAuditParams defines parameters for ListConsoleAudit.
+type ListConsoleAuditParams struct {
+	// Since RFC 3339 instant with an offset (default 30 days ago).
+	Since    *string `form:"since,omitempty" json:"since,omitempty"`
+	Actor    *string `form:"actor,omitempty" json:"actor,omitempty"`
+	Type     *string `form:"type,omitempty" json:"type,omitempty"`
+	BeforeId *int64  `form:"before_id,omitempty" json:"before_id,omitempty"`
+	Limit    *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListConsolePublicationsParams defines parameters for ListConsolePublications.
+type ListConsolePublicationsParams struct {
+	Dataset ListConsolePublicationsParamsDataset `form:"dataset" json:"dataset"`
+	Limit   *int                                 `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Before Only versions below this one.
+	Before *int64 `form:"before,omitempty" json:"before,omitempty"`
+}
+
+// ListConsolePublicationsParamsDataset defines parameters for ListConsolePublications.
+type ListConsolePublicationsParamsDataset string
+
+// GetConsolePublicationDiffParams defines parameters for GetConsolePublicationDiff.
+type GetConsolePublicationDiffParams struct {
+	// Limit The features listed at most.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListConsoleRestrictionsParams defines parameters for ListConsoleRestrictions.
+type ListConsoleRestrictionsParams struct {
+	State *ListConsoleRestrictionsParamsState `form:"state,omitempty" json:"state,omitempty"`
+	Limit *int                                `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListConsoleRestrictionsParamsState defines parameters for ListConsoleRestrictions.
+type ListConsoleRestrictionsParamsState string
+
+// ListConsoleSubscriptionsParams defines parameters for ListConsoleSubscriptions.
+type ListConsoleSubscriptionsParams struct {
+	Status *ListConsoleSubscriptionsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// After Only subscriptions whose id sorts after this one (the next page).
+	After *string `form:"after,omitempty" json:"after,omitempty"`
+	Limit *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListConsoleSubscriptionsParamsStatus defines parameters for ListConsoleSubscriptions.
+type ListConsoleSubscriptionsParamsStatus string
+
+// ListConsoleDeliveriesParams defines parameters for ListConsoleDeliveries.
+type ListConsoleDeliveriesParams struct {
+	// Since RFC 3339 instant with an offset (default 24 h ago).
+	Since *string `form:"since,omitempty" json:"since,omitempty"`
+	Limit *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
 
 // ListPublicationsParams defines parameters for ListPublications.
 type ListPublicationsParams struct {
@@ -2536,6 +3013,27 @@ type GetDatasetVersionParams struct {
 
 // GetDatasetVersionParamsDataset defines parameters for GetDatasetVersion.
 type GetDatasetVersionParamsDataset string
+
+// CreateConsoleAccountJSONRequestBody defines body for CreateConsoleAccount for application/json ContentType.
+type CreateConsoleAccountJSONRequestBody = ConsoleAccountCreate
+
+// PatchConsoleAccountJSONRequestBody defines body for PatchConsoleAccount for application/json ContentType.
+type PatchConsoleAccountJSONRequestBody = ConsoleAccountPatch
+
+// RepublishConsolePublicationJSONRequestBody defines body for RepublishConsolePublication for application/json ContentType.
+type RepublishConsolePublicationJSONRequestBody = ConsoleActionReason
+
+// CreateConsoleSessionJSONRequestBody defines body for CreateConsoleSession for application/json ContentType.
+type CreateConsoleSessionJSONRequestBody = ConsoleLogin
+
+// RetryConsoleDeliveryJSONRequestBody defines body for RetryConsoleDelivery for application/json ContentType.
+type RetryConsoleDeliveryJSONRequestBody = ConsoleActionReason
+
+// ResumeConsoleSubscriptionJSONRequestBody defines body for ResumeConsoleSubscription for application/json ContentType.
+type ResumeConsoleSubscriptionJSONRequestBody = ConsoleActionReason
+
+// SuspendConsoleSubscriptionJSONRequestBody defines body for SuspendConsoleSubscription for application/json ContentType.
+type SuspendConsoleSubscriptionJSONRequestBody = ConsoleActionReason
 
 // PutPublicationApplicationGeoPlusJSONRequestBody defines body for PutPublication for application/geo+json ContentType.
 type PutPublicationApplicationGeoPlusJSONRequestBody = PublicationBody
@@ -2702,6 +3200,57 @@ type ServerInterface interface {
 	// ListChanges The change cursor feed
 	// (GET /v1/changes)
 	ListChanges(w http.ResponseWriter, r *http.Request, params ListChangesParams)
+	// ListConsoleAccounts The console accounts
+	// (GET /v1/console/accounts)
+	ListConsoleAccounts(w http.ResponseWriter, r *http.Request)
+	// CreateConsoleAccount Create a console account
+	// (POST /v1/console/accounts)
+	CreateConsoleAccount(w http.ResponseWriter, r *http.Request)
+	// PatchConsoleAccount Change a console account
+	// (PATCH /v1/console/accounts/{id})
+	PatchConsoleAccount(w http.ResponseWriter, r *http.Request, id ConsoleAccountID)
+	// ListConsoleAudit The audit log
+	// (GET /v1/console/audit)
+	ListConsoleAudit(w http.ResponseWriter, r *http.Request, params ListConsoleAuditParams)
+	// GetConsoleMe The caller's account and session
+	// (GET /v1/console/me)
+	GetConsoleMe(w http.ResponseWriter, r *http.Request)
+	// ListConsolePublications A dataset's versions
+	// (GET /v1/console/publications)
+	ListConsolePublications(w http.ResponseWriter, r *http.Request, params ListConsolePublicationsParams)
+	// GetConsolePublicationDiff What a version added, changed and removed
+	// (GET /v1/console/publications/{id}/diff)
+	GetConsolePublicationDiff(w http.ResponseWriter, r *http.Request, id ConsolePublicationID, params GetConsolePublicationDiffParams)
+	// RepublishConsolePublication Announce the current version again
+	// (POST /v1/console/publications/{id}/republish)
+	RepublishConsolePublication(w http.ResponseWriter, r *http.Request, id ConsolePublicationID)
+	// ListConsoleRestrictions The restriction heads with their events
+	// (GET /v1/console/restrictions)
+	ListConsoleRestrictions(w http.ResponseWriter, r *http.Request, params ListConsoleRestrictionsParams)
+	// DeleteConsoleSession Log out
+	// (DELETE /v1/console/session)
+	DeleteConsoleSession(w http.ResponseWriter, r *http.Request)
+	// CreateConsoleSession Log in to the console
+	// (POST /v1/console/session)
+	CreateConsoleSession(w http.ResponseWriter, r *http.Request)
+	// GetConsoleStatus Service status with the process counters
+	// (GET /v1/console/status)
+	GetConsoleStatus(w http.ResponseWriter, r *http.Request)
+	// ListConsoleSubscriptions Every client's subscriptions
+	// (GET /v1/console/subscriptions)
+	ListConsoleSubscriptions(w http.ResponseWriter, r *http.Request, params ListConsoleSubscriptionsParams)
+	// ListConsoleDeliveries A subscription's deliveries with their attempts
+	// (GET /v1/console/subscriptions/{id}/deliveries)
+	ListConsoleDeliveries(w http.ResponseWriter, r *http.Request, id SubscriptionID, params ListConsoleDeliveriesParams)
+	// RetryConsoleDelivery Re-queue a delivery now
+	// (POST /v1/console/subscriptions/{id}/deliveries/{delivery_id}/retry)
+	RetryConsoleDelivery(w http.ResponseWriter, r *http.Request, id SubscriptionID, deliveryId string)
+	// ResumeConsoleSubscription Resume a suspended subscription
+	// (POST /v1/console/subscriptions/{id}/resume)
+	ResumeConsoleSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID)
+	// SuspendConsoleSubscription Suspend a subscription
+	// (POST /v1/console/subscriptions/{id}/suspend)
+	SuspendConsoleSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID)
 	// ListPublications The version history of a dataset
 	// (GET /v1/publications/{dataset})
 	ListPublications(w http.ResponseWriter, r *http.Request, dataset ListPublicationsParamsDataset, params ListPublicationsParams)
@@ -3053,6 +3602,575 @@ func (siw *ServerInterfaceWrapper) ListChanges(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListChanges(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListConsoleAccounts operation middleware
+func (siw *ServerInterfaceWrapper) ListConsoleAccounts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListConsoleAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateConsoleAccount operation middleware
+func (siw *ServerInterfaceWrapper) CreateConsoleAccount(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateConsoleAccount(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchConsoleAccount operation middleware
+func (siw *ServerInterfaceWrapper) PatchConsoleAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ConsoleAccountID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchConsoleAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListConsoleAudit operation middleware
+func (siw *ServerInterfaceWrapper) ListConsoleAudit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListConsoleAuditParams
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor", r.URL.Query(), &params.Actor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "type", r.URL.Query(), &params.Type, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "type"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before_id", r.URL.Query(), &params.BeforeId, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListConsoleAudit(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConsoleMe operation middleware
+func (siw *ServerInterfaceWrapper) GetConsoleMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConsoleMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListConsolePublications operation middleware
+func (siw *ServerInterfaceWrapper) ListConsolePublications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListConsolePublicationsParams
+
+	// ------------- Required query parameter "dataset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "dataset", r.URL.Query(), &params.Dataset, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dataset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListConsolePublications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConsolePublicationDiff operation middleware
+func (siw *ServerInterfaceWrapper) GetConsolePublicationDiff(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ConsolePublicationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetConsolePublicationDiffParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConsolePublicationDiff(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RepublishConsolePublication operation middleware
+func (siw *ServerInterfaceWrapper) RepublishConsolePublication(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ConsolePublicationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RepublishConsolePublication(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListConsoleRestrictions operation middleware
+func (siw *ServerInterfaceWrapper) ListConsoleRestrictions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListConsoleRestrictionsParams
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListConsoleRestrictions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteConsoleSession operation middleware
+func (siw *ServerInterfaceWrapper) DeleteConsoleSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteConsoleSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateConsoleSession operation middleware
+func (siw *ServerInterfaceWrapper) CreateConsoleSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateConsoleSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConsoleStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetConsoleStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConsoleStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListConsoleSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) ListConsoleSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListConsoleSubscriptionsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "after"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListConsoleSubscriptions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListConsoleDeliveries operation middleware
+func (siw *ServerInterfaceWrapper) ListConsoleDeliveries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListConsoleDeliveriesParams
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListConsoleDeliveries(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RetryConsoleDelivery operation middleware
+func (siw *ServerInterfaceWrapper) RetryConsoleDelivery(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "delivery_id" -------------
+	var deliveryId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "delivery_id", r.PathValue("delivery_id"), &deliveryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "delivery_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RetryConsoleDelivery(w, r, id, deliveryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResumeConsoleSubscription operation middleware
+func (siw *ServerInterfaceWrapper) ResumeConsoleSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResumeConsoleSubscription(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SuspendConsoleSubscription operation middleware
+func (siw *ServerInterfaceWrapper) SuspendConsoleSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SuspendConsoleSubscription(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4198,6 +5316,23 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/subscriptions/{id}", wrapper.PatchSubscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions/{id}/deliveries", wrapper.ListDeliveries)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/subscriptions/{id}/deliveries/{delivery_id}/retry", wrapper.RetryDelivery)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/console/session", wrapper.DeleteConsoleSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/session", wrapper.CreateConsoleSession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/me", wrapper.GetConsoleMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/accounts", wrapper.ListConsoleAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/accounts", wrapper.CreateConsoleAccount)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/console/accounts/{id}", wrapper.PatchConsoleAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/publications", wrapper.ListConsolePublications)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/publications/{id}/diff", wrapper.GetConsolePublicationDiff)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/publications/{id}/republish", wrapper.RepublishConsolePublication)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/restrictions", wrapper.ListConsoleRestrictions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/subscriptions", wrapper.ListConsoleSubscriptions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/subscriptions/{id}/deliveries", wrapper.ListConsoleDeliveries)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/subscriptions/{id}/suspend", wrapper.SuspendConsoleSubscription)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/subscriptions/{id}/resume", wrapper.ResumeConsoleSubscription)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/subscriptions/{id}/deliveries/{delivery_id}/retry", wrapper.RetryConsoleDelivery)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/audit", wrapper.ListConsoleAudit)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/status", wrapper.GetConsoleStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}", wrapper.GetDataset)
 	m.HandleFunc(http.MethodHead+" "+options.BaseURL+"/v1/{dataset}", wrapper.HeadDataset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions", wrapper.ListDatasetVersions)
@@ -4245,6 +5380,15 @@ type DatasetHeadResponseHeaders struct {
 }
 type DatasetHeadResponse struct {
 	Headers DatasetHeadResponseHeaders
+}
+
+type LockedResponseHeaders struct {
+	RetryAfter *string
+}
+type LockedApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers LockedResponseHeaders
 }
 
 type NotModifiedResponseHeaders struct {
@@ -4910,6 +6054,2013 @@ type ListChangesdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ListChangesdefaultApplicationProblemPlusJSONResponse) VisitListChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAccountsRequestObject struct {
+}
+
+type ListConsoleAccountsResponseObject interface {
+	VisitListConsoleAccountsResponse(w http.ResponseWriter) error
+}
+
+type ListConsoleAccounts200JSONResponse ConsoleAccountList
+
+func (response ListConsoleAccounts200JSONResponse) VisitListConsoleAccountsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAccounts401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsoleAccounts401ApplicationProblemPlusJSONResponse) VisitListConsoleAccountsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAccounts403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleAccounts403ApplicationProblemPlusJSONResponse) VisitListConsoleAccountsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAccounts503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleAccounts503ApplicationProblemPlusJSONResponse) VisitListConsoleAccountsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAccountsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListConsoleAccountsdefaultApplicationProblemPlusJSONResponse) VisitListConsoleAccountsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccountRequestObject struct {
+	Body *CreateConsoleAccountJSONRequestBody
+}
+
+type CreateConsoleAccountResponseObject interface {
+	VisitCreateConsoleAccountResponse(w http.ResponseWriter) error
+}
+
+type CreateConsoleAccount201JSONResponse ConsoleAccountCreated
+
+func (response CreateConsoleAccount201JSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccount400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsoleAccount400ApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccount401ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleAccount401ApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccount403ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleAccount403ApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccount409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleAccount409ApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccount413ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleAccount413ApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccount415ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleAccount415ApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccount503ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleAccount503ApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleAccountdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateConsoleAccountdefaultApplicationProblemPlusJSONResponse) VisitCreateConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccountRequestObject struct {
+	Id   ConsoleAccountID `json:"id"`
+	Body *PatchConsoleAccountJSONRequestBody
+}
+
+type PatchConsoleAccountResponseObject interface {
+	VisitPatchConsoleAccountResponse(w http.ResponseWriter) error
+}
+
+type PatchConsoleAccount200JSONResponse ConsoleAccountPatched
+
+func (response PatchConsoleAccount200JSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response PatchConsoleAccount400ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount401ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchConsoleAccount401ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount403ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchConsoleAccount403ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount404ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchConsoleAccount404ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount409ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchConsoleAccount409ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount413ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchConsoleAccount413ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount415ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchConsoleAccount415ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccount503ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchConsoleAccount503ApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchConsoleAccountdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PatchConsoleAccountdefaultApplicationProblemPlusJSONResponse) VisitPatchConsoleAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAuditRequestObject struct {
+	Params ListConsoleAuditParams
+}
+
+type ListConsoleAuditResponseObject interface {
+	VisitListConsoleAuditResponse(w http.ResponseWriter) error
+}
+
+type ListConsoleAudit200JSONResponse ConsoleAuditList
+
+func (response ListConsoleAudit200JSONResponse) VisitListConsoleAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAudit400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsoleAudit400ApplicationProblemPlusJSONResponse) VisitListConsoleAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAudit401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleAudit401ApplicationProblemPlusJSONResponse) VisitListConsoleAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAudit403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleAudit403ApplicationProblemPlusJSONResponse) VisitListConsoleAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAudit503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleAudit503ApplicationProblemPlusJSONResponse) VisitListConsoleAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleAuditdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListConsoleAuditdefaultApplicationProblemPlusJSONResponse) VisitListConsoleAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleMeRequestObject struct {
+}
+
+type GetConsoleMeResponseObject interface {
+	VisitGetConsoleMeResponse(w http.ResponseWriter) error
+}
+
+type GetConsoleMe200JSONResponse ConsoleMe
+
+func (response GetConsoleMe200JSONResponse) VisitGetConsoleMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleMe401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetConsoleMe401ApplicationProblemPlusJSONResponse) VisitGetConsoleMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleMe403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsoleMe403ApplicationProblemPlusJSONResponse) VisitGetConsoleMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleMe404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsoleMe404ApplicationProblemPlusJSONResponse) VisitGetConsoleMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleMe503ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsoleMe503ApplicationProblemPlusJSONResponse) VisitGetConsoleMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleMedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetConsoleMedefaultApplicationProblemPlusJSONResponse) VisitGetConsoleMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsolePublicationsRequestObject struct {
+	Params ListConsolePublicationsParams
+}
+
+type ListConsolePublicationsResponseObject interface {
+	VisitListConsolePublicationsResponse(w http.ResponseWriter) error
+}
+
+type ListConsolePublications200JSONResponse ConsolePublicationList
+
+func (response ListConsolePublications200JSONResponse) VisitListConsolePublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsolePublications400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsolePublications400ApplicationProblemPlusJSONResponse) VisitListConsolePublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsolePublications401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsolePublications401ApplicationProblemPlusJSONResponse) VisitListConsolePublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsolePublications403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsolePublications403ApplicationProblemPlusJSONResponse) VisitListConsolePublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsolePublications503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsolePublications503ApplicationProblemPlusJSONResponse) VisitListConsolePublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsolePublicationsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListConsolePublicationsdefaultApplicationProblemPlusJSONResponse) VisitListConsolePublicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsolePublicationDiffRequestObject struct {
+	Id     ConsolePublicationID `json:"id"`
+	Params GetConsolePublicationDiffParams
+}
+
+type GetConsolePublicationDiffResponseObject interface {
+	VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error
+}
+
+type GetConsolePublicationDiff200JSONResponse ConsolePublicationDiff
+
+func (response GetConsolePublicationDiff200JSONResponse) VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsolePublicationDiff400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetConsolePublicationDiff400ApplicationProblemPlusJSONResponse) VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsolePublicationDiff401ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsolePublicationDiff401ApplicationProblemPlusJSONResponse) VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsolePublicationDiff403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsolePublicationDiff403ApplicationProblemPlusJSONResponse) VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsolePublicationDiff404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsolePublicationDiff404ApplicationProblemPlusJSONResponse) VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsolePublicationDiff503ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsolePublicationDiff503ApplicationProblemPlusJSONResponse) VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsolePublicationDiffdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetConsolePublicationDiffdefaultApplicationProblemPlusJSONResponse) VisitGetConsolePublicationDiffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublicationRequestObject struct {
+	Id   ConsolePublicationID `json:"id"`
+	Body *RepublishConsolePublicationJSONRequestBody
+}
+
+type RepublishConsolePublicationResponseObject interface {
+	VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error
+}
+
+type RepublishConsolePublication202JSONResponse Change
+
+func (response RepublishConsolePublication202JSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response RepublishConsolePublication400ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication401ApplicationProblemPlusJSONResponse Problem
+
+func (response RepublishConsolePublication401ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication403ApplicationProblemPlusJSONResponse Problem
+
+func (response RepublishConsolePublication403ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication404ApplicationProblemPlusJSONResponse Problem
+
+func (response RepublishConsolePublication404ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication409ApplicationProblemPlusJSONResponse Problem
+
+func (response RepublishConsolePublication409ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication413ApplicationProblemPlusJSONResponse Problem
+
+func (response RepublishConsolePublication413ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication415ApplicationProblemPlusJSONResponse Problem
+
+func (response RepublishConsolePublication415ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublication503ApplicationProblemPlusJSONResponse Problem
+
+func (response RepublishConsolePublication503ApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RepublishConsolePublicationdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RepublishConsolePublicationdefaultApplicationProblemPlusJSONResponse) VisitRepublishConsolePublicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleRestrictionsRequestObject struct {
+	Params ListConsoleRestrictionsParams
+}
+
+type ListConsoleRestrictionsResponseObject interface {
+	VisitListConsoleRestrictionsResponse(w http.ResponseWriter) error
+}
+
+type ListConsoleRestrictions200JSONResponse RestrictionList
+
+func (response ListConsoleRestrictions200JSONResponse) VisitListConsoleRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleRestrictions400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsoleRestrictions400ApplicationProblemPlusJSONResponse) VisitListConsoleRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleRestrictions401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleRestrictions401ApplicationProblemPlusJSONResponse) VisitListConsoleRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleRestrictions403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleRestrictions403ApplicationProblemPlusJSONResponse) VisitListConsoleRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleRestrictions503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleRestrictions503ApplicationProblemPlusJSONResponse) VisitListConsoleRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleRestrictionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListConsoleRestrictionsdefaultApplicationProblemPlusJSONResponse) VisitListConsoleRestrictionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteConsoleSessionRequestObject struct {
+}
+
+type DeleteConsoleSessionResponseObject interface {
+	VisitDeleteConsoleSessionResponse(w http.ResponseWriter) error
+}
+
+type DeleteConsoleSession204Response struct {
+}
+
+func (response DeleteConsoleSession204Response) VisitDeleteConsoleSessionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteConsoleSession401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteConsoleSession401ApplicationProblemPlusJSONResponse) VisitDeleteConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteConsoleSession403ApplicationProblemPlusJSONResponse Problem
+
+func (response DeleteConsoleSession403ApplicationProblemPlusJSONResponse) VisitDeleteConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteConsoleSession503ApplicationProblemPlusJSONResponse Problem
+
+func (response DeleteConsoleSession503ApplicationProblemPlusJSONResponse) VisitDeleteConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteConsoleSessiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteConsoleSessiondefaultApplicationProblemPlusJSONResponse) VisitDeleteConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionRequestObject struct {
+	Body *CreateConsoleSessionJSONRequestBody
+}
+
+type CreateConsoleSessionResponseObject interface {
+	VisitCreateConsoleSessionResponse(w http.ResponseWriter) error
+}
+
+type CreateConsoleSession201JSONResponse ConsoleSession
+
+func (response CreateConsoleSession201JSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSession400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsoleSession400ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSession401ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSession401ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSession413ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSession413ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSession415ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSession415ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSession423ApplicationProblemPlusJSONResponse struct {
+	LockedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsoleSession423ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(423)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSession429ApplicationProblemPlusJSONResponse struct {
+	RateLimitedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsoleSession429ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSession503ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSession503ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateConsoleSessiondefaultApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleStatusRequestObject struct {
+}
+
+type GetConsoleStatusResponseObject interface {
+	VisitGetConsoleStatusResponse(w http.ResponseWriter) error
+}
+
+type GetConsoleStatus200JSONResponse ConsoleStatus
+
+func (response GetConsoleStatus200JSONResponse) VisitGetConsoleStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleStatus401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetConsoleStatus401ApplicationProblemPlusJSONResponse) VisitGetConsoleStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleStatus403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsoleStatus403ApplicationProblemPlusJSONResponse) VisitGetConsoleStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleStatus503ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsoleStatus503ApplicationProblemPlusJSONResponse) VisitGetConsoleStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleStatusdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetConsoleStatusdefaultApplicationProblemPlusJSONResponse) VisitGetConsoleStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleSubscriptionsRequestObject struct {
+	Params ListConsoleSubscriptionsParams
+}
+
+type ListConsoleSubscriptionsResponseObject interface {
+	VisitListConsoleSubscriptionsResponse(w http.ResponseWriter) error
+}
+
+type ListConsoleSubscriptions200JSONResponse ConsoleSubscriptionList
+
+func (response ListConsoleSubscriptions200JSONResponse) VisitListConsoleSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleSubscriptions400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsoleSubscriptions400ApplicationProblemPlusJSONResponse) VisitListConsoleSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleSubscriptions401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleSubscriptions401ApplicationProblemPlusJSONResponse) VisitListConsoleSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleSubscriptions403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleSubscriptions403ApplicationProblemPlusJSONResponse) VisitListConsoleSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleSubscriptions503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleSubscriptions503ApplicationProblemPlusJSONResponse) VisitListConsoleSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleSubscriptionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListConsoleSubscriptionsdefaultApplicationProblemPlusJSONResponse) VisitListConsoleSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleDeliveriesRequestObject struct {
+	Id     SubscriptionID `json:"id"`
+	Params ListConsoleDeliveriesParams
+}
+
+type ListConsoleDeliveriesResponseObject interface {
+	VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error
+}
+
+type ListConsoleDeliveries200JSONResponse DeliveryList
+
+func (response ListConsoleDeliveries200JSONResponse) VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleDeliveries400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsoleDeliveries400ApplicationProblemPlusJSONResponse) VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleDeliveries401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleDeliveries401ApplicationProblemPlusJSONResponse) VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleDeliveries403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleDeliveries403ApplicationProblemPlusJSONResponse) VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleDeliveries404ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleDeliveries404ApplicationProblemPlusJSONResponse) VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleDeliveries503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListConsoleDeliveries503ApplicationProblemPlusJSONResponse) VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleDeliveriesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListConsoleDeliveriesdefaultApplicationProblemPlusJSONResponse) VisitListConsoleDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDeliveryRequestObject struct {
+	Id         SubscriptionID `json:"id"`
+	DeliveryId string         `json:"delivery_id"`
+	Body       *RetryConsoleDeliveryJSONRequestBody
+}
+
+type RetryConsoleDeliveryResponseObject interface {
+	VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error
+}
+
+type RetryConsoleDelivery202JSONResponse Delivery
+
+func (response RetryConsoleDelivery202JSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response RetryConsoleDelivery400ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery401ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryConsoleDelivery401ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery403ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryConsoleDelivery403ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery404ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryConsoleDelivery404ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery409ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryConsoleDelivery409ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery413ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryConsoleDelivery413ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery415ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryConsoleDelivery415ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDelivery503ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryConsoleDelivery503ApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryConsoleDeliverydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RetryConsoleDeliverydefaultApplicationProblemPlusJSONResponse) VisitRetryConsoleDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscriptionRequestObject struct {
+	Id   SubscriptionID `json:"id"`
+	Body *ResumeConsoleSubscriptionJSONRequestBody
+}
+
+type ResumeConsoleSubscriptionResponseObject interface {
+	VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type ResumeConsoleSubscription200JSONResponse Subscription
+
+func (response ResumeConsoleSubscription200JSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeConsoleSubscription400ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription401ApplicationProblemPlusJSONResponse Problem
+
+func (response ResumeConsoleSubscription401ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription403ApplicationProblemPlusJSONResponse Problem
+
+func (response ResumeConsoleSubscription403ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription404ApplicationProblemPlusJSONResponse Problem
+
+func (response ResumeConsoleSubscription404ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription409ApplicationProblemPlusJSONResponse Problem
+
+func (response ResumeConsoleSubscription409ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription413ApplicationProblemPlusJSONResponse Problem
+
+func (response ResumeConsoleSubscription413ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription415ApplicationProblemPlusJSONResponse Problem
+
+func (response ResumeConsoleSubscription415ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscription503ApplicationProblemPlusJSONResponse Problem
+
+func (response ResumeConsoleSubscription503ApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeConsoleSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ResumeConsoleSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitResumeConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscriptionRequestObject struct {
+	Id   SubscriptionID `json:"id"`
+	Body *SuspendConsoleSubscriptionJSONRequestBody
+}
+
+type SuspendConsoleSubscriptionResponseObject interface {
+	VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type SuspendConsoleSubscription200JSONResponse Subscription
+
+func (response SuspendConsoleSubscription200JSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response SuspendConsoleSubscription400ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription401ApplicationProblemPlusJSONResponse Problem
+
+func (response SuspendConsoleSubscription401ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription403ApplicationProblemPlusJSONResponse Problem
+
+func (response SuspendConsoleSubscription403ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription404ApplicationProblemPlusJSONResponse Problem
+
+func (response SuspendConsoleSubscription404ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription409ApplicationProblemPlusJSONResponse Problem
+
+func (response SuspendConsoleSubscription409ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription413ApplicationProblemPlusJSONResponse Problem
+
+func (response SuspendConsoleSubscription413ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription415ApplicationProblemPlusJSONResponse Problem
+
+func (response SuspendConsoleSubscription415ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscription503ApplicationProblemPlusJSONResponse Problem
+
+func (response SuspendConsoleSubscription503ApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendConsoleSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response SuspendConsoleSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitSuspendConsoleSubscriptionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -7651,6 +10802,57 @@ type StrictServerInterface interface {
 	// ListChanges The change cursor feed
 	// (GET /v1/changes)
 	ListChanges(ctx context.Context, request ListChangesRequestObject) (ListChangesResponseObject, error)
+	// ListConsoleAccounts The console accounts
+	// (GET /v1/console/accounts)
+	ListConsoleAccounts(ctx context.Context, request ListConsoleAccountsRequestObject) (ListConsoleAccountsResponseObject, error)
+	// CreateConsoleAccount Create a console account
+	// (POST /v1/console/accounts)
+	CreateConsoleAccount(ctx context.Context, request CreateConsoleAccountRequestObject) (CreateConsoleAccountResponseObject, error)
+	// PatchConsoleAccount Change a console account
+	// (PATCH /v1/console/accounts/{id})
+	PatchConsoleAccount(ctx context.Context, request PatchConsoleAccountRequestObject) (PatchConsoleAccountResponseObject, error)
+	// ListConsoleAudit The audit log
+	// (GET /v1/console/audit)
+	ListConsoleAudit(ctx context.Context, request ListConsoleAuditRequestObject) (ListConsoleAuditResponseObject, error)
+	// GetConsoleMe The caller's account and session
+	// (GET /v1/console/me)
+	GetConsoleMe(ctx context.Context, request GetConsoleMeRequestObject) (GetConsoleMeResponseObject, error)
+	// ListConsolePublications A dataset's versions
+	// (GET /v1/console/publications)
+	ListConsolePublications(ctx context.Context, request ListConsolePublicationsRequestObject) (ListConsolePublicationsResponseObject, error)
+	// GetConsolePublicationDiff What a version added, changed and removed
+	// (GET /v1/console/publications/{id}/diff)
+	GetConsolePublicationDiff(ctx context.Context, request GetConsolePublicationDiffRequestObject) (GetConsolePublicationDiffResponseObject, error)
+	// RepublishConsolePublication Announce the current version again
+	// (POST /v1/console/publications/{id}/republish)
+	RepublishConsolePublication(ctx context.Context, request RepublishConsolePublicationRequestObject) (RepublishConsolePublicationResponseObject, error)
+	// ListConsoleRestrictions The restriction heads with their events
+	// (GET /v1/console/restrictions)
+	ListConsoleRestrictions(ctx context.Context, request ListConsoleRestrictionsRequestObject) (ListConsoleRestrictionsResponseObject, error)
+	// DeleteConsoleSession Log out
+	// (DELETE /v1/console/session)
+	DeleteConsoleSession(ctx context.Context, request DeleteConsoleSessionRequestObject) (DeleteConsoleSessionResponseObject, error)
+	// CreateConsoleSession Log in to the console
+	// (POST /v1/console/session)
+	CreateConsoleSession(ctx context.Context, request CreateConsoleSessionRequestObject) (CreateConsoleSessionResponseObject, error)
+	// GetConsoleStatus Service status with the process counters
+	// (GET /v1/console/status)
+	GetConsoleStatus(ctx context.Context, request GetConsoleStatusRequestObject) (GetConsoleStatusResponseObject, error)
+	// ListConsoleSubscriptions Every client's subscriptions
+	// (GET /v1/console/subscriptions)
+	ListConsoleSubscriptions(ctx context.Context, request ListConsoleSubscriptionsRequestObject) (ListConsoleSubscriptionsResponseObject, error)
+	// ListConsoleDeliveries A subscription's deliveries with their attempts
+	// (GET /v1/console/subscriptions/{id}/deliveries)
+	ListConsoleDeliveries(ctx context.Context, request ListConsoleDeliveriesRequestObject) (ListConsoleDeliveriesResponseObject, error)
+	// RetryConsoleDelivery Re-queue a delivery now
+	// (POST /v1/console/subscriptions/{id}/deliveries/{delivery_id}/retry)
+	RetryConsoleDelivery(ctx context.Context, request RetryConsoleDeliveryRequestObject) (RetryConsoleDeliveryResponseObject, error)
+	// ResumeConsoleSubscription Resume a suspended subscription
+	// (POST /v1/console/subscriptions/{id}/resume)
+	ResumeConsoleSubscription(ctx context.Context, request ResumeConsoleSubscriptionRequestObject) (ResumeConsoleSubscriptionResponseObject, error)
+	// SuspendConsoleSubscription Suspend a subscription
+	// (POST /v1/console/subscriptions/{id}/suspend)
+	SuspendConsoleSubscription(ctx context.Context, request SuspendConsoleSubscriptionRequestObject) (SuspendConsoleSubscriptionResponseObject, error)
 	// ListPublications The version history of a dataset
 	// (GET /v1/publications/{dataset})
 	ListPublications(ctx context.Context, request ListPublicationsRequestObject) (ListPublicationsResponseObject, error)
@@ -7902,6 +11104,488 @@ func (sh *strictHandler) ListChanges(w http.ResponseWriter, r *http.Request, par
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListChangesResponseObject); ok {
 		if err := validResponse.VisitListChangesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListConsoleAccounts operation middleware
+func (sh *strictHandler) ListConsoleAccounts(w http.ResponseWriter, r *http.Request) {
+	var request ListConsoleAccountsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListConsoleAccounts(ctx, request.(ListConsoleAccountsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListConsoleAccounts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListConsoleAccountsResponseObject); ok {
+		if err := validResponse.VisitListConsoleAccountsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateConsoleAccount operation middleware
+func (sh *strictHandler) CreateConsoleAccount(w http.ResponseWriter, r *http.Request) {
+	var request CreateConsoleAccountRequestObject
+
+	var body CreateConsoleAccountJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateConsoleAccount(ctx, request.(CreateConsoleAccountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateConsoleAccount")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateConsoleAccountResponseObject); ok {
+		if err := validResponse.VisitCreateConsoleAccountResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchConsoleAccount operation middleware
+func (sh *strictHandler) PatchConsoleAccount(w http.ResponseWriter, r *http.Request, id ConsoleAccountID) {
+	var request PatchConsoleAccountRequestObject
+
+	request.Id = id
+
+	var body PatchConsoleAccountJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchConsoleAccount(ctx, request.(PatchConsoleAccountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchConsoleAccount")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchConsoleAccountResponseObject); ok {
+		if err := validResponse.VisitPatchConsoleAccountResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListConsoleAudit operation middleware
+func (sh *strictHandler) ListConsoleAudit(w http.ResponseWriter, r *http.Request, params ListConsoleAuditParams) {
+	var request ListConsoleAuditRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListConsoleAudit(ctx, request.(ListConsoleAuditRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListConsoleAudit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListConsoleAuditResponseObject); ok {
+		if err := validResponse.VisitListConsoleAuditResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConsoleMe operation middleware
+func (sh *strictHandler) GetConsoleMe(w http.ResponseWriter, r *http.Request) {
+	var request GetConsoleMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConsoleMe(ctx, request.(GetConsoleMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConsoleMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConsoleMeResponseObject); ok {
+		if err := validResponse.VisitGetConsoleMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListConsolePublications operation middleware
+func (sh *strictHandler) ListConsolePublications(w http.ResponseWriter, r *http.Request, params ListConsolePublicationsParams) {
+	var request ListConsolePublicationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListConsolePublications(ctx, request.(ListConsolePublicationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListConsolePublications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListConsolePublicationsResponseObject); ok {
+		if err := validResponse.VisitListConsolePublicationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConsolePublicationDiff operation middleware
+func (sh *strictHandler) GetConsolePublicationDiff(w http.ResponseWriter, r *http.Request, id ConsolePublicationID, params GetConsolePublicationDiffParams) {
+	var request GetConsolePublicationDiffRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConsolePublicationDiff(ctx, request.(GetConsolePublicationDiffRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConsolePublicationDiff")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConsolePublicationDiffResponseObject); ok {
+		if err := validResponse.VisitGetConsolePublicationDiffResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RepublishConsolePublication operation middleware
+func (sh *strictHandler) RepublishConsolePublication(w http.ResponseWriter, r *http.Request, id ConsolePublicationID) {
+	var request RepublishConsolePublicationRequestObject
+
+	request.Id = id
+
+	var body RepublishConsolePublicationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RepublishConsolePublication(ctx, request.(RepublishConsolePublicationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RepublishConsolePublication")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RepublishConsolePublicationResponseObject); ok {
+		if err := validResponse.VisitRepublishConsolePublicationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListConsoleRestrictions operation middleware
+func (sh *strictHandler) ListConsoleRestrictions(w http.ResponseWriter, r *http.Request, params ListConsoleRestrictionsParams) {
+	var request ListConsoleRestrictionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListConsoleRestrictions(ctx, request.(ListConsoleRestrictionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListConsoleRestrictions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListConsoleRestrictionsResponseObject); ok {
+		if err := validResponse.VisitListConsoleRestrictionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteConsoleSession operation middleware
+func (sh *strictHandler) DeleteConsoleSession(w http.ResponseWriter, r *http.Request) {
+	var request DeleteConsoleSessionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteConsoleSession(ctx, request.(DeleteConsoleSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteConsoleSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteConsoleSessionResponseObject); ok {
+		if err := validResponse.VisitDeleteConsoleSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateConsoleSession operation middleware
+func (sh *strictHandler) CreateConsoleSession(w http.ResponseWriter, r *http.Request) {
+	var request CreateConsoleSessionRequestObject
+
+	var body CreateConsoleSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateConsoleSession(ctx, request.(CreateConsoleSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateConsoleSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateConsoleSessionResponseObject); ok {
+		if err := validResponse.VisitCreateConsoleSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConsoleStatus operation middleware
+func (sh *strictHandler) GetConsoleStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetConsoleStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConsoleStatus(ctx, request.(GetConsoleStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConsoleStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConsoleStatusResponseObject); ok {
+		if err := validResponse.VisitGetConsoleStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListConsoleSubscriptions operation middleware
+func (sh *strictHandler) ListConsoleSubscriptions(w http.ResponseWriter, r *http.Request, params ListConsoleSubscriptionsParams) {
+	var request ListConsoleSubscriptionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListConsoleSubscriptions(ctx, request.(ListConsoleSubscriptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListConsoleSubscriptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListConsoleSubscriptionsResponseObject); ok {
+		if err := validResponse.VisitListConsoleSubscriptionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListConsoleDeliveries operation middleware
+func (sh *strictHandler) ListConsoleDeliveries(w http.ResponseWriter, r *http.Request, id SubscriptionID, params ListConsoleDeliveriesParams) {
+	var request ListConsoleDeliveriesRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListConsoleDeliveries(ctx, request.(ListConsoleDeliveriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListConsoleDeliveries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListConsoleDeliveriesResponseObject); ok {
+		if err := validResponse.VisitListConsoleDeliveriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RetryConsoleDelivery operation middleware
+func (sh *strictHandler) RetryConsoleDelivery(w http.ResponseWriter, r *http.Request, id SubscriptionID, deliveryId string) {
+	var request RetryConsoleDeliveryRequestObject
+
+	request.Id = id
+	request.DeliveryId = deliveryId
+
+	var body RetryConsoleDeliveryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RetryConsoleDelivery(ctx, request.(RetryConsoleDeliveryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RetryConsoleDelivery")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RetryConsoleDeliveryResponseObject); ok {
+		if err := validResponse.VisitRetryConsoleDeliveryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResumeConsoleSubscription operation middleware
+func (sh *strictHandler) ResumeConsoleSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID) {
+	var request ResumeConsoleSubscriptionRequestObject
+
+	request.Id = id
+
+	var body ResumeConsoleSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResumeConsoleSubscription(ctx, request.(ResumeConsoleSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResumeConsoleSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResumeConsoleSubscriptionResponseObject); ok {
+		if err := validResponse.VisitResumeConsoleSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SuspendConsoleSubscription operation middleware
+func (sh *strictHandler) SuspendConsoleSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID) {
+	var request SuspendConsoleSubscriptionRequestObject
+
+	request.Id = id
+
+	var body SuspendConsoleSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SuspendConsoleSubscription(ctx, request.(SuspendConsoleSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SuspendConsoleSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SuspendConsoleSubscriptionResponseObject); ok {
+		if err := validResponse.VisitSuspendConsoleSubscriptionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

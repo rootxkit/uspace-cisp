@@ -31,6 +31,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/auth"
 	"github.com/rootxkit/uspace-cisp/internal/authtest"
 	"github.com/rootxkit/uspace-cisp/internal/config"
+	"github.com/rootxkit/uspace-cisp/internal/console/consoletest"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
 	"github.com/rootxkit/uspace-cisp/internal/jws"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
@@ -308,6 +309,16 @@ type pubHarness struct {
 	anspSigner *rsa.PrivateKey
 	// The subscriptions (WP-6) when the store serves them.
 	subs *Subscriptions
+	// The console (WP-8): the one verifier (the console issuer beside
+	// the ecosystem's), the session issuer, the account store, the
+	// console store fake, the revocation cache and the login limiter.
+	verifier     *auth.MachineVerifier
+	sessions     *auth.SessionIssuer
+	accounts     *consoletest.Store
+	cfake        *fakeConsole
+	revocations  *auth.RevocationCache
+	loginLimiter *RateLimiter
+	console      *Console
 }
 
 type harnessOption func(*Publications, *Server)
@@ -321,8 +332,9 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 	if err != nil {
 		t.Fatal(err)
 	}
+	sessions := consoleSessionIssuer(t)
 	mv, err := auth.NewMachineVerifier(ctx, auth.MachineConfig{
-		Issuers:   []auth.Source{{ID: tokenIssuer, Keys: iss.JWKS()}},
+		Issuers:   []auth.Source{{ID: tokenIssuer, Keys: iss.JWKS()}, sessions.Source()},
 		Audiences: []string{tokenAudience},
 	})
 	if err != nil {
@@ -364,7 +376,7 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 		Verifier: func() *jws.DetachedVerifier { return anspDV }, Problems: WriteProblem,
 		MaxBodyBytes: restrictionMaxBytes, Component: status.Component("signature"),
 	}}.Routes())
-	h := &pubHarness{t: t, iss: iss, signer: key, status: status, now: now, anspSigner: anspKey}
+	h := &pubHarness{t: t, iss: iss, signer: key, status: status, now: now, anspSigner: anspKey, verifier: mv, sessions: sessions}
 	if st == nil {
 		h.fake = newFakeStore()
 		st = h.fake
@@ -392,10 +404,12 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 	}
 	maps.Copy(routes, PublicReadAuth(h.limiter))
 	maps.Copy(routes, StreamAuth(h.limiter))
+	maps.Copy(routes, h.withConsole(st, server, status, logger))
 	for _, o := range opts {
 		o(h.pubs, server)
 	}
-	caps := map[string]int64{PublicationRoute: maxBytes}
+	caps := ConsoleBodyCaps()
+	caps[PublicationRoute] = maxBytes
 	for _, r := range RestrictionWriteRoutes {
 		caps[r] = restrictionMaxBytes
 	}

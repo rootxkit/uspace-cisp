@@ -44,6 +44,9 @@ type RateLimiterConfig struct {
 	RPM int64
 	// Burst is the full reads a client may make at once (0: 10).
 	Burst int
+	// Window, when set, replaces RPM: Burst requests per Window (the
+	// console login: 20 per 15 minutes, WP-8).
+	Window time.Duration
 	// CheapFactor multiplies the rate and the burst for HEAD and for a
 	// request that will be answered 304 (0: 10).
 	CheapFactor int
@@ -102,6 +105,9 @@ func NewRateLimiter(cfg RateLimiterConfig) *RateLimiter {
 		cfg.Now = time.Now
 	}
 	perS := float64(cfg.RPM) / 60
+	if cfg.Window > 0 {
+		perS = float64(cfg.Burst) / cfg.Window.Seconds()
+	}
 	return &RateLimiter{
 		cfg: cfg, full: rate.Limit(perS), cheap: rate.Limit(perS * float64(cfg.CheapFactor)),
 		burst: cfg.Burst, cheapBurst: cfg.Burst * cfg.CheapFactor,

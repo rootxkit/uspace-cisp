@@ -149,7 +149,7 @@ func TestDefaults(t *testing.T) {
 		{EnvSigningKID, api.SigningKID, ""},
 		{EnvSigningKeyPrevFile, api.SigningKeyPrevFile, ""},
 		{EnvSessionKeyFile, api.SessionKeyFile, ""},
-		{EnvSecretsKey, api.SecretsKey, ""},
+		{EnvSecretsKeyFile, api.SecretsKeyFile, ""},
 		{EnvPublicBaseURL, api.PublicBaseURL, ""},
 		{EnvIssuerURL, api.IssuerURL, ""},
 		{EnvReadMaxAgeS, api.ReadMaxAge, 60 * time.Second},
@@ -450,14 +450,15 @@ func TestRedactedNeverPrintsASecret(t *testing.T) {
 		dbPassword = "db-Pa55word-91"
 		tsPassword = "ts-Pa55word-42"
 		natsToken  = "nats-T0ken-77"
-		secretsKey = "secrets-key-value-for-the-test"
 		queryPass  = "q-Pa55-13"
 	)
 	env := []string{
 		"CISP_DATABASE_URL=postgres://cisp_api:" + dbPassword + "@db:5432/cisp?sslmode=disable",
 		"CISP_TIMESERIES_URL=postgres://db:5432/cisp_ts?user=cisp_api&password=" + queryPass + "&x=" + tsPassword[:0],
 		"CISP_NATS_URL=nats://" + natsToken + "@nats:4222",
-		"CISP_SECRETS_KEY=" + secretsKey,
+		"CISP_SECRETS_KEY_FILE=/run/secrets/cisp-secrets.key",
+		"CISP_SESSION_KEY_FILE=/run/secrets/cisp-session.pem",
+		"CISP_CONSOLE_ISSUER=https://uspace-cisp.example/console",
 		"CISP_SIGNING_KEY_FILE=/run/secrets/cisp-signing.pem",
 		"CISP_SIGNING_KID=cisp-1",
 	}
@@ -467,7 +468,7 @@ func TestRedactedNeverPrintsASecret(t *testing.T) {
 	}
 	red := api.Redacted()
 	all := fmt.Sprint(red)
-	for _, secret := range []string{dbPassword, natsToken, secretsKey, queryPass} {
+	for _, secret := range []string{dbPassword, natsToken, queryPass} {
 		if strings.Contains(all, secret) {
 			t.Errorf("Redacted output contains a secret %q: %s", secret, all)
 		}
@@ -481,8 +482,8 @@ func TestRedactedNeverPrintsASecret(t *testing.T) {
 	if red[EnvNATSURL] != "nats://***@nats:4222" {
 		t.Errorf("nats URL = %q", red[EnvNATSURL])
 	}
-	if red[EnvSecretsKey] != "***" {
-		t.Errorf("secrets key = %q", red[EnvSecretsKey])
+	if red[EnvSecretsKeyFile] != "/run/secrets/cisp-secrets.key" {
+		t.Errorf("secrets key file path not kept: %q", red[EnvSecretsKeyFile])
 	}
 	if red[EnvHTTPAddr] != ":8080" {
 		t.Errorf("plain value changed: %q", red[EnvHTTPAddr])

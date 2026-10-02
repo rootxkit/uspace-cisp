@@ -55,7 +55,8 @@ const (
 	EnvSigningKIDPrev            = "CISP_SIGNING_KID_PREV"
 	EnvPublisherSigMaxSkewS      = "CISP_PUBLISHER_SIGNATURE_MAX_SKEW_S"
 	EnvSessionKeyFile            = "CISP_SESSION_KEY_FILE"
-	EnvSecretsKey                = "CISP_SECRETS_KEY" //nolint:gosec // G101: a variable name, not a credential
+	EnvSecretsKeyFile            = "CISP_SECRETS_KEY_FILE" //nolint:gosec // G101: a variable name, not a credential
+	EnvConsoleIssuer             = "CISP_CONSOLE_ISSUER"
 	EnvPublicBaseURL             = "CISP_PUBLIC_BASE_URL"
 	EnvIssuerURL                 = "CISP_ISSUER_URL"
 	EnvReadMaxAgeS               = "CISP_READ_MAX_AGE_S"
@@ -119,7 +120,8 @@ var Catalogue = []Var{
 	{Name: EnvSigningKIDPrev, Default: ""},
 	{Name: EnvPublisherSigMaxSkewS, Default: "300"},
 	{Name: EnvSessionKeyFile, Default: ""},
-	{Name: EnvSecretsKey, Default: "", Secret: true},
+	{Name: EnvSecretsKeyFile, Default: ""},
+	{Name: EnvConsoleIssuer, Default: ""},
 	{Name: EnvPublicBaseURL, Default: ""},
 	{Name: EnvIssuerURL, Default: ""},
 	{Name: EnvReadMaxAgeS, Default: "60"},

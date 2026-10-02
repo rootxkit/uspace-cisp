@@ -3,7 +3,10 @@ package console
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base32"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -34,6 +37,17 @@ const (
 	// initialPasswordBytes is the entropy of a one-time initial password
 	// (160 bits, 32 base32 characters).
 	initialPasswordBytes = 20
+	// DefaultChallengeTTL is how long an MFA challenge of the password
+	// step lives (the uspace-authority's default).
+	DefaultChallengeTTL = 5 * time.Minute
+	// DefaultMaxChallengeAttempts is the wrong codes one challenge takes
+	// before it is exhausted (the per-account lockout counts them too).
+	DefaultMaxChallengeAttempts = 5
+	// MaxChallengeTokenBytes bounds a challenge token read from a body.
+	MaxChallengeTokenBytes = 256
+	// challengeTokenBytes is the entropy of a challenge token (256 bits,
+	// 43 base64url characters).
+	challengeTokenBytes = 32
 )
 
 // Account statuses.
@@ -44,12 +58,15 @@ const (
 
 // The audit events of accounts and sessions.
 const (
-	EventSessionIssued  = "session_issued"
-	EventSessionRevoked = "session_revoked"
-	EventLoginFailed    = "login_failed"
-	EventAccountLocked  = "account_locked"
-	EventAccountCreated = "account_created"
-	EventAccountChanged = "account_changed"
+	EventSessionIssued = "session_issued"
+	// EventChallengeIssued is a password accepted for an account with
+	// MFA: a challenge was opened, no session yet.
+	EventChallengeIssued = "login_challenge_issued"
+	EventSessionRevoked  = "session_revoked"
+	EventLoginFailed     = "login_failed"
+	EventAccountLocked   = "account_locked"
+	EventAccountCreated  = "account_created"
+	EventAccountChanged  = "account_changed"
 )
 
 // Login refusal slugs (problem types).
@@ -62,6 +79,10 @@ const (
 	SlugLastAdmin          = "last_admin"
 	SlugUsernameTaken      = "username_taken"
 	SlugBusy               = "busy"
+	// SlugChallengeInvalid is a challenge that is unknown, spent,
+	// expired, exhausted, or whose account can no longer sign in: sign
+	// in again from the password.
+	SlugChallengeInvalid = "challenge_invalid"
 )
 
 var usernamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{2,63}$`)
@@ -92,6 +113,7 @@ type Store interface {
 	PatchAccount(ctx context.Context, id string, decide func(a store.Account, activeAdmins []string, now time.Time) (store.AccountChange, error)) (store.Account, []string, error)
 	Session(ctx context.Context, jti string) (store.Session, error)
 	RevokeSession(ctx context.Context, jti string, e store.Event) (bool, error)
+	ExchangeChallenge(ctx context.Context, tokenHash string, decide func(ch *store.LoginChallenge, a *store.Account, now time.Time) (store.LoginOutcome, error)) error
 }
 
 // SessionSigner signs a session token (*auth.SessionIssuer).
@@ -117,6 +139,11 @@ type Config struct {
 	MaxFailedLogins int
 	Lockout         time.Duration
 	HashSlots       int
+	// ChallengeTTL is the life of an MFA challenge (DefaultChallengeTTL);
+	// MaxChallengeAttempts the wrong codes it takes
+	// (DefaultMaxChallengeAttempts).
+	ChallengeTTL         time.Duration
+	MaxChallengeAttempts int
 	// NewID makes account and session ids (store.NewID).
 	NewID func(time.Time) string
 }
@@ -148,6 +175,12 @@ func NewAccounts(cfg Config) (*Accounts, error) {
 	}
 	if cfg.HashSlots <= 0 {
 		cfg.HashSlots = DefaultHashSlots
+	}
+	if cfg.ChallengeTTL <= 0 {
+		cfg.ChallengeTTL = DefaultChallengeTTL
+	}
+	if cfg.MaxChallengeAttempts <= 0 {
+		cfg.MaxChallengeAttempts = DefaultMaxChallengeAttempts
 	}
 	if cfg.NewID == nil {
 		cfg.NewID = store.NewID
@@ -191,12 +224,22 @@ type LoginRequest struct {
 	TOTP     *string
 }
 
-// LoginResult is an issued session.
+// LoginResult is an issued session or, from the password step of an
+// account with MFA and no code, an MFA challenge (Challenge set, no
+// session).
 type LoginResult struct {
 	Token     string
 	JTI       string
 	ExpiresAt time.Time
 	Account   store.Account
+	Challenge *Challenge
+}
+
+// Challenge is an MFA challenge as the password step answers it: the
+// token (shown once; only its SHA-256 is stored) and its expiry.
+type Challenge struct {
+	Token     string
+	ExpiresAt time.Time
 }
 
 // NormaliseUsername is the stored form of a username (lower case).
@@ -208,6 +251,12 @@ func NormaliseUsername(u string) string { return strings.ToLower(u) }
 // 423 locked whatever the password. An unknown or disabled username is
 // refused as a wrong password is (401 invalid_credentials), after the
 // same argon2id work.
+//
+// An account with MFA and an authenticator, asked without a code, gets
+// an MFA challenge in place of a session (the two-step sign-in): the
+// right password opens it, counts nothing and resets nothing, so the
+// failed-login counter keeps counting the codes VerifyMFA is then sent.
+// With a code, the one request still issues the session.
 func (a *Accounts) Login(ctx context.Context, req LoginRequest) (LoginResult, error) {
 	if err := a.acquire(ctx); err != nil {
 		return LoginResult{}, err
@@ -243,6 +292,9 @@ func (a *Accounts) Login(ctx context.Context, req LoginRequest) (LoginResult, er
 			}
 		}
 		step := acc.TOTPLastStep
+		if acc.MFARequired && (req.TOTP == nil || *req.TOTP == "") && len(acc.TOTPSecretEnc) > 0 {
+			return a.openChallenge(acc, now, hash, rehash, &res)
+		}
 		if acc.MFARequired {
 			s, refused, err := a.checkTOTP(acc, req.TOTP, now)
 			if err != nil {
@@ -256,25 +308,152 @@ func (a *Accounts) Login(ctx context.Context, req LoginRequest) (LoginResult, er
 			}
 			step = &s
 		}
-		iat := now.Truncate(time.Second)
-		exp := iat.Add(auth.SessionTTL)
-		jti := a.cfg.NewID(now)
-		token, err := a.cfg.Sessions.Issue(acc.ID, acc.Role, jti, iat, exp)
-		if err != nil {
-			return store.LoginOutcome{}, fmt.Errorf("session: %w", err)
+		return a.issue(acc, now, hash, step, rehash, false, &res)
+	})
+	if err != nil {
+		return LoginResult{}, err
+	}
+	return res, nil
+}
+
+// issue signs a session for acc and writes it with the account's
+// successful login (the counter reset, the last login, the password
+// hash, the TOTP step) and its session_issued row; *res is the session.
+func (a *Accounts) issue(acc *store.Account, now time.Time, hash string, step *int64, rehash, challenge bool, res *LoginResult) (store.LoginOutcome, error) {
+	iat := now.Truncate(time.Second)
+	exp := iat.Add(auth.SessionTTL)
+	jti := a.cfg.NewID(now)
+	token, err := a.cfg.Sessions.Issue(acc.ID, acc.Role, jti, iat, exp)
+	if err != nil {
+		return store.LoginOutcome{}, fmt.Errorf("session: %w", err)
+	}
+	last := now
+	*res = LoginResult{Token: token, JTI: jti, ExpiresAt: exp, Account: *acc}
+	res.Account.LastLoginAt, res.Account.FailedLogins, res.Account.LockedUntil = &last, 0, nil
+	return store.LoginOutcome{
+		Update:  &store.AccountLoginUpdate{FailedLogins: 0, LastLoginAt: &last, PasswordHash: hash, TOTPLastStep: step},
+		Session: &store.NewSession{JTI: jti, AccountID: acc.ID, IssuedAt: iat, ExpiresAt: exp},
+		Events: []store.Event{{
+			TS: now, ActorType: store.ActorAccount, ActorID: acc.ID, EventType: EventSessionIssued,
+			EntityType: "session", EntityID: jti,
+			Payload: map[string]any{"role": acc.Role, "expires_at": exp.Format(time.RFC3339), "mfa": acc.MFARequired, "rehashed": rehash, "challenge": challenge},
+		}},
+	}, nil
+}
+
+// openChallenge opens an MFA challenge for acc after its password was
+// accepted: a 256-bit token whose SHA-256 is stored, bound to the
+// account, expiring after ChallengeTTL. The account row keeps its
+// counter and lockout; only a rehashed password is written.
+func (a *Accounts) openChallenge(acc *store.Account, now time.Time, hash string, rehash bool, res *LoginResult) (store.LoginOutcome, error) {
+	token, tokenHash, err := newChallengeToken()
+	if err != nil {
+		return store.LoginOutcome{}, err
+	}
+	exp := now.Add(a.cfg.ChallengeTTL)
+	*res = LoginResult{Account: *acc, Challenge: &Challenge{Token: token, ExpiresAt: exp}}
+	out := store.LoginOutcome{
+		Challenge: &store.NewLoginChallenge{TokenHash: tokenHash, AccountID: acc.ID, CreatedAt: now, ExpiresAt: exp},
+		Events: []store.Event{{
+			TS: now, ActorType: store.ActorAccount, ActorID: acc.ID, EventType: EventChallengeIssued,
+			EntityType: "account", EntityID: acc.ID,
+			Payload: map[string]any{"expires_at": exp.Format(time.RFC3339), "rehashed": rehash},
+		}},
+	}
+	if rehash {
+		out.Update = &store.AccountLoginUpdate{
+			FailedLogins: acc.FailedLogins, LockedUntil: acc.LockedUntil, LastLoginAt: acc.LastLoginAt,
+			PasswordHash: hash, TOTPLastStep: acc.TOTPLastStep,
 		}
-		last := now
-		res = LoginResult{Token: token, JTI: jti, ExpiresAt: exp, Account: *acc}
-		res.Account.LastLoginAt, res.Account.FailedLogins, res.Account.LockedUntil = &last, 0, nil
-		return store.LoginOutcome{
-			Update:  &store.AccountLoginUpdate{FailedLogins: 0, LastLoginAt: &last, PasswordHash: hash, TOTPLastStep: step},
-			Session: &store.NewSession{JTI: jti, AccountID: acc.ID, IssuedAt: iat, ExpiresAt: exp},
-			Events: []store.Event{{
-				TS: now, ActorType: store.ActorAccount, ActorID: acc.ID, EventType: EventSessionIssued,
-				EntityType: "session", EntityID: jti,
-				Payload: map[string]any{"role": acc.Role, "expires_at": exp.Format(time.RFC3339), "mfa": acc.MFARequired, "rehashed": rehash},
-			}},
-		}, nil
+	}
+	return out, nil
+}
+
+// newChallengeToken is 256 random bits, base64url without padding, and
+// the SHA-256 of the token in hex: only the hash is stored.
+func newChallengeToken() (token, tokenHash string, err error) {
+	b := make([]byte, challengeTokenBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", "", fmt.Errorf("challenge: %w", err)
+	}
+	token = base64.RawURLEncoding.EncodeToString(b)
+	return token, ChallengeHash(token), nil
+}
+
+// ChallengeHash is the stored form of a challenge token: SHA-256, hex.
+func ChallengeHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+// MFARequest is the body of POST /v1/console/session/mfa.
+type MFARequest struct {
+	Challenge string
+	Code      string
+}
+
+// VerifyMFA exchanges an MFA challenge and a TOTP code for a session (the
+// second step of the two-step sign-in), judged under the account's and
+// the challenge's row locks on the database's clock. A challenge is
+// single use, expires after ChallengeTTL and takes MaxChallengeAttempts
+// wrong codes; an unknown, spent, expired or exhausted one, or one whose
+// account is disabled, is 401 challenge_invalid (sign in again). A
+// locked account is 423 locked. A wrong or reused code is 401
+// invalid_totp or totp_reused, counts one attempt on the challenge and
+// one failure towards the account's lockout, as in the one-step login.
+func (a *Accounts) VerifyMFA(ctx context.Context, req MFARequest) (LoginResult, error) {
+	invalid := func(detail string) *Error {
+		return refusal(http.StatusUnauthorized, SlugChallengeInvalid, "mfa_token", detail)
+	}
+	if req.Challenge == "" || len(req.Challenge) > MaxChallengeTokenBytes {
+		return LoginResult{}, invalid("the sign-in challenge is not valid; sign in again")
+	}
+	var res LoginResult
+	err := a.cfg.Store.ExchangeChallenge(ctx, ChallengeHash(req.Challenge), func(ch *store.LoginChallenge, acc *store.Account, now time.Time) (store.LoginOutcome, error) {
+		if ch == nil || acc == nil {
+			return store.LoginOutcome{Refusal: invalid("the sign-in challenge is not valid; sign in again")}, nil
+		}
+		refuse := func(reason, detail string) store.LoginOutcome {
+			return store.LoginOutcome{Refusal: invalid(detail), Events: []store.Event{{
+				TS: now, ActorType: store.ActorAccount, ActorID: acc.ID, EventType: EventLoginFailed,
+				EntityType: "account", EntityID: acc.ID,
+				Payload: map[string]any{"field": "mfa_token", "reason": reason, "failed_logins": acc.FailedLogins},
+			}}}
+		}
+		switch {
+		case ch.UsedAt != nil:
+			return refuse("challenge_used", "the sign-in challenge was used; sign in again"), nil
+		case !now.Before(ch.ExpiresAt):
+			return refuse("challenge_expired", "the sign-in challenge expired; sign in again"), nil
+		case ch.Attempts >= a.cfg.MaxChallengeAttempts:
+			return refuse("challenge_exhausted", "too many wrong codes for this sign-in; sign in again"), nil
+		case acc.Status != StatusActive:
+			return refuse("account_disabled", "the sign-in challenge is not valid; sign in again"), nil
+		}
+		if acc.LockedUntil != nil && acc.LockedUntil.After(now) {
+			e := refusal(http.StatusLocked, SlugLocked, "username", "the account is locked after repeated failures; try again later")
+			e.RetryAfter = acc.LockedUntil.Sub(now)
+			return store.LoginOutcome{Refusal: e}, nil
+		}
+		code := req.Code
+		step, refused, err := a.checkTOTP(acc, &code, now)
+		if err != nil {
+			return store.LoginOutcome{}, err
+		}
+		if refused != nil {
+			if refused.Slug == SlugMFARequired {
+				return store.LoginOutcome{Refusal: refused}, nil
+			}
+			out := a.failed(acc, now, refused, "totp")
+			out.ChallengeAttempt = true
+			return out, nil
+		}
+		out, err := a.issue(acc, now, acc.PasswordHash, &step, false, true, &res)
+		if err != nil {
+			return store.LoginOutcome{}, err
+		}
+		out.ChallengeUsed = true
+		return out, nil
 	})
 	if err != nil {
 		return LoginResult{}, err

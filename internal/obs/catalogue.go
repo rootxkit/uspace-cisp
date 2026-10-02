@@ -131,7 +131,8 @@ func buildCatalogue() []Metric {
 	add(counter("session_check_failed", "Console requests refused 503 because the revocation list could not be read or a session's use could not be recorded (fail closed).", "any increase"))
 	add(counter("session_revocation_cache_bypassed", "Session checks that asked the database because the revocation cache was full or stale.", "sustained increase"))
 	add(counter("console_logins", "Console sessions issued.", ""))
-	add(counter("console_logins_refused", "Console logins refused (wrong credentials, locked, TOTP).", "a burst (password guessing)"))
+	add(counter("console_logins_refused", "Console logins refused (wrong credentials, locked, TOTP, challenge).", "a burst (password guessing)"))
+	add(counter("console_mfa_challenges", "Console MFA challenges opened (passwords accepted for an account with MFA).", ""))
 	add(counter("console_actions", "Console actions written (accounts, subscriptions, retries, republications).", ""))
 
 	// Store counters mirrored into Prometheus.

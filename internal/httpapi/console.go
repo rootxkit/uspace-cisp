@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/rootxkit/uspace-core/core"
@@ -33,10 +34,17 @@ import (
 // needs (the x-role of api/openapi.yaml; a test keeps the two equal).
 const (
 	ConsoleLoginRoute = "POST /v1/console/session"
+	// ConsoleMFARoute is the login's second step: the MFA challenge of
+	// the password step and a TOTP code for a session.
+	ConsoleMFARoute = "POST /v1/console/session/mfa"
 )
 
-// ConsoleRoles is the role each console operation needs; the login
-// needs none (it is rate-limited per address instead).
+// ConsoleLoginRoutes are the login's two steps: no role, the
+// per-address login limiter shared by both, application/json.
+var ConsoleLoginRoutes = []string{ConsoleLoginRoute, ConsoleMFARoute}
+
+// ConsoleRoles is the role each console operation needs; the login's
+// two steps need none (they are rate-limited per address instead).
 var ConsoleRoles = map[string]string{
 	"DELETE /v1/console/session":                                         auth.RoleViewer,
 	"GET /v1/console/me":                                                 auth.RoleViewer,
@@ -61,6 +69,7 @@ var ConsoleRoles = map[string]string{
 // T8: 64 KiB).
 var consoleBodyRoutes = []string{
 	ConsoleLoginRoute,
+	ConsoleMFARoute,
 	"POST /v1/console/accounts",
 	"PATCH /v1/console/accounts/{id}",
 	"POST /v1/console/publications/{id}/republish",
@@ -91,11 +100,11 @@ const (
 
 // ConsoleAuth is the console's route middleware: the role of each
 // operation through the session guard, application/json on the bodies,
-// and the per-address login limiter on the login.
+// and the per-address login limiter on the login's two steps.
 type ConsoleAuth struct {
 	Sessions *auth.SessionGuard
-	// Login limits the login per client address (a RateLimiter with
-	// LoginBurst over LoginWindow).
+	// Login limits the login's two steps together per client address (a
+	// RateLimiter with LoginBurst over LoginWindow).
 	Login *RateLimiter
 }
 
@@ -109,10 +118,11 @@ func (a ConsoleAuth) Routes() (map[string]func(http.Handler) http.Handler, error
 	for _, r := range consoleBodyRoutes {
 		body[r] = true
 	}
-	out := map[string]func(http.Handler) http.Handler{
-		ConsoleLoginRoute: func(next http.Handler) http.Handler {
+	out := map[string]func(http.Handler) http.Handler{}
+	for _, route := range ConsoleLoginRoutes {
+		out[route] = func(next http.Handler) http.Handler {
 			return auth.Chain(next, a.Login.Middleware, requireJSONMediaType)
-		},
+		}
 	}
 	for route, role := range ConsoleRoles {
 		mw, err := a.Sessions.RequireRole(role)
@@ -138,7 +148,10 @@ func ConsoleOffRoutes() map[string]func(http.Handler) http.Handler {
 				"the console is not configured (CISP_SESSION_KEY_FILE, CISP_CONSOLE_ISSUER, CISP_SECRETS_KEY_FILE)")
 		})
 	}
-	out := map[string]func(http.Handler) http.Handler{ConsoleLoginRoute: off}
+	out := map[string]func(http.Handler) http.Handler{}
+	for _, route := range ConsoleLoginRoutes {
+		out[route] = off
+	}
 	for route := range ConsoleRoles {
 		out[route] = off
 	}
@@ -171,6 +184,7 @@ const (
 	MaxDiffFeatures        = 5000
 	CounterConsoleLogins   = "console_logins"
 	CounterConsoleRefused  = "console_logins_refused"
+	CounterConsoleMFA      = "console_mfa_challenges"
 	CounterConsoleActions  = "console_actions"
 	consoleComponent       = "console"
 	SlugSubscriptionState  = "subscription_state"
@@ -242,6 +256,11 @@ func prob(p problemResponse) consoleResponse { return consoleResponse{w: p} }
 
 // VisitCreateConsoleSessionResponse implements gen.CreateConsoleSessionResponseObject.
 func (r consoleResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+	return r.w.write(w)
+}
+
+// VisitCreateConsoleSessionMfaResponse implements gen.CreateConsoleSessionMfaResponseObject.
+func (r consoleResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
 	return r.w.write(w)
 }
 
@@ -393,7 +412,8 @@ func reasonOf(ctx context.Context, body *gen.ConsoleActionReason) (string, *cons
 
 // --- sessions and accounts -------------------------------------------------
 
-// CreateConsoleSession logs in (WP-8).
+// CreateConsoleSession logs in (WP-8): a session, or for an account with
+// MFA and no code the MFA challenge of the two-step sign-in (Q41).
 func (s *Server) CreateConsoleSession(ctx context.Context, req gen.CreateConsoleSessionRequestObject) (gen.CreateConsoleSessionResponseObject, error) {
 	c := s.Console
 	if c == nil || c.Accounts == nil {
@@ -406,14 +426,56 @@ func (s *Server) CreateConsoleSession(ctx context.Context, req gen.CreateConsole
 	if err != nil {
 		var ce *console.Error
 		if errors.As(err, &ce) {
-			c.counter(CounterConsoleRefused, "Console logins refused (wrong credentials, locked, TOTP).")
+			c.counter(CounterConsoleRefused, "Console logins refused (wrong credentials, locked, TOTP, challenge).")
 		}
 		return c.failure(ctx, err)
 	}
+	if ch := res.Challenge; ch != nil {
+		c.counter(CounterConsoleMFA, "Console MFA challenges opened (passwords accepted for an account with MFA).")
+		c.logger().LogAttrs(ctx, slog.LevelInfo, "console mfa challenge opened", slog.String("account_id", res.Account.ID))
+		return ok(http.StatusOK, gen.ConsoleMFAChallenge{MfaToken: ch.Token, ExpiresAt: ch.ExpiresAt.UTC()}), nil
+	}
+	return c.sessionIssued(ctx, res), nil
+}
+
+// CreateConsoleSessionMfa is the login's second step (Q41): the MFA
+// challenge and a TOTP code for a session.
+func (s *Server) CreateConsoleSessionMfa(ctx context.Context, req gen.CreateConsoleSessionMfaRequestObject) (gen.CreateConsoleSessionMfaResponseObject, error) {
+	c := s.Console
+	if c == nil || c.Accounts == nil {
+		return consoleUnavailable(ctx), nil
+	}
+	if req.Body == nil {
+		return prob(badRequest(ctx, core.Fieldf("body", "required"))), nil
+	}
+	// The spec's bounds on the body, named (the strict server decodes
+	// JSON and checks no pattern).
+	if n := len(req.Body.MfaToken); n == 0 || n > console.MaxChallengeTokenBytes {
+		return prob(badRequest(ctx, core.Fieldf("mfa_token", "required, 1 to %d characters", console.MaxChallengeTokenBytes))), nil
+	}
+	if !totpCodePattern.MatchString(req.Body.Code) {
+		return prob(badRequest(ctx, core.Fieldf("code", "six digits"))), nil
+	}
+	res, err := c.Accounts.VerifyMFA(ctx, console.MFARequest{Challenge: req.Body.MfaToken, Code: req.Body.Code})
+	if err != nil {
+		var ce *console.Error
+		if errors.As(err, &ce) {
+			c.counter(CounterConsoleRefused, "Console logins refused (wrong credentials, locked, TOTP, challenge).")
+		}
+		return c.failure(ctx, err)
+	}
+	return c.sessionIssued(ctx, res), nil
+}
+
+// totpCodePattern is ConsoleMFA.code of api/openapi.yaml.
+var totpCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
+
+// sessionIssued answers an issued session: counted, logged, 201.
+func (c *Console) sessionIssued(ctx context.Context, res console.LoginResult) consoleResponse {
 	c.counter(CounterConsoleLogins, "Console sessions issued.")
 	c.logger().LogAttrs(ctx, slog.LevelInfo, "console session issued", slog.String("account_id", res.Account.ID),
 		slog.String("role", res.Account.Role), slog.String("jti", res.JTI))
-	return ok(http.StatusCreated, gen.ConsoleSession{Token: res.Token, ExpiresAt: res.ExpiresAt.UTC(), Account: accountBody(res.Account)}), nil
+	return ok(http.StatusCreated, gen.ConsoleSession{Token: res.Token, ExpiresAt: res.ExpiresAt.UTC(), Account: accountBody(res.Account)})
 }
 
 // DeleteConsoleSession logs out (WP-8).

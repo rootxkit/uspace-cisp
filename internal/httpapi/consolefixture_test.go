@@ -19,6 +19,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/authtest"
 	"github.com/rootxkit/uspace-cisp/internal/console"
 	"github.com/rootxkit/uspace-cisp/internal/console/consoletest"
+	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
 	"github.com/rootxkit/uspace-cisp/internal/publication"
 	"github.com/rootxkit/uspace-cisp/internal/store"
@@ -382,3 +383,41 @@ func (h *pubHarness) consoleDo(t testing.TB, req *http.Request) *httptest.Respon
 // k32 is a secrets key for tests: 32 bytes built at run time so no
 // key-shaped literal sits in the repository.
 func k32() []byte { return bytes.Repeat([]byte{0x5a}, 32) }
+
+var consoleAddrs atomic.Int64
+
+// nextAddr is a client address no other request of the run used: the
+// login limiter is per address and counts both steps.
+func nextAddr() string {
+	n := consoleAddrs.Add(1)
+	return "10." + strconv.FormatInt((n>>16)&0xff, 10) + "." + strconv.FormatInt((n>>8)&0xff, 10) + "." + strconv.FormatInt(n&0xff, 10) + ":4321"
+}
+
+// challengeFor runs the password step of u (an account with MFA) from an
+// address of its own and returns the MFA challenge.
+func (h *pubHarness) challengeFor(t testing.TB, u consoleUser) gen.ConsoleMFAChallenge {
+	t.Helper()
+	req := h.consoleReq(http.MethodPost, "/v1/console/session", "", map[string]any{"username": u.username, "password": u.password})
+	req.RemoteAddr = nextAddr()
+	rec := h.consoleDo(t, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("password step of %s = %d %s", u.username, rec.Code, rec.Body.String())
+	}
+	var ch gen.ConsoleMFAChallenge
+	if err := json.Unmarshal(rec.Body.Bytes(), &ch); err != nil {
+		t.Fatal(err)
+	}
+	return ch
+}
+
+// mfaBody is the code step's body for u: a new challenge and the
+// current TOTP code.
+func (h *pubHarness) mfaBody(t testing.TB, u consoleUser) map[string]any {
+	t.Helper()
+	ch := h.challengeFor(t, u)
+	code, err := auth.TOTPCode(u.secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return map[string]any{"mfa_token": ch.MfaToken, "code": code}
+}

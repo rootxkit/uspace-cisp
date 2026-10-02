@@ -925,14 +925,24 @@ paths:
     post:
       operationId: createConsoleSession
       tags: [console]
-      summary: Log in to the console
+      summary: Log in to the console (the password step)
       description: |
-        Role: none (the login). Exchanges a username, a password and,
-        for an account with mfa_required (every admin), a TOTP code (30
-        s step, one step of skew, never the same code twice) for a
-        console session token, returned once; the web BFF stores it in
-        the uspace_session cookie and forwards it as a bearer to
-        /v1/console/*. The token is the ecosystem's session shape (M20):
+        Role: none (the login). Exchanges a username and a password for a
+        console session token, returned once (201); the web BFF stores it
+        in the uspace_session cookie and forwards it as a bearer to
+        /v1/console/*. For an account with mfa_required (every admin) the
+        sign-in has two steps (the uspace-authority's contract, which the
+        kit's BFF follows): without totp the right password answers 200
+        with an MFA challenge {mfa_token, expires_at} and no session, and
+        POST /v1/console/session/mfa exchanges the challenge and a TOTP
+        code for the session. The challenge is single use, bound to the
+        account, expires after 5 minutes and takes 5 wrong codes; only
+        its SHA-256 is stored. The password step resets no failure
+        count. Sending totp (30 s step, one step of skew, never the same
+        code twice) in this request still signs in in one step. An
+        account with mfa_required and no authenticator enrolled is 401
+        mfa_required (an admin resets its MFA). The token is the
+        ecosystem's session shape (M20):
         RS256 by the CISP's session key, iss CISP_CONSOLE_ISSUER, aud the
         CISP's own host, sub the account id, scope "session", roles [the
         account's role], realm console, jti the session id, at most 12 h.
@@ -951,6 +961,12 @@ paths:
             schema:
               $ref: "#/components/schemas/ConsoleLogin"
       responses:
+        "200":
+          description: The password is right and the account needs a TOTP code; no session yet. Send the challenge and the code to POST /v1/console/session/mfa before expires_at.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleMFAChallenge"
         "201":
           description: The session; the token is shown once.
           content:
@@ -991,6 +1007,57 @@ paths:
           $ref: "#/components/responses/Problem"
         "403":
           $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/console/session/mfa:
+    post:
+      operationId: createConsoleSessionMfa
+      tags: [console]
+      summary: Log in to the console (the code step)
+      description: |
+        Role: none (the login's second step). Exchanges the MFA challenge
+        of POST /v1/console/session and a TOTP code (30 s step, one step
+        of skew, never the same code twice) for a console session token,
+        returned once, as the one-step login returns it. The challenge
+        and the account are judged under their row locks on the
+        database's clock. An unknown, used, expired or exhausted
+        challenge (5 wrong codes), or one whose account was disabled
+        since, is 401 challenge_invalid: sign in again from the password.
+        A wrong or reused code is 401 invalid_totp or totp_reused and
+        counts towards the account's lockout as in the one-step login:
+        five failures lock the account for 15 minutes (423 locked). The
+        address limit of the login (20 per 15 minutes, 429) counts both
+        steps. Every issued session is an audit row (session_issued);
+        every refusal with a known account a login_failed row.
+      x-role: none
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsoleMFA"
+      responses:
+        "201":
+          description: The session; the token is shown once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleSession"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "415":
+          $ref: "#/components/responses/Problem"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/Problem"
         default:
@@ -3915,7 +3982,32 @@ components:
           maxLength: 1024
         totp:
           type: string
-          description: The six-digit TOTP code; required for an account with mfa_required.
+          description: The six-digit TOTP code of an account with mfa_required, to sign in in one step; without it such an account gets an MFA challenge.
+          pattern: "^[0-9]{6}$"
+    ConsoleMFAChallenge:
+      type: object
+      description: The password step's answer for an account with mfa_required; the token is shown once and only its SHA-256 is stored.
+      required: [mfa_token, expires_at]
+      properties:
+        mfa_token:
+          type: string
+          minLength: 1
+          maxLength: 256
+        expires_at:
+          type: string
+          format: date-time
+    ConsoleMFA:
+      type: object
+      required: [mfa_token, code]
+      properties:
+        mfa_token:
+          type: string
+          description: The challenge of POST /v1/console/session.
+          minLength: 1
+          maxLength: 256
+        code:
+          type: string
+          description: The six-digit TOTP code.
           pattern: "^[0-9]{6}$"
     ConsoleRole:
       type: string

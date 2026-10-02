@@ -1763,9 +1763,24 @@ type ConsoleAuditList struct {
 type ConsoleLogin struct {
 	Password string `json:"password"`
 
-	// Totp The six-digit TOTP code; required for an account with mfa_required.
+	// Totp The six-digit TOTP code of an account with mfa_required, to sign in in one step; without it such an account gets an MFA challenge.
 	Totp     *string `json:"totp,omitempty"`
 	Username string  `json:"username"`
+}
+
+// ConsoleMFA defines model for ConsoleMFA.
+type ConsoleMFA struct {
+	// Code The six-digit TOTP code.
+	Code string `json:"code"`
+
+	// MfaToken The challenge of POST /v1/console/session.
+	MfaToken string `json:"mfa_token"`
+}
+
+// ConsoleMFAChallenge The password step's answer for an account with mfa_required; the token is shown once and only its SHA-256 is stored.
+type ConsoleMFAChallenge struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	MfaToken  string    `json:"mfa_token"`
 }
 
 // ConsoleMe defines model for ConsoleMe.
@@ -3082,6 +3097,9 @@ type RepublishConsolePublicationJSONRequestBody = ConsoleActionReason
 // CreateConsoleSessionJSONRequestBody defines body for CreateConsoleSession for application/json ContentType.
 type CreateConsoleSessionJSONRequestBody = ConsoleLogin
 
+// CreateConsoleSessionMfaJSONRequestBody defines body for CreateConsoleSessionMfa for application/json ContentType.
+type CreateConsoleSessionMfaJSONRequestBody = ConsoleMFA
+
 // RetryConsoleDeliveryJSONRequestBody defines body for RetryConsoleDelivery for application/json ContentType.
 type RetryConsoleDeliveryJSONRequestBody = ConsoleActionReason
 
@@ -3286,9 +3304,12 @@ type ServerInterface interface {
 	// DeleteConsoleSession Log out
 	// (DELETE /v1/console/session)
 	DeleteConsoleSession(w http.ResponseWriter, r *http.Request)
-	// CreateConsoleSession Log in to the console
+	// CreateConsoleSession Log in to the console (the password step)
 	// (POST /v1/console/session)
 	CreateConsoleSession(w http.ResponseWriter, r *http.Request)
+	// CreateConsoleSessionMfa Log in to the console (the code step)
+	// (POST /v1/console/session/mfa)
+	CreateConsoleSessionMfa(w http.ResponseWriter, r *http.Request)
 	// GetConsoleStatus Service status with the process counters
 	// (GET /v1/console/status)
 	GetConsoleStatus(w http.ResponseWriter, r *http.Request)
@@ -4012,6 +4033,20 @@ func (siw *ServerInterfaceWrapper) CreateConsoleSession(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateConsoleSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateConsoleSessionMfa operation middleware
+func (siw *ServerInterfaceWrapper) CreateConsoleSessionMfa(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateConsoleSessionMfa(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5374,6 +5409,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/subscriptions/{id}/deliveries/{delivery_id}/retry", wrapper.RetryDelivery)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/console/session", wrapper.DeleteConsoleSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/session", wrapper.CreateConsoleSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/session/mfa", wrapper.CreateConsoleSessionMfa)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/me", wrapper.GetConsoleMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/accounts", wrapper.ListConsoleAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/accounts", wrapper.CreateConsoleAccount)
@@ -7233,6 +7269,20 @@ type CreateConsoleSessionResponseObject interface {
 	VisitCreateConsoleSessionResponse(w http.ResponseWriter) error
 }
 
+type CreateConsoleSession200JSONResponse ConsoleMFAChallenge
+
+func (response CreateConsoleSession200JSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateConsoleSession201JSONResponse ConsoleSession
 
 func (response CreateConsoleSession201JSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
@@ -7363,6 +7413,155 @@ type CreateConsoleSessiondefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CreateConsoleSessiondefaultApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfaRequestObject struct {
+	Body *CreateConsoleSessionMfaJSONRequestBody
+}
+
+type CreateConsoleSessionMfaResponseObject interface {
+	VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error
+}
+
+type CreateConsoleSessionMfa201JSONResponse ConsoleSession
+
+func (response CreateConsoleSessionMfa201JSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfa400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsoleSessionMfa400ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfa401ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSessionMfa401ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfa413ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSessionMfa413ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfa415ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSessionMfa415ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfa423ApplicationProblemPlusJSONResponse struct {
+	LockedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsoleSessionMfa423ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(423)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfa429ApplicationProblemPlusJSONResponse struct {
+	RateLimitedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsoleSessionMfa429ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfa503ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateConsoleSessionMfa503ApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleSessionMfadefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateConsoleSessionMfadefaultApplicationProblemPlusJSONResponse) VisitCreateConsoleSessionMfaResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -10888,9 +11087,12 @@ type StrictServerInterface interface {
 	// DeleteConsoleSession Log out
 	// (DELETE /v1/console/session)
 	DeleteConsoleSession(ctx context.Context, request DeleteConsoleSessionRequestObject) (DeleteConsoleSessionResponseObject, error)
-	// CreateConsoleSession Log in to the console
+	// CreateConsoleSession Log in to the console (the password step)
 	// (POST /v1/console/session)
 	CreateConsoleSession(ctx context.Context, request CreateConsoleSessionRequestObject) (CreateConsoleSessionResponseObject, error)
+	// CreateConsoleSessionMfa Log in to the console (the code step)
+	// (POST /v1/console/session/mfa)
+	CreateConsoleSessionMfa(ctx context.Context, request CreateConsoleSessionMfaRequestObject) (CreateConsoleSessionMfaResponseObject, error)
 	// GetConsoleStatus Service status with the process counters
 	// (GET /v1/console/status)
 	GetConsoleStatus(ctx context.Context, request GetConsoleStatusRequestObject) (GetConsoleStatusResponseObject, error)
@@ -11465,6 +11667,37 @@ func (sh *strictHandler) CreateConsoleSession(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateConsoleSessionResponseObject); ok {
 		if err := validResponse.VisitCreateConsoleSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateConsoleSessionMfa operation middleware
+func (sh *strictHandler) CreateConsoleSessionMfa(w http.ResponseWriter, r *http.Request) {
+	var request CreateConsoleSessionMfaRequestObject
+
+	var body CreateConsoleSessionMfaJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateConsoleSessionMfa(ctx, request.(CreateConsoleSessionMfaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateConsoleSessionMfa")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateConsoleSessionMfaResponseObject); ok {
+		if err := validResponse.VisitCreateConsoleSessionMfaResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

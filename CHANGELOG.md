@@ -219,3 +219,19 @@ additively within `/v1`.
   the circle as a 64-vertex polygon on the geodesic circle drawn with
   uspace-core geodesy (`internal/outline`, counter `outline_failed`);
   the public map draws it (§15 Q43).
+- Two-step console sign-in (§15 Q41 (3)), additive within `/v1`: for an
+  account with MFA, `POST /v1/console/session` without `totp` answers
+  200 `{mfa_token, expires_at}` and the new `POST
+  /v1/console/session/mfa` `{mfa_token, code}` exchanges it for the
+  session. Challenges are single use, bound to the account, expire
+  after 5 minutes, take 5 wrong codes and are stored by their SHA-256
+  (`login_challenges`, migration `0012_login_challenges`), the
+  uspace-authority's `internal/authz` contract; the per-account lockout,
+  the `FOR UPDATE` judgement on the database's clock and the
+  per-address login limit cover both steps; `totp` in the one request
+  still signs in. Audit row `login_challenge_issued`, counter
+  `console_mfa_challenges`. The web's BFF passes the step through the
+  kit (`apiMfaPath`, the sealed `uspace_mfa` cookie) and needs
+  `CISP_WEB_MFA_CHALLENGE_SECRET` (`WEB_MFA_CHALLENGE_SECRET` in
+  compose; at least 32 bytes; without it every `/_bff/*` route answers
+  503 naming it); a Playwright test signs in in two steps.

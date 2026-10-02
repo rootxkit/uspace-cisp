@@ -11,6 +11,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/rootxkit/uspace-core/ed318"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/rootxkit/uspace-cisp/internal/bus"
 	"github.com/rootxkit/uspace-cisp/internal/dataset"
@@ -140,3 +141,59 @@ func goAccepts(t *testing.T, name string, raw []byte) string {
 func edLimits() ed318.Limits { return ed318.Limits{} }
 
 var testNow = time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
+
+// The producers a cis/change/v1 record may name: the CISP's own, and
+// the ANSP process that delivers directly to /v1/cis/notifications
+// while the CISP is unreachable (cross-plan M1, M5; uspace-ansp sends
+// ansp/api). Any other system is refused, by the OpenAPI component and
+// by the exported JSON Schema alike.
+func TestChangeProducer(t *testing.T) {
+	component := components(t)["Change"]
+	if component == nil || component.Value == nil {
+		t.Fatal("no component Change")
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "..", "schemas", "cis", "change", "v1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := jsonschema.NewCompiler()
+	if err := c.AddResource("change.json", doc); err != nil {
+		t.Fatal(err)
+	}
+	exported, err := c.Compile("change.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := os.ReadFile(filepath.Join("..", "..", "schemas", "cis", "change", "examples", "ansp-direct-restriction-created.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := func(producer string) any {
+		var v map[string]any
+		if err := json.Unmarshal(base, &v); err != nil {
+			t.Fatal(err)
+		}
+		v["producer"] = producer
+		return v
+	}
+	for _, p := range []string{"ansp/api", "ansp/manned-feed", "ansp-1/api-2", "uspace-cisp", "cisp/deliver-deliver-1"} {
+		if err := component.Value.VisitJSON(record(p)); err != nil {
+			t.Errorf("producer %q refused by the component: %v", p, err)
+		}
+		if err := exported.Validate(record(p)); err != nil {
+			t.Errorf("producer %q refused by the exported schema: %v", p, err)
+		}
+	}
+	for _, p := range []string{"ussp/api", "authority/api", "lab/api", "ansp", "ansp/", "ansp/API", "ansp-x/api", "ansp-1/api", "ansp/api/extra", "xansp/api", ""} {
+		if err := component.Value.VisitJSON(record(p)); err == nil {
+			t.Errorf("producer %q accepted by the component", p)
+		}
+		if err := exported.Validate(record(p)); err == nil {
+			t.Errorf("producer %q accepted by the exported schema", p)
+		}
+	}
+}

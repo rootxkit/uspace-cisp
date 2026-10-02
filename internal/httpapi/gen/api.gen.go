@@ -1615,7 +1615,11 @@ type AirspaceConstraints struct {
 // bbox is [min lng, min lat, max lng, max lat] of what changed,
 // absent for the whole dataset. producer is uspace-cisp on the bus,
 // the change feed and the stream, and cisp/deliver-<instance> in a
-// webhook (the deliver instance that sent it).
+// webhook (the deliver instance that sent it). A record the ANSP
+// delivers directly to /v1/cis/notifications while the CISP is
+// unreachable (cross-plan M1, M5) names the ANSP process,
+// ansp/<process> or ansp-<n>/<process>-<n> as in the common
+// envelope (ansp/api today); receivers allow-list its issuer.
 //
 // reason is an open enumeration (spec 04 section 4: values are
 // added within v1). A receiver pulls pull_url only for publication

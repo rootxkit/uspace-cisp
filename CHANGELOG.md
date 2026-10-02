@@ -266,3 +266,13 @@ additively within `/v1`.
   the ED-269 bytes with the publisher's signature. `cispctl ed269
   convert --to ed318|ed269`. The circle outline places its vertices
   with core `v1.3.0`'s `geodesy.Destination` (§15 Q43, Q45).
+
+### Changed
+
+- `cis/change/v1` takes the ANSP's degraded direct deliveries: the
+  `producer` pattern admits `ansp/<process>` and `ansp-<n>/<process>-<n>`
+  (the common envelope's forms; uspace-ansp sends `ansp/api`) besides
+  `uspace-cisp` and `cisp/deliver-<instance>`, as the one receiver path
+  `POST /v1/cis/notifications` with the CISP and the ANSP as allow-listed
+  issuers needs (cross-plan M1, M5). Any other system is still refused.
+  Additive within v1.

@@ -72,3 +72,24 @@ additively within `/v1`.
   components with examples; migration `0007_publisher_heartbeat`; the
   USSP list snapshot is its canonical form with the `cis_*` members; the
   api publishes committed changes through `internal/bus`.
+- WP-4 the read API (F3 pull) and the public subset: `GET|HEAD
+  /v1/{dataset}` (the signed snapshot from the bounded per-instance
+  cache, gzip as stored, `ETag`, `Last-Modified`, `Cache-Control`,
+  `X-CIS-Version`, `If-None-Match` 304; `bbox` on the GiST prefilter,
+  `at` keeping and marking what cannot be evaluated, `applies_at`
+  annotating `cis_applicability`, `since_version` deltas within 1000
+  versions; served stale with `X-CIS-Stale`, `X-CIS-Age-S` and
+  `no-store` when the database is gone, filtered reads 503 `cis_stale`);
+  `GET /v1/{dataset}/versions` and `/versions/{v}` (verbatim bytes, the
+  publisher's signature and kid, the CISP's signature made once per
+  version, `body_sha256` re-checked: 500 `integrity`); `GET /v1/changes`
+  (`cis/change/v1`, exported to `schemas/cis/change/v1.json`);
+  `GET /v1/status` (datasets, publisher staleness, degraded components
+  with since-times, `mtls_mode`); `GET|HEAD /public/v1/{dataset}`
+  without a token, the USSP list without `base_url` and
+  `certificate_id`, rate-limited per client address (`CISP_PUBLIC_RPM`,
+  burst 10, HEAD and 304 at ten times, 10 000 clients LRU,
+  `CISP_TRUSTED_PROXY_CIDR` for `X-Forwarded-For`);
+  `internal/applicability` (`ed318.Applies` at the feature's centroid,
+  unknown kept); the dataset-first routes registered per dataset;
+  `golang.org/x/time` for the token buckets.

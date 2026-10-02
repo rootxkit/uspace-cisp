@@ -197,6 +197,12 @@ type StoredPublication struct {
 	PublisherSignature *string
 	SignatureKID       *string
 	ReceivedAt         time.Time
+	// SourceBody, SourceSHA256 and SourceContentType are what the
+	// publisher sent when Body was mapped from another format (ED-269,
+	// WP-12); nil otherwise. PublisherSignature then covers SourceBody.
+	SourceBody        []byte
+	SourceSHA256      []byte
+	SourceContentType *string
 }
 
 // Publication is one stored version; ErrNotFound when there is none.
@@ -211,7 +217,7 @@ func (s *Store) Publication(ctx context.Context, ds publication.Dataset, version
 	return StoredPublication{
 		Dataset: ds, Version: p.Version, Body: p.Body, BodySHA256: p.BodySha256, ContentType: p.ContentType,
 		PublisherClientID: p.PublisherClientID, PublisherSignature: p.PublisherSignature, SignatureKID: p.SignatureKid,
-		ReceivedAt: p.ReceivedAt,
+		ReceivedAt: p.ReceivedAt, SourceBody: p.SourceBody, SourceSHA256: p.SourceSha256, SourceContentType: p.SourceContentType,
 	}, nil
 }
 

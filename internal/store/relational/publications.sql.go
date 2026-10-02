@@ -130,7 +130,8 @@ func (q *Queries) GetDataset(ctx context.Context, name string) (Dataset, error) 
 const getPublication = `-- name: GetPublication :one
 SELECT id, dataset, version, publisher_client_id, received_at, body, body_sha256,
        content_type, publisher_signature, signature_kid, feature_count, added,
-       changed, removed, supersedes_version, warnings, reason
+       changed, removed, supersedes_version, warnings, reason, source_body,
+       source_sha256, source_content_type
 FROM publications
 WHERE dataset = $1 AND version = $2
 `
@@ -161,6 +162,9 @@ func (q *Queries) GetPublication(ctx context.Context, arg GetPublicationParams) 
 		&i.SupersedesVersion,
 		&i.Warnings,
 		&i.Reason,
+		&i.SourceBody,
+		&i.SourceSha256,
+		&i.SourceContentType,
 	)
 	return i, err
 }
@@ -269,9 +273,11 @@ const insertPublication = `-- name: InsertPublication :exec
 INSERT INTO publications (
     id, dataset, version, publisher_client_id, received_at, body, body_sha256,
     content_type, publisher_signature, signature_kid, feature_count, added,
-    changed, removed, supersedes_version, warnings, reason
+    changed, removed, supersedes_version, warnings, reason, source_body,
+    source_sha256, source_content_type
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+    $18, $19, $20
 )
 `
 
@@ -293,6 +299,9 @@ type InsertPublicationParams struct {
 	SupersedesVersion  *int64
 	Warnings           []byte
 	Reason             string
+	SourceBody         []byte
+	SourceSha256       []byte
+	SourceContentType  *string
 }
 
 func (q *Queries) InsertPublication(ctx context.Context, arg InsertPublicationParams) error {
@@ -314,6 +323,9 @@ func (q *Queries) InsertPublication(ctx context.Context, arg InsertPublicationPa
 		arg.SupersedesVersion,
 		arg.Warnings,
 		arg.Reason,
+		arg.SourceBody,
+		arg.SourceSha256,
+		arg.SourceContentType,
 	)
 	return err
 }

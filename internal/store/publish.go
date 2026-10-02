@@ -58,6 +58,10 @@ type PublishInput struct {
 	// PublisherSignature and SignatureKID are the publisher's detached
 	// JWS and its key id; nil for versions the CISP makes (expiry).
 	PublisherSignature, SignatureKID *string
+	// Source, when set, is what the publisher sent when Body was mapped
+	// from another format (an ED-269 publication, WP-12): kept verbatim
+	// beside the mapped Body, and the bytes PublisherSignature covers.
+	Source *Source
 	// Collection is the whole dataset at the new version (ED-318
 	// datasets); nil for ussp_list, whose snapshot is Body.
 	Collection *ed318.FeatureCollection
@@ -86,6 +90,29 @@ type PublishInput struct {
 	// (the restrictions lifecycle, WP-5: the head, its event and the
 	// version commit together or not at all).
 	Before func(ctx context.Context, tx BeforeTx) (Prepared, error)
+}
+
+// Source is a publication's bytes as the publisher sent them, in the
+// format they were mapped from.
+type Source struct {
+	Body        []byte
+	ContentType string
+}
+
+// sourceColumns are the publications.source_* values of a Source: all
+// null without one (migration 0013).
+type sourceColumns struct {
+	body, sha256 []byte
+	contentType  *string
+}
+
+func sourceOf(src *Source) sourceColumns {
+	if src == nil {
+		return sourceColumns{}
+	}
+	sum := sha256.Sum256(src.Body)
+	ct := src.ContentType
+	return sourceColumns{body: src.Body, sha256: sum[:], contentType: &ct}
 }
 
 // BeforeTx is what PublishInput.Before is handed inside the transaction.
@@ -223,6 +250,7 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 		received = now
 	}
 	bodySHA := sha256.Sum256(in.Body)
+	src := sourceOf(in.Source)
 	// The USSP list is compared by its canonical content (D3), so a
 	// re-publication that differs only in whitespace or member order is
 	// unchanged.
@@ -322,6 +350,7 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 			FeatureCount: int32(len(next)), Added: int32(len(diff.Added)),
 			Changed: int32(len(diff.Changed)), Removed: int32(len(diff.Removed)),
 			SupersedesVersion: supersedes, Warnings: warnings, Reason: string(in.Reason),
+			SourceBody: src.body, SourceSha256: src.sha256, SourceContentType: src.contentType,
 		}); err != nil {
 			return fmt.Errorf("insert publication: %w", err)
 		}

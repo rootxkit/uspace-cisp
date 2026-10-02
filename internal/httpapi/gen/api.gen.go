@@ -603,6 +603,21 @@ func (e PublicationResultDataset) Valid() bool {
 	}
 }
 
+// Defines values for PublicationResultMappedFrom.
+const (
+	PublicationResultMappedFromEd269 PublicationResultMappedFrom = "ed269"
+)
+
+// Valid indicates whether the value is a known member of the PublicationResultMappedFrom enum.
+func (e PublicationResultMappedFrom) Valid() bool {
+	switch e {
+	case PublicationResultMappedFromEd269:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PublicationVersionReason.
 const (
 	PublicationVersionReasonPublication          PublicationVersionReason = "publication"
@@ -1548,6 +1563,21 @@ func (e ListDatasetVersionsParamsDataset) Valid() bool {
 	}
 }
 
+// Defines values for GetDatasetVersionParamsFormat.
+const (
+	GetDatasetVersionParamsFormatEd269 GetDatasetVersionParamsFormat = "ed269"
+)
+
+// Valid indicates whether the value is a known member of the GetDatasetVersionParamsFormat enum.
+func (e GetDatasetVersionParamsFormat) Valid() bool {
+	switch e {
+	case GetDatasetVersionParamsFormatEd269:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetDatasetVersionParamsDataset.
 const (
 	GetDatasetVersionParamsDatasetRestrictions   GetDatasetVersionParamsDataset = "restrictions"
@@ -2017,6 +2047,12 @@ type DisplayGeometry struct {
 // DisplayGeometryType defines model for DisplayGeometry.Type.
 type DisplayGeometryType string
 
+// ED269Document A EUROCAE ED-269 geo-zone document (a features list, optionally
+// in a UASZoneList wrapper), as uspace-core/ed269 reads and writes
+// it. The server validates it with uspace-core; this schema does
+// not.
+type ED269Document = json.RawMessage
+
 // FieldProblem defines model for FieldProblem.
 type FieldProblem struct {
 	// Field The JSON path or parameter name.
@@ -2160,11 +2196,15 @@ type PublicationResult struct {
 	Dataset      PublicationResultDataset `json:"dataset"`
 
 	// Etag Examples: "zones:5"
-	Etag         string     `json:"etag"`
-	FeatureCount *int       `json:"feature_count,omitempty"`
-	ReceivedAt   *time.Time `json:"received_at,omitempty"`
-	Removed      *[]string  `json:"removed,omitempty"`
-	RemovedCount *int       `json:"removed_count,omitempty"`
+	Etag         string `json:"etag"`
+	FeatureCount *int   `json:"feature_count,omitempty"`
+
+	// MappedFrom ed269 when the publication was an ED-269 document that
+	// uspace-core mapped onto ED-318 (WP-12); absent otherwise.
+	MappedFrom   *PublicationResultMappedFrom `json:"mapped_from,omitempty"`
+	ReceivedAt   *time.Time                   `json:"received_at,omitempty"`
+	Removed      *[]string                    `json:"removed,omitempty"`
+	RemovedCount *int                         `json:"removed_count,omitempty"`
 
 	// Truncated How many identifiers each list left out.
 	Truncated *struct {
@@ -2179,6 +2219,10 @@ type PublicationResult struct {
 
 // PublicationResultDataset defines model for PublicationResult.Dataset.
 type PublicationResultDataset string
+
+// PublicationResultMappedFrom ed269 when the publication was an ED-269 document that
+// uspace-core mapped onto ED-318 (WP-12); absent otherwise.
+type PublicationResultMappedFrom string
 
 // PublicationVersion defines model for PublicationVersion.
 type PublicationVersion struct {
@@ -2947,6 +2991,12 @@ type ListPublicationsParamsDataset string
 
 // PutPublicationParams defines parameters for PutPublication.
 type PutPublicationParams struct {
+	// Lang The language of an ED-269 document's single-string texts
+	// (name, message, otherReasonInfo, the authority texts), as an
+	// ED-318 language tag of 1 to 5 characters; ka when absent.
+	// Only read for application/vnd.ed269+json.
+	Lang *string `form:"lang,omitempty" json:"lang,omitempty"`
+
 	// IfMatch The current ETag; required by the server (428 when absent).
 	IfMatch *string `json:"If-Match,omitempty"`
 
@@ -3079,8 +3129,23 @@ type ListDatasetVersionsParamsDataset string
 
 // GetDatasetVersionParams defines parameters for GetDatasetVersion.
 type GetDatasetVersionParams struct {
+	// Format ed269 exports the version as an ED-269 document.
+	Format *GetDatasetVersionParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+
+	// Source With format=ed269: the ED-269 bytes the publisher sent,
+	// verbatim (400 without format=ed269).
+	Source *bool `form:"source,omitempty" json:"source,omitempty"`
+
+	// Lang With format=ed269: the language whose text an ED-269
+	// single-string field takes (else English, else the first; the
+	// whole list is carried in extendedProperties.ed269.texts); ka
+	// when absent.
+	Lang        *string      `form:"lang,omitempty" json:"lang,omitempty"`
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
+
+// GetDatasetVersionParamsFormat defines parameters for GetDatasetVersion.
+type GetDatasetVersionParamsFormat string
 
 // GetDatasetVersionParamsDataset defines parameters for GetDatasetVersion.
 type GetDatasetVersionParamsDataset string
@@ -3114,6 +3179,9 @@ type PutPublicationApplicationGeoPlusJSONRequestBody = PublicationBody
 
 // PutPublicationJSONRequestBody defines body for PutPublication for application/json ContentType.
 type PutPublicationJSONRequestBody = PublicationBody
+
+// PutPublicationApplicationVndEd269PlusJSONRequestBody defines body for PutPublication for application/vnd.ed269+json ContentType.
+type PutPublicationApplicationVndEd269PlusJSONRequestBody = ED269Document
 
 // PostPublisherHeartbeatJSONRequestBody defines body for PostPublisherHeartbeat for application/json ContentType.
 type PostPublisherHeartbeatJSONRequestBody = PublisherHeartbeat
@@ -4344,6 +4412,19 @@ func (siw *ServerInterfaceWrapper) PutPublication(w http.ResponseWriter, r *http
 	// Parameter object where we will unmarshal all parameters from the context
 	var params PutPublicationParams
 
+	// ------------- Optional query parameter "lang" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "lang", r.URL.Query(), &params.Lang, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "lang"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lang", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "If-Match" -------------
@@ -5236,6 +5317,45 @@ func (siw *ServerInterfaceWrapper) GetDatasetVersion(w http.ResponseWriter, r *h
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetDatasetVersionParams
+
+	// ------------- Optional query parameter "format" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "format", r.URL.Query(), &params.Format, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source", r.URL.Query(), &params.Source, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "lang" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "lang", r.URL.Query(), &params.Lang, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "lang"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lang", Err: err})
+		}
+		return
+	}
 
 	headers := r.Header
 
@@ -8440,10 +8560,11 @@ func (response ListPublicationsdefaultApplicationProblemPlusJSONResponse) VisitL
 }
 
 type PutPublicationRequestObject struct {
-	Dataset                    PutPublicationParamsDataset `json:"dataset"`
-	Params                     PutPublicationParams
-	ApplicationGeoPlusJSONBody *PutPublicationApplicationGeoPlusJSONRequestBody
-	JSONBody                   *PutPublicationJSONRequestBody
+	Dataset                         PutPublicationParamsDataset `json:"dataset"`
+	Params                          PutPublicationParams
+	ApplicationGeoPlusJSONBody      *PutPublicationApplicationGeoPlusJSONRequestBody
+	JSONBody                        *PutPublicationJSONRequestBody
+	ApplicationVndEd269PlusJSONBody *PutPublicationApplicationVndEd269PlusJSONRequestBody
 }
 
 type PutPublicationResponseObject interface {
@@ -10832,6 +10953,7 @@ type GetDatasetVersion200ResponseHeaders struct {
 	CacheControl        *string
 	ETag                *string
 	LastModified        *string
+	XCISMappedFrom      *string
 	XCISSignature       string
 	XCISVersion         *int64
 	XPublisherKid       *string
@@ -10858,6 +10980,9 @@ func (response GetDatasetVersion200ApplicationGeoPlusJSONResponse) VisitGetDatas
 	}
 	if response.Headers.LastModified != nil {
 		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.XCISMappedFrom != nil {
+		w.Header().Set("X-CIS-Mapped-From", fmt.Sprint(*response.Headers.XCISMappedFrom))
 	}
 	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
 	if response.Headers.XCISVersion != nil {
@@ -10894,6 +11019,48 @@ func (response GetDatasetVersion200JSONResponse) VisitGetDatasetVersionResponse(
 	}
 	if response.Headers.LastModified != nil {
 		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.XCISMappedFrom != nil {
+		w.Header().Set("X-CIS-Mapped-From", fmt.Sprint(*response.Headers.XCISMappedFrom))
+	}
+	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	if response.Headers.XPublisherKid != nil {
+		w.Header().Set("X-Publisher-Kid", fmt.Sprint(*response.Headers.XPublisherKid))
+	}
+	if response.Headers.XPublisherSignature != nil {
+		w.Header().Set("X-Publisher-Signature", fmt.Sprint(*response.Headers.XPublisherSignature))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion200ApplicationVndEd269PlusJSONResponse struct {
+	Body    ED269Document
+	Headers GetDatasetVersion200ResponseHeaders
+}
+
+func (response GetDatasetVersion200ApplicationVndEd269PlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/vnd.ed269+json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.XCISMappedFrom != nil {
+		w.Header().Set("X-CIS-Mapped-From", fmt.Sprint(*response.Headers.XCISMappedFrom))
 	}
 	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
 	if response.Headers.XCISVersion != nil {
@@ -10983,6 +11150,20 @@ func (response GetDatasetVersion404ApplicationProblemPlusJSONResponse) VisitGetD
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion406ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDatasetVersion406ApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(406)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11933,6 +12114,16 @@ func (sh *strictHandler) PutPublication(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 		request.JSONBody = &body
+
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/vnd.ed269+json") {
+
+		var body PutPublicationApplicationVndEd269PlusJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.ApplicationVndEd269PlusJSONBody = &body
 
 	}
 

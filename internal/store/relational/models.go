@@ -161,6 +161,10 @@ type Publication struct {
 	SupersedesVersion  *int64
 	Warnings           []byte
 	Reason             string
+	// The publisher's bytes when the version was mapped from another format (ED-269, WP-12); body holds the mapped ED-318. The publisher signature covers these bytes.
+	SourceBody        []byte
+	SourceSha256      []byte
+	SourceContentType *string
 }
 
 // Every publication attempt with its outcome and problems (Annex III A(5)); insert-only.

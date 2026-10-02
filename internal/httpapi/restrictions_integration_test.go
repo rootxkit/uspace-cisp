@@ -258,33 +258,53 @@ func TestRestrictionPlacementOnPostgres(t *testing.T) {
 	}
 }
 
-// The expiry on PostgreSQL: an active restriction one second past its
-// ends_at is ended by the next tick with ended_by expiry, a
-// restriction_expired version and change, and a job_runs row; a second
-// replica asking for the lock while the first holds it skips the run.
+// The expiry on PostgreSQL, judged on the database's clock (E-01 both
+// ways): with this process's clock an hour late, an active restriction
+// whose ends_at the database has passed is ended by the next tick
+// (ended_by expiry, a restriction_expired version, job_runs at the
+// database's now()); with the process clock two hours early, one whose
+// ends_at the database has not reached stays active. A second replica
+// asking for the lock while the first holds it skips the run.
 func TestRestrictionExpiryOnPostgres(t *testing.T) {
-	h, st, t0 := pgRestrictions(t)
-	fid := darID(t)
-	ends := t0.Add(2 * time.Second)
-	rec := h.postRestriction(createDoc(anspRefOf("NOTAM-EXP"), 1, "active", fid, t0, ends))
+	ctx := context.Background()
+	h, st, _ := pgRestrictions(t)
+	dbNow := func() time.Time {
+		t.Helper()
+		var now time.Time
+		if err := st.Pool().QueryRow(ctx, "SELECT now()").Scan(&now); err != nil {
+			t.Fatal(err)
+		}
+		return now.UTC().Truncate(time.Second)
+	}
+	db := dbNow()
+	late := db.Add(-time.Hour)
+
+	// Created while the process clock is an hour late, it ended 10 s ago
+	// on the database's clock.
+	h.processAt(late)
+	gone := darID(t)
+	rec := h.postRestriction(createDoc(anspRefOf("NOTAM-EXP"), 1, "active", gone, late, db.Add(-10*time.Second)))
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create = %d %s", rec.Code, rec.Body.String())
 	}
-	id := decodeRestriction(t, rec).Restriction.Id
-	h.at(ends.Add(-time.Second))
-	if _, ran, err := h.rs.ExpireTick(context.Background()); err != nil || !ran {
-		t.Fatalf("tick before: %v %v", ran, err)
+	goneID := decodeRestriction(t, rec).Restriction.Id
+	// One that ends in an hour, while the process clock runs two hours
+	// early.
+	h.processAt(db)
+	stays := darID(t)
+	rec = h.postRestriction(createDoc(anspRefOf("NOTAM-STAY"), 1, "active", stays, db, db.Add(time.Hour)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create = %d %s", rec.Code, rec.Body.String())
 	}
-	if head, _ := st.Restriction(context.Background(), id, false); head.State != restriction.StateActive {
-		t.Fatalf("expired one second early: %s", head.State)
-	}
+	staysID := decodeRestriction(t, rec).Restriction.Id
+
 	before := datasetVersion(t, st)
-	h.at(ends.Add(time.Second))
-	n, ran, err := h.rs.ExpireTick(context.Background())
+	h.processAt(late)
+	n, ran, err := h.rs.ExpireTick(ctx)
 	if err != nil || !ran || n < 1 {
-		t.Fatalf("tick after: %d %v %v", n, ran, err)
+		t.Fatalf("tick with a late process clock: %d %v %v", n, ran, err)
 	}
-	head, err := st.Restriction(context.Background(), id, false)
+	head, err := st.Restriction(ctx, goneID, false)
 	if err != nil || head.State != restriction.StateEnded || head.EndedBy == nil || *head.EndedBy != restriction.EndedByExpiry {
 		t.Fatalf("head %+v %v", head.Head, err)
 	}
@@ -292,20 +312,32 @@ func TestRestrictionExpiryOnPostgres(t *testing.T) {
 	if last.Op != restriction.OpExpire || last.Actor != store.SystemActor || last.PublicationID == nil {
 		t.Errorf("event %+v", last)
 	}
-	pub, err := relational.New(st.Pool()).GetPublication(context.Background(), relational.GetPublicationParams{Dataset: "restrictions", Version: datasetVersion(t, st)})
+	pub, err := relational.New(st.Pool()).GetPublication(ctx, relational.GetPublicationParams{Dataset: "restrictions", Version: datasetVersion(t, st)})
 	if err != nil || pub.Reason != string(publication.ReasonRestrictionExpired) || pub.PublisherSignature != nil || pub.PublisherClientID != store.SystemPublisher {
 		t.Errorf("expiry publication %+v %v", pub.Reason, err)
 	}
 	if datasetVersion(t, st) < before+1 {
 		t.Errorf("no version: %d", datasetVersion(t, st))
 	}
-	run, err := st.LastJobRun(context.Background(), JobRestrictionExpiry)
-	if err != nil || !run.RanAt.Equal(ends.Add(time.Second)) || run.Instance != "test/1" || run.Count < 1 {
-		t.Errorf("job run %+v %v", run, err)
+	run, err := st.LastJobRun(ctx, JobRestrictionExpiry)
+	if err != nil || run.RanAt.Sub(db).Abs() > time.Minute || run.Age > time.Minute || run.Instance != "test/1" || run.Count < 1 {
+		t.Errorf("job run %+v %v (database now %v, process clock %v)", run, err, db, late)
 	}
+
+	h.processAt(db.Add(2 * time.Hour))
+	if _, _, err := h.rs.ExpireTick(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if head, _ := st.Restriction(ctx, staysID, false); head.State != restriction.StateActive {
+		t.Errorf("an early process clock ended a restriction before its ends_at: %s", head.State)
+	}
+	if end := h.patchRestriction(staysID, doc{"op": "end", "ansp_version": 2}); end.Code != http.StatusOK {
+		t.Fatalf("end = %d", end.Code)
+	}
+
 	// The leader lock: a second replica inside the first's run skips.
-	ran, err = st.RunJob(context.Background(), "wp5_lock_test", "a", t0, func(ctx context.Context) (int, error) {
-		inner, err := st.RunJob(ctx, "wp5_lock_test", "b", t0, func(context.Context) (int, error) { return 0, nil })
+	ran, err = st.RunJob(ctx, "wp5_lock_test", "a", func(ctx context.Context, _ time.Time) (int, error) {
+		inner, err := st.RunJob(ctx, "wp5_lock_test", "b", func(context.Context, time.Time) (int, error) { return 0, nil })
 		if err != nil || inner {
 			t.Errorf("the second replica ran: %v %v", inner, err)
 		}
@@ -314,7 +346,7 @@ func TestRestrictionExpiryOnPostgres(t *testing.T) {
 	if err != nil || !ran {
 		t.Errorf("the first replica: %v %v", ran, err)
 	}
-	t.Logf("expired %s on PostgreSQL: %d this tick, job run %+v", fid, n, run)
+	t.Logf("expired %s on PostgreSQL by the database's clock (process clock an hour late): %d this tick, job run %+v", gone, n, run)
 }
 
 // Staleness and the heartbeat references from the publishers table:

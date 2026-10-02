@@ -21,20 +21,44 @@ func (q *Queries) CountActiveRestrictions(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
+const databaseNow = `-- name: DatabaseNow :one
+SELECT now()::timestamptz AS now
+`
+
+// The database's clock (the transaction's start): the expiry and its
+// run are judged on it, never on a replica's clock.
+func (q *Queries) DatabaseNow(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRow(ctx, databaseNow)
+	var now time.Time
+	err := row.Scan(&now)
+	return now, err
+}
+
 const getJobRun = `-- name: GetJobRun :one
-SELECT name, last_run_at, last_instance, last_count
+SELECT name, last_run_at, last_instance, last_count,
+       extract(epoch FROM now() - last_run_at)::float8 AS age_s
 FROM job_runs
 WHERE name = $1
 `
 
-func (q *Queries) GetJobRun(ctx context.Context, name string) (JobRun, error) {
+type GetJobRunRow struct {
+	Name         string
+	LastRunAt    time.Time
+	LastInstance string
+	LastCount    int32
+	AgeS         float64
+}
+
+// The last run and its age on the database's clock.
+func (q *Queries) GetJobRun(ctx context.Context, name string) (GetJobRunRow, error) {
 	row := q.db.QueryRow(ctx, getJobRun, name)
-	var i JobRun
+	var i GetJobRunRow
 	err := row.Scan(
 		&i.Name,
 		&i.LastRunAt,
 		&i.LastInstance,
 		&i.LastCount,
+		&i.AgeS,
 	)
 	return i, err
 }
@@ -458,25 +482,19 @@ func (q *Queries) ListRestrictions(ctx context.Context, arg ListRestrictionsPara
 
 const recordJobRun = `-- name: RecordJobRun :exec
 INSERT INTO job_runs (name, last_run_at, last_instance, last_count)
-VALUES ($1, $2, $3, $4)
+VALUES ($1, now(), $2, $3)
 ON CONFLICT (name) DO UPDATE
 SET last_run_at = EXCLUDED.last_run_at, last_instance = EXCLUDED.last_instance, last_count = EXCLUDED.last_count
 `
 
 type RecordJobRunParams struct {
 	Name     string
-	RanAt    time.Time
 	Instance string
 	Count    int32
 }
 
 func (q *Queries) RecordJobRun(ctx context.Context, arg RecordJobRunParams) error {
-	_, err := q.db.Exec(ctx, recordJobRun,
-		arg.Name,
-		arg.RanAt,
-		arg.Instance,
-		arg.Count,
-	)
+	_, err := q.db.Exec(ctx, recordJobRun, arg.Name, arg.Instance, arg.Count)
 	return err
 }
 

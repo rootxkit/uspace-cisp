@@ -80,14 +80,21 @@ SELECT count(*)::bigint FROM restrictions WHERE state = 'active';
 -- transaction ends; the others skip the run.
 SELECT pg_try_advisory_xact_lock(hashtext('cisp.job.' || sqlc.arg(name)::text)::bigint) AS locked;
 
+-- name: DatabaseNow :one
+-- The database's clock (the transaction's start): the expiry and its
+-- run are judged on it, never on a replica's clock.
+SELECT now()::timestamptz AS now;
+
 -- name: RecordJobRun :exec
 INSERT INTO job_runs (name, last_run_at, last_instance, last_count)
-VALUES (sqlc.arg(name), sqlc.arg(ran_at), sqlc.arg(instance), sqlc.arg(count))
+VALUES (sqlc.arg(name), now(), sqlc.arg(instance), sqlc.arg(count))
 ON CONFLICT (name) DO UPDATE
 SET last_run_at = EXCLUDED.last_run_at, last_instance = EXCLUDED.last_instance, last_count = EXCLUDED.last_count;
 
 -- name: GetJobRun :one
-SELECT name, last_run_at, last_instance, last_count
+-- The last run and its age on the database's clock.
+SELECT name, last_run_at, last_instance, last_count,
+       extract(epoch FROM now() - last_run_at)::float8 AS age_s
 FROM job_runs
 WHERE name = $1;
 

@@ -366,7 +366,8 @@ func withEvents(ctx context.Context, q *relational.Queries, recs []RestrictionRe
 }
 
 // ExpiredRestrictions are the ids of the active heads whose ends_at is
-// not after now, at most limit, soonest first.
+// not after now, at most limit, soonest first. now is the database's
+// clock RunJob hands the expiry.
 func (s *Store) ExpiredRestrictions(ctx context.Context, now time.Time, limit int) ([]string, error) {
 	ids, err := relational.New(s.pool).ListExpiredRestrictions(ctx, relational.ListExpiredRestrictionsParams{
 		Now: now.UTC(), MaxRows: int32(min(max(limit, 0), 1<<20)),
@@ -428,10 +429,13 @@ func (s *Store) PublishersRefs(ctx context.Context) ([]PublisherRefs, error) {
 
 // JobRun is the last run of a leader-elected job.
 type JobRun struct {
-	Name     string
+	Name string
+	// RanAt is the database's clock when the run committed.
 	RanAt    time.Time
 	Instance string
 	Count    int
+	// Age is how long ago it ran, on the database's clock.
+	Age time.Duration
 }
 
 // LastJobRun is the job's last run; ErrNotFound before the first.
@@ -443,16 +447,21 @@ func (s *Store) LastJobRun(ctx context.Context, name string) (JobRun, error) {
 	if err != nil {
 		return JobRun{}, fmt.Errorf("job run %s: %w", name, err)
 	}
-	return JobRun{Name: r.Name, RanAt: r.LastRunAt.UTC(), Instance: r.LastInstance, Count: int(r.LastCount)}, nil
+	return JobRun{
+		Name: r.Name, RanAt: r.LastRunAt.UTC(), Instance: r.LastInstance, Count: int(r.LastCount),
+		Age: time.Duration(r.AgeS * float64(time.Second)),
+	}, nil
 }
 
 // RunJob runs fn as the one leader of the job name for this run: it
 // takes the job's transaction-scoped advisory lock without waiting (a
-// replica that does not get it skips the run, ran false) and, when fn
-// succeeds, records the run in job_runs with fn's count. The lock is held
-// until the record commits, so two replicas never run the job at once.
-// fn does its own writes in its own transactions.
-func (s *Store) RunJob(ctx context.Context, name, instance string, now time.Time, fn func(ctx context.Context) (int, error)) (bool, error) {
+// replica that does not get it skips the run, ran false), hands fn the
+// database's clock (now() of the job's transaction: no replica's clock
+// decides), and, when fn succeeds, records the run in job_runs at the
+// database's now() with fn's count. The lock is held until the record
+// commits, so two replicas never run the job at once. fn does its own
+// writes in its own transactions.
+func (s *Store) RunJob(ctx context.Context, name, instance string, fn func(ctx context.Context, now time.Time) (int, error)) (bool, error) {
 	ran := false
 	err := s.tx(ctx, func(_ pgx.Tx, q *relational.Queries) error {
 		locked, err := q.TryJobLock(ctx, name)
@@ -462,13 +471,17 @@ func (s *Store) RunJob(ctx context.Context, name, instance string, now time.Time
 		if !locked {
 			return nil
 		}
-		n, err := fn(ctx)
+		now, err := q.DatabaseNow(ctx)
+		if err != nil {
+			return fmt.Errorf("job %s clock: %w", name, err)
+		}
+		n, err := fn(ctx, now.UTC())
 		if err != nil {
 			return err
 		}
 		ran = true
 		return q.RecordJobRun(ctx, relational.RecordJobRunParams{
-			Name: name, RanAt: now.UTC(), Instance: instance, Count: int32(min(max(n, 0), 1<<30)),
+			Name: name, Instance: instance, Count: int32(min(max(n, 0), 1<<30)),
 		})
 	})
 	if err != nil {

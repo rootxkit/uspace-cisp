@@ -100,7 +100,7 @@ type RestrictionStore interface {
 	ExpiredRestrictions(ctx context.Context, now time.Time, limit int) ([]string, error)
 	ActiveRestrictionRefs(ctx context.Context) ([]string, error)
 	CountActiveRestrictions(ctx context.Context) (int64, error)
-	RunJob(ctx context.Context, name, instance string, now time.Time, fn func(ctx context.Context) (int, error)) (bool, error)
+	RunJob(ctx context.Context, name, instance string, fn func(ctx context.Context, now time.Time) (int, error)) (bool, error)
 	LastJobRun(ctx context.Context, name string) (store.JobRun, error)
 	PublishersRefs(ctx context.Context) ([]store.PublisherRefs, error)
 }

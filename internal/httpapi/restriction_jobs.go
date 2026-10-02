@@ -110,17 +110,19 @@ func (rs *Restrictions) Report(ctx context.Context) (*RestrictionStatusReport, e
 		return nil, err
 	}
 	out.Active = n
-	last := rs.Started
+	// The age of the last run is the database's (its clock wrote it);
+	// before the first run, this process's uptime is the age.
+	age := now.Sub(rs.Started)
 	run, err := rs.Store.LastJobRun(ctx, JobRestrictionExpiry)
 	switch {
 	case err == nil:
 		at, inst, count := run.RanAt.UTC(), run.Instance, run.Count
 		out.Expiry.LastRunAt, out.Expiry.LastInstance, out.Expiry.LastCount = &at, &inst, &count
-		last = at
+		age = run.Age
 	case !errors.Is(err, store.ErrNotFound):
 		return nil, err
 	}
-	out.Expiry.Stale = now.Sub(last) > rs.staleAfter()
+	out.Expiry.Stale = age > rs.staleAfter()
 	out.expiryStale = out.Expiry.Stale
 	pubs, err := rs.Store.PublishersRefs(ctx)
 	if err != nil {
@@ -215,10 +217,12 @@ func (rs *Restrictions) expiryFailures() float64 { return rs.failuresGauge().Val
 // actor system). Nothing else ends a restriction here. It returns how
 // many expired and whether this replica ran the job.
 func (rs *Restrictions) ExpireTick(ctx context.Context) (int, bool, error) {
-	now := rs.now()
 	exp := rs.status().Component(ExpiryComponent)
 	failures, expired := 0, 0
-	ran, err := rs.Store.RunJob(ctx, JobRestrictionExpiry, rs.Instance, now, func(ctx context.Context) (int, error) {
+	// now is the database's clock: a replica whose clock runs late never
+	// keeps a restriction past its ends_at, and one whose clock runs early
+	// never ends one before it.
+	ran, err := rs.Store.RunJob(ctx, JobRestrictionExpiry, rs.Instance, func(ctx context.Context, now time.Time) (int, error) {
 		ids, err := rs.Store.ExpiredRestrictions(ctx, now, MaxExpiredPerTick)
 		if err != nil {
 			return 0, err

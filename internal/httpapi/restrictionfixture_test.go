@@ -42,6 +42,20 @@ type fakeRestrictions struct {
 	refsErr error
 	// refs are the publishers' declared refs (PublishersRefs).
 	declared map[string][]string
+	// clock is the database's clock (RunJob, LastJobRun); nil is
+	// time.Now. The harness's at sets it with the restrictions' clock.
+	clock func() time.Time
+}
+
+// The fake is a RestrictionStore (a mismatch would leave the harness
+// without restrictions at run time).
+var _ RestrictionStore = (*fakeStore)(nil)
+
+func (r *fakeRestrictions) now() time.Time {
+	if r.clock == nil {
+		return time.Now().UTC()
+	}
+	return r.clock()
 }
 
 func (f *fakeStore) rs() *fakeRestrictions {
@@ -258,7 +272,7 @@ func (f *fakeStore) CountActiveRestrictions(ctx context.Context) (int64, error) 
 	return int64(len(refs)), err
 }
 
-func (f *fakeStore) RunJob(ctx context.Context, name, instance string, now time.Time, fn func(ctx context.Context) (int, error)) (bool, error) {
+func (f *fakeStore) RunJob(ctx context.Context, name, instance string, fn func(ctx context.Context, now time.Time) (int, error)) (bool, error) {
 	f.mu.Lock()
 	if f.down {
 		f.mu.Unlock()
@@ -268,8 +282,9 @@ func (f *fakeStore) RunJob(ctx context.Context, name, instance string, now time.
 		f.mu.Unlock()
 		return false, nil
 	}
+	now := f.rs().now()
 	f.mu.Unlock()
-	n, err := fn(ctx)
+	n, err := fn(ctx, now)
 	if err != nil {
 		return false, err
 	}
@@ -289,6 +304,7 @@ func (f *fakeStore) LastJobRun(_ context.Context, name string) (store.JobRun, er
 	if !ok {
 		return store.JobRun{}, store.ErrNotFound
 	}
+	r.Age = f.rs().now().Sub(r.RanAt)
 	return r, nil
 }
 
@@ -333,8 +349,17 @@ func (h *pubHarness) withRestrictions(st PublicationStore, server *Server, statu
 	server.Status.Restrictions = h.rs.Report
 }
 
-// at sets the restrictions' clock.
-func (h *pubHarness) at(t time.Time) { h.rs.Now = func() time.Time { return t } }
+// at sets the restrictions' clock and, on the fake store, the
+// database's.
+func (h *pubHarness) at(t time.Time) {
+	h.rs.Now = func() time.Time { return t }
+	if h.fake != nil {
+		h.fake.rs().clock = func() time.Time { return t }
+	}
+}
+
+// processAt sets only the restrictions' (the process's) clock.
+func (h *pubHarness) processAt(t time.Time) { h.rs.Now = func() time.Time { return t } }
 
 func (h *pubHarness) anspToken() string {
 	return h.token(anspID, auth.ScopePublishRestrictions, auth.ScopeRead)

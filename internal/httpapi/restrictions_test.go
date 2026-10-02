@@ -969,3 +969,36 @@ func TestCisRestrictionMember(t *testing.T) {
 	h.State = "gone"
 	check(restriction.MemberOf(h), false)
 }
+
+// The expiry and its staleness are judged on the database's clock, never
+// this process's (E-01 both ways): a process clock hours early ends
+// nothing before the database reaches ends_at, a process clock hours late
+// keeps nothing past it, and the last run's age is the database's.
+func TestRestrictionExpiryDatabaseClock(t *testing.T) {
+	h, t0 := restrictionHarness(t)
+	a := decodeRestriction(t, h.postRestriction(createDoc("NOTAM-DB1", 1, "active", "DARDB01", t0, t0.Add(time.Hour)))).Restriction.Id
+	db := func(at time.Time) { h.fake.rs().clock = func() time.Time { return at } }
+
+	h.processAt(t0.Add(3 * time.Hour))
+	db(t0.Add(30 * time.Minute))
+	if n, _, err := h.rs.ExpireTick(context.Background()); err != nil || n != 0 || h.fake.rs().heads[a].State != restriction.StateActive {
+		t.Fatalf("early process clock: %d %v %s", n, err, h.fake.rs().heads[a].State)
+	}
+	h.processAt(t0)
+	db(t0.Add(time.Hour))
+	if n, _, err := h.rs.ExpireTick(context.Background()); err != nil || n != 1 || h.fake.rs().heads[a].State != restriction.StateEnded {
+		t.Fatalf("late process clock: %d %v %s", n, err, h.fake.rs().heads[a].State)
+	}
+	if run := h.fake.rs().jobs[JobRestrictionExpiry]; !run.RanAt.Equal(t0.Add(time.Hour)) {
+		t.Errorf("job run at %v, not the database's clock", run.RanAt)
+	}
+	// The age is the database's: the process clock 31 s on says nothing.
+	h.processAt(t0.Add(time.Hour + 31*time.Second))
+	if rep, err := h.rs.Report(context.Background()); err != nil || rep.Expiry.Stale {
+		t.Errorf("process clock 31 s on: stale %v %v", rep.Expiry.Stale, err)
+	}
+	db(t0.Add(time.Hour + 31*time.Second))
+	if rep, err := h.rs.Report(context.Background()); err != nil || !rep.Expiry.Stale {
+		t.Errorf("database clock 31 s on: stale %v %v", rep.Expiry.Stale, err)
+	}
+}

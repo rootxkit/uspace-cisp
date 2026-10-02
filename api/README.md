@@ -35,6 +35,34 @@ shape of its `Problem` schema (`type` =
 
 Never edit anything under `internal/httpapi/gen/` by hand.
 
+## Webhooks (F3 push)
+
+A subscription (`POST /v1/subscriptions`, scope `cis.read`) names a
+`callback_url`; the CISP POSTs every matching change there and never
+assumes the path (receivers in the ecosystem expose
+`POST /v1/cis/notifications`, M1). The body is `application/jose`, a
+compact JWS whose payload is `{iss, aud, sub, iat, jti, body}` as
+`uspace-core/auth` `SignCompact` writes it: `iss` is the CISP's issuer
+URL, `aud` the callback's host without its port, `sub` the subscription
+id, `jti` the delivery id (also in `X-CIS-Delivery-Id`), and `body` the
+`cis/change/v1` record. Verify it with core's `CompactVerifier` against
+`/.well-known/jwks.json`, answer 2xx within 2 s, and treat `jti` as the
+replay key.
+
+Act on the `reason`, an open enumeration:
+
+- `publication` and the `restriction_*` reasons: pull `pull_url` (the
+  delta from the previous version), and only when its host is the
+  CISP's public host.
+- `subscription_test` (the verification ping of a new or changed
+  subscription), `republished` (the current version announced again,
+  content unchanged) and **any reason you do not know**: acknowledge
+  with `204` and do not pull (M5, M16).
+
+A notification is a hint. Keep your own 60 s `HEAD` reconciliation on
+the dataset's `ETag`; a failed delivery is retried for 24 h but never
+blocks a newer one. `test/e2e/subscriber` is the reference receiver.
+
 ## Verifying
 
 - `make generate-check`: the generated code is what the file produces.

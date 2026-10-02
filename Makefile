@@ -26,7 +26,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: all build vet fmt fmt-check lint tools staticcheck tidy test race cover \
         generate generate-check integration vectors secrets vulncheck \
-        dev-deps dev-deps-down image ci clean jws-smoke
+        dev-deps dev-deps-down image ci clean jws-smoke e2e
 
 all: ci
 
@@ -36,6 +36,7 @@ build:
 vet:
 	$(GO) vet $(PKGS)
 	$(GO) vet -tags integration ./...
+	$(GO) vet -tags e2e ./test/e2e/...
 
 fmt:
 	gofmt -w .
@@ -106,6 +107,19 @@ integration:
 	echo "integration: $$n top-level tests passed"; \
 	if [ "$$n" -eq 0 ]; then echo "integration: zero tests ran"; exit 1; fi
 
+# The compose-driven end to end tests (test/e2e, WP-6): PostgreSQL +
+# TimescaleDB, NATS and the reference subscriber container in compose,
+# the api, deliver and cispctl built from this checkout. Docker with
+# compose is required; fails when a test fails and when zero tests ran.
+# The latency, the kill-the-subscriber and the NATS-outage summaries go
+# to $GITHUB_STEP_SUMMARY in CI.
+e2e:
+	@set -o pipefail; \
+	(cd test/e2e && $(GO) test -tags e2e -count=1 -v -timeout 20m .) 2>&1 | tee e2e.log; \
+	n=$$(grep -c '^--- PASS' e2e.log || true); \
+	echo "e2e: $$n tests passed"; \
+	if [ "$$n" -eq 0 ]; then echo "e2e: zero tests ran"; exit 1; fi
+
 # uspace-core's vector tests with this module's build list, then this
 # module's own vector adapters (TestVectors<File>; none until WP-3).
 vectors:
@@ -152,4 +166,4 @@ image:
 ci: build vet lint race jws-smoke generate-check vectors vulncheck secrets integration
 
 clean:
-	rm -f coverage.out integration.log
+	rm -f coverage.out integration.log e2e.log

@@ -327,3 +327,26 @@ func TestStatusLineWarning(t *testing.T) {
 		t.Errorf("cleared line level = %v", got[2]["level"])
 	}
 }
+
+// A summary is printed in the healthy line and changes no level; it is
+// removed by an empty one (E-02: the branch that says nothing is wrong).
+func TestStatusLineSummary(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(&buf, "deliver", slog.LevelInfo)
+	s := NewStatus("deliver", nil, t0)
+	q := s.Component("deliver")
+	q.SetSummary("0 queued, 0 due")
+	s.Log(context.Background(), logger, t0)
+	q.SetSummary("")
+	s.Log(context.Background(), logger, t0)
+	got := lines(t, &buf)
+	if len(got) != 2 {
+		t.Fatalf("got %d lines", len(got))
+	}
+	if d, _ := got[0]["deliver"].(map[string]any); got[0]["level"] != "INFO" || d["summary"] != "0 queued, 0 due" {
+		t.Errorf("line %v", got[0])
+	}
+	if d, _ := got[1]["deliver"].(map[string]any); d["summary"] != nil {
+		t.Errorf("summary kept: %v", got[1])
+	}
+}

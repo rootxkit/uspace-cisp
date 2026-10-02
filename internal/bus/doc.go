@@ -19,4 +19,14 @@
 // and waits at most AckWait (5 s) for the stream's acknowledgement. Its
 // error is for the caller to count (bus_publish_failed): the change is
 // already committed and deliver's scan covers a lost publish (D6).
+//
+// The consumer side (WP-6) is deliver's durable pull consumer:
+//
+//	func (b *Bus) DurableConsumer(ctx context.Context, cfg ConsumerConfig) (*Consumer, error)
+//	func (c *Consumer) Fetch(ctx context.Context, batch int, maxWait time.Duration, each func(Msg)) error
+//	func ParseChange(data []byte) (publication.Change, error)
+//
+// "deliver" on every cis.v1.change.* subject, explicit ack, at most 256
+// unacknowledged, 30 s ack wait, 20 deliveries, from the newest message
+// on first creation. Fetch hands each message over as it arrives.
 package bus

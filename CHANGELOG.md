@@ -144,3 +144,28 @@ additively within `/v1`.
   `CISP_ALLOW_INSECURE_CALLBACKS` and `CISP_TIMESERIES_URL`; deliver
   needs `CISP_SIGNING_KEY_FILE`, `CISP_SIGNING_KID`, `CISP_ISSUER_URL`
   and `CISP_PUBLIC_BASE_URL` with a database.
+- WP-7 the WS change stream, bus resilience and observability, on
+  `uspace-core` v1.2.0: `WS /v1/stream?datasets=` (`internal/stream`):
+  every frame the lab's common envelope (`envelope/v1`) around
+  `console/status/v1` (on connect, every 2 s and at once after the bus
+  returns, with `nats`, `degraded[]`, dataset versions, `cis_age_s`,
+  publishers and `resync_since`) or `cis/change/v1`; at most
+  `CISP_STREAM_MAX_CLIENTS` per instance (503 `stream_full`), a
+  64-frame queue per client (`dropped_frames`, 1013 when it stays
+  full), the per-IP limiter on the upgrade, an `Origin` allow-list
+  (403 `origin`), the `uspace_session` cookie verified by the shared
+  verifier and 4401 on a non-public stream (`CISP_STREAM_PUBLIC`).
+  `internal/bus`: `Connect` returns within `CISP_NATS_CONNECT_TIMEOUT_S`
+  with the broker absent (`never connected`), `State` with since-times,
+  `Watch`, `Subscribe` for the hub with a resync on every return of the
+  connection, slow-consumer errors counted and never fatal; `deliver`
+  under the same policy. `internal/obs`: the metrics catalogue
+  (`docs/RUNBOOKS/observability.md`, tested both ways and against the
+  code), `obs.Once`, the status line's counters since the previous
+  line and its `start` line, uncatalogued metrics warned, the store's
+  counters mirrored, `cisp_publication_seconds`,
+  `restriction_expiry_job_age_s`, `publisher_stale`, `nats_degraded_s`;
+  spans `validate`, `publish_tx`, `bus_publish` and `delivery_attempt`
+  (`claim`, `sign`, `post`) with the change id, only with
+  `CISP_OTEL_ENDPOINT`. Integration tests stop and start a real broker
+  (`internal/natstest`, docker).

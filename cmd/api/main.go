@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/config"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
+	"github.com/rootxkit/uspace-cisp/internal/restriction"
 	"github.com/rootxkit/uspace-cisp/internal/store"
 )
 
@@ -174,6 +176,16 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		server.Reads = reads(cfg, st, cache.SnapshotCache, sec, status, logger)
 		server.Status.Cache = cache.SnapshotCache
 		server.Status.Publishers = st.Publishers
+		rs := restrictions(cfg, st, sec, status, logger)
+		rs.OnPublished = cache.poke
+		server.Restrictions = rs
+		server.Publications.OnANSPRefs = rs.CompareRefs
+		server.Reads.PublisherStale = rs.ANSPStale
+		server.Status.Restrictions = rs.Report
+		status.AddProbe(rs.Probe)
+		expiry := time.NewTicker(cfg.ExpiryInterval)
+		defer expiry.Stop()
+		go rs.RunExpiry(ctx, expiry.C)
 	}
 	// The public reads' per-client limit; a request the cache will answer
 	// 304 is counted at the cheap rate.
@@ -190,7 +202,7 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		HandlerTimeout:       cfg.HandlerTimeout,
 		MaxBodyBytes:         cfg.MaxBodyBytes,
 		BodyReadMinBytesPerS: cfg.BodyReadMinBytesPerS,
-		RouteBodyCaps:        map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes},
+		RouteBodyCaps:        routeBodyCaps(cfg),
 		RouteMiddleware:      sec.routes(cfg, status, limiter),
 	})
 	if err != nil {
@@ -313,6 +325,37 @@ func publications(cfg *config.API, st *store.Store, sec *security, status *obs.S
 func reads(cfg *config.API, st *store.Store, cache *store.SnapshotCache, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Reads {
 	r := &httpapi.Reads{
 		Store: st, Cache: cache, MaxAge: cfg.ReadMaxAge, PublicBaseURL: cfg.PublicBaseURL,
+		Status: status, Logger: logger,
+	}
+	if sec.keys != nil {
+		r.Signer = httpapi.KeyRingSigner{Keys: sec.keys}
+	}
+	return r
+}
+
+// routeBodyCaps raises the cap of PUT /v1/publications/{dataset} to the
+// publication cap and sets the restriction writes' cap.
+func routeBodyCaps(cfg *config.API) map[string]int64 {
+	caps := map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes}
+	for _, route := range httpapi.RestrictionWriteRoutes {
+		caps[route] = cfg.MaxRestrictionBytes
+	}
+	return caps
+}
+
+// restrictions is the restrictions lifecycle on the database (WP-5): the
+// handlers, the expiry (leader-elected across replicas, named by this
+// host and process) and the ANSP's staleness; every version is signed
+// with the CISP's key ring.
+func restrictions(cfg *config.API, st *store.Store, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Restrictions {
+	host, err := os.Hostname()
+	if err != nil {
+		host = "unknown-host"
+	}
+	r := &httpapi.Restrictions{
+		Store: st, Limits: restriction.F3548Limits(), ANSPClientID: cfg.ANSPClientID,
+		MaxBodyBytes: cfg.MaxRestrictionBytes, ExpiryStaleAfter: cfg.ExpiryStaleAfter,
+		Instance: host + "/" + strconv.Itoa(os.Getpid()), Started: time.Now().UTC(),
 		Status: status, Logger: logger,
 	}
 	if sec.keys != nil {

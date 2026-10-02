@@ -116,6 +116,11 @@ type Publications struct {
 	// (the api pokes its snapshot cache, so this instance's reads see the
 	// version at once instead of at the next refresh).
 	OnPublished func()
+	// OnANSPRefs, when set, is handed the active_refs of every recorded
+	// ANSP heartbeat that declares some (WP-5 compares them with the
+	// active restrictions and counts the differences; it never acts on
+	// them).
+	OnANSPRefs func(ctx context.Context, refs []string)
 }
 
 func (p *Publications) now() time.Time {
@@ -804,5 +809,8 @@ func (p *Publications) heartbeat(ctx context.Context, req gen.PostPublisherHeart
 		return p.storeFailure(ctx, "", err)
 	}
 	p.count("publishers", CounterHeartbeats)
+	if kind == publisherKindANSP && refs != nil && p.OnANSPRefs != nil {
+		p.OnANSPRefs(ctx, refs)
+	}
 	return gen.PostPublisherHeartbeat204Response{}, nil
 }

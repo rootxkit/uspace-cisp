@@ -44,7 +44,10 @@ type StatusReport struct {
 	Registry *obs.Status
 	// MTLSMode is CISP_MTLS_MODE.
 	MTLSMode string
-	Logger   *slog.Logger
+	// Restrictions reads the restrictions block (WP-5; nil without a
+	// database).
+	Restrictions func(ctx context.Context) (*RestrictionStatusReport, error)
+	Logger       *slog.Logger
 	// Now is the clock; nil is time.Now.
 	Now func() time.Time
 }
@@ -78,6 +81,8 @@ type statusBody struct {
 	Publishers []statusPublisher `json:"publishers"`
 	Degraded   []statusDegraded  `json:"degraded"`
 	MTLSMode   string            `json:"mtls_mode,omitempty"`
+	// Restrictions is absent when it cannot be read (database degraded).
+	Restrictions *RestrictionStatusReport `json:"restrictions,omitempty"`
 }
 
 // VisitGetStatusResponse implements gen.GetStatusResponseObject.
@@ -149,6 +154,19 @@ func (rep *StatusReport) build(ctx context.Context) statusBody {
 	}
 
 	out.Publishers = rep.publishers(ctx, now, degraded)
+	if rep.Restrictions != nil {
+		rs, err := rep.Restrictions(ctx)
+		if err != nil {
+			if rep.Logger != nil {
+				rep.Logger.LogAttrs(ctx, slog.LevelWarn, "status: restrictions not read", slog.String("error", err.Error()))
+			}
+			if _, ok := degraded["database"]; !ok {
+				degraded["database"] = statusDegraded{Component: "database", Since: now, Reason: "the restrictions could not be read"}
+			}
+		} else {
+			out.Restrictions = rs
+		}
+	}
 	for _, d := range degraded {
 		out.Degraded = append(out.Degraded, d)
 	}

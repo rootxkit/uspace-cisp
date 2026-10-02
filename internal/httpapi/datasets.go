@@ -67,7 +67,12 @@ const (
 	CounterStaleServed          = "stale_served"
 	CounterStaleRefused         = "stale_refused"
 	CounterSignatureEvicted     = "signature_cache_evicted"
+	CounterStalePublisherServed = "stale_publisher_served"
 )
+
+// MemberPublisherStaleSince is the top-level member of a restrictions
+// body while the ANSP is stale (docs/PLAN.md section 15 Q3).
+const MemberPublisherStaleSince = "cis_publisher_stale_since"
 
 // Bounds of the reads (E-10).
 const (
@@ -124,6 +129,11 @@ type Reads struct {
 	SignatureCacheEntries int
 	// Daylight resolves ED-318 daylight events (nil: NOAADaylight).
 	Daylight ed318.Daylight
+	// PublisherStale, when set, says whether the ANSP, the publisher of
+	// the restrictions dataset, is stale and since when (nil: never
+	// heard from) (WP-5). A stale ANSP's dataset bodies carry
+	// cis_publisher_stale_since; nothing else about them changes.
+	PublisherStale func(ctx context.Context) (bool, *time.Time, error)
 	// Status receives the reads' counters; nil: a private one.
 	Status *obs.Status
 	Logger *slog.Logger
@@ -613,12 +623,88 @@ func (r *Reads) unfiltered(ctx context.Context, ds publication.Dataset, q readQu
 	} else {
 		h["Content-Type"] = mediaGeoJSON
 	}
+	if member, stale := r.stalePublisher(ctx, ds, q.head); stale {
+		return r.withStalePublisher(ctx, ds, h, snap.BodyGz, member)
+	}
 	// Only a test store holds an unsigned snapshot (NoopSigner); an empty
 	// header would read as a signature that does not verify.
 	if snap.CISPSignature != "" {
 		h[HeaderSignature] = snap.CISPSignature
 	}
 	return readResponse{status: http.StatusOK, headers: h, gz: snap.BodyGz, encoded: acceptsGzip(q.acceptEncoding) && !q.head, head: q.head}, nil
+}
+
+// stalePublisher is the cis_publisher_stale_since value of a
+// restrictions body while the ANSP is stale (a time, or null when never
+// heard from). A staleness that cannot be read is logged and leaves the
+// body as stored: the member says the ANSP is stale, never that it is not.
+func (r *Reads) stalePublisher(ctx context.Context, ds publication.Dataset, head bool) (json.RawMessage, bool) {
+	if ds != publication.DatasetRestrictions || r.PublisherStale == nil || head {
+		return nil, false
+	}
+	stale, since, err := r.PublisherStale(ctx)
+	if err != nil {
+		r.logger().LogAttrs(ctx, slog.LevelWarn, "ansp staleness not read for the restrictions read", slog.String("error", err.Error()))
+		return nil, false
+	}
+	if !stale {
+		return nil, false
+	}
+	if since == nil {
+		return json.RawMessage("null"), true
+	}
+	raw, err := json.Marshal(since.UTC())
+	if err != nil {
+		return nil, false
+	}
+	return raw, true
+}
+
+// withStalePublisher serves the snapshot with cis_publisher_stale_since
+// added at the top level, signed at serve time over the bytes served and
+// never cached (the member must not outlive the silence).
+func (r *Reads) withStalePublisher(ctx context.Context, ds publication.Dataset, h map[string]string, gz []byte, member json.RawMessage) (readObject, error) {
+	zr, err := gzip.NewReader(bytes.NewReader(gz))
+	if err != nil {
+		return r.failure(ctx, ds, err)
+	}
+	body, err := io.ReadAll(zr)
+	if err != nil {
+		return r.failure(ctx, ds, err)
+	}
+	body = withTopMember(body, member)
+	if r.Signer != nil {
+		sig, err := r.Signer.Sign(ctx, body)
+		if err != nil {
+			return r.failure(ctx, ds, err)
+		}
+		h[HeaderSignature] = sig
+	}
+	h["Cache-Control"] = "no-store"
+	r.count(CounterStalePublisherServed)
+	return readResponse{status: http.StatusOK, headers: h, body: body}, nil
+}
+
+// jsonSpace is the JSON whitespace (RFC 8259 section 2).
+const jsonSpace = " \t\r\n"
+
+// withTopMember is the JSON object body with cis_publisher_stale_since
+// first; the rest of the bytes are as they were.
+func withTopMember(body []byte, value json.RawMessage) []byte {
+	i := bytes.IndexByte(body, '{')
+	if i < 0 {
+		return body
+	}
+	out := make([]byte, 0, len(body)+len(value)+32)
+	out = append(out, body[:i+1]...)
+	out = append(out, '"')
+	out = append(out, MemberPublisherStaleSince...)
+	out = append(out, '"', ':')
+	out = append(out, value...)
+	if rest := bytes.TrimLeft(body[i+1:], jsonSpace); len(rest) > 0 && rest[0] != '}' {
+		out = append(out, ',')
+	}
+	return append(out, body[i+1:]...)
 }
 
 // filtered builds the collection of the current features in the box,
@@ -665,6 +751,11 @@ func (r *Reads) filtered(ctx context.Context, ds publication.Dataset, f filter, 
 		return r.failure(ctx, ds, err)
 	}
 	h["Content-Type"] = mediaGeoJSON
+	if member, stale := r.stalePublisher(ctx, ds, q.head); stale {
+		body = withTopMember(body, member)
+		h["Cache-Control"] = "no-store"
+		r.count(CounterStalePublisherServed)
+	}
 	return readResponse{status: http.StatusOK, headers: h, body: body, head: q.head}, nil
 }
 

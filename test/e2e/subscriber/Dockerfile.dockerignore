@@ -1,0 +1,12 @@
+.git
+.github
+local
+web
+docs
+deploy
+*.pem
+*.key
+.env
+.env.*
+coverage.*
+*.log

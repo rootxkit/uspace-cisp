@@ -169,3 +169,22 @@ additively within `/v1`.
   (`claim`, `sign`, `post`) with the change id, only with
   `CISP_OTEL_ENDPOINT`. Integration tests stop and start a real broker
   (`internal/natstest`, docker).
+- WP-8 console accounts, sessions and the console API: local accounts
+  (argon2id in PHC form, 64 MiB / 3 / 4, re-hashed on login when the
+  parameters change; TOTP for every admin with a code never accepted
+  twice, `accounts.totp_last_step`; secrets sealed with AES-256-GCM
+  under `CISP_SECRETS_KEY`); `POST /v1/console/session` issues the
+  ecosystem's session token through core `Issuer.IssueSession` (scope
+  `session`, `roles[]`, realm `console`, 12 h), five failures lock 15
+  minutes on the database's clock, 20 attempts per address per 15
+  minutes; `RequireRole` on the shared verifier with the console issuer
+  allow-listed (`CISP_CONSOLE_ISSUER`, `CISP_SESSION_KEY_FILE`), a
+  bounded revocation cache refreshed every 10 s; accounts (admin, the
+  last active admin kept under row locks), publications with per-feature
+  JSON Pointer diffs (200 paths), restrictions, subscriptions with
+  delivery summaries, deliveries, audit and status; suspend, resume,
+  retry and republish (a change record of the current version, no
+  content) as audited actions with a reason. No console route reaches
+  content (a test reads the handlers). `cispctl create-account`,
+  `export-audit` (signed JSON lines), `verify-audit` and `partitions`.
+  Migration `0010_console`.

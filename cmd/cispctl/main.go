@@ -2,8 +2,9 @@
 // configuration check, the migrations of the two trees, the rebuild of
 // the materialised current version, the delivery log's retention, the
 // signing key rotation, the console's accounts, audit export and
-// verification and events partitions (WP-8), and two dev helpers that
-// sign a body and verify a detached signature with a local key.
+// verification and events partitions (WP-8), the offline ED-269 mapping
+// (WP-12), and two dev helpers that sign a body and verify a detached
+// signature with a local key.
 // It is never long-running and never on the request path.
 package main
 
@@ -75,6 +76,10 @@ commands:
   partitions [--ensure-months N]
                   create the monthly events partitions from this month
                   through N months ahead (default 3; run monthly)
+  ed269 convert --to ed318|ed269 [--lang ka] [--max-bytes N] < in > out
+                  map one document offline through uspace-core's mapping:
+                  --to ed318 reads ED-269 strictly and maps it, --to ed269
+                  exports ED-318; problems on stderr and exit 1
   sign --key FILE --kid K < body
                   print the X-JWS-Signature value of the body (dev helper)
   verify-signature --key FILE --kid K --sig SIG < body
@@ -122,6 +127,8 @@ func runIO(ctx context.Context, args, environ []string, stdin io.Reader, stdout,
 		return exportAudit(ctx, args[1:], environ, stdout, stderr, now)
 	case len(args) >= 1 && args[0] == "partitions":
 		return partitions(ctx, args[1:], environ, stdout, stderr)
+	case len(args) >= 1 && args[0] == "ed269":
+		return ed269Convert(args[1:], stdin, stdout, stderr)
 	default:
 		_, _ = fmt.Fprint(stderr, usage)
 		return exitUsage
@@ -203,6 +210,10 @@ func openTree(ctx context.Context, tree store.Tree, environ []string, stderr io.
 }
 
 func migrate(ctx context.Context, args, environ []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		_, _ = fmt.Fprint(stderr, usage)
+		return exitUsage
+	}
 	tree, err := store.ParseTree(args[0])
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cispctl: %v\n%s", err, usage)

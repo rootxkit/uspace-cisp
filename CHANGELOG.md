@@ -215,3 +215,7 @@ additively within `/v1`.
   and live, polling or disconnected from `WS /v1/stream` or `HEAD`; the
   time control; `/[locale]/ussps`. Playwright scenarios against the
   fixture server (§15 Q42).
+- Circle zones on filtered reads: `extendedProperties.cis_display_geometry`,
+  the circle as a 64-vertex polygon on the geodesic circle drawn with
+  uspace-core geodesy (`internal/outline`, counter `outline_failed`);
+  the public map draws it (§15 Q43).

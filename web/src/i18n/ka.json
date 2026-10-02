@@ -114,5 +114,7 @@
   "cisp.ussps.no_limitations": "არ არის გამოქვეყნებული",
   "cisp.ussps.contact": "კონტაქტი",
   "cisp.ussps.terms": "პირობები",
-  "cisp.ussps.terms_link": "მომსახურების პირობები"
+  "cisp.ussps.terms_link": "მომსახურების პირობები",
+  "cisp.list.circle_drawn": "წრე, კონტური დახატულია CIS-ის მიერ",
+  "cisp.panel.circle_drawn": "{radius} მ რადიუსის წრე გამოქვეყნებული ცენტრის გარშემო. რუკა ხატავს CIS-ის მიერ გამოთვლილ კონტურს (64 წერტილი წრეზე); მოქმედებს წრე, როგორც ის გამოქვეყნდა."
 }

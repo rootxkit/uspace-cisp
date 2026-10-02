@@ -43,6 +43,7 @@ export function FeatureList(props: {
                     type="button"
                     data-feature={f.id}
                     data-applicability={verdict ?? "unstated"}
+                    data-drawn={circle === null ? "as-published" : f.drawnFromOutline ? "outline" : "not-drawn"}
                     aria-pressed={selected}
                     className={[
                       "w-full rounded px-2 py-1 text-start text-sm hover:bg-[var(--us-hover)]",
@@ -56,7 +57,7 @@ export function FeatureList(props: {
                       {t(`zone.type.${f.view.type}`)}
                       {f.view.restrictionState !== null && ` · ${t(`restriction.state.${f.view.restrictionState}`)}`}
                       {verdict !== null && verdict !== "applies" && ` · ${t(`cisp.applicability.short.${verdict}`)}`}
-                      {circle !== null && ` · ${t("cisp.list.circle")}`}
+                      {circle !== null && ` · ${t(f.drawnFromOutline ? "cisp.list.circle_drawn" : "cisp.list.circle")}`}
                     </span>
                   </button>
                 </li>

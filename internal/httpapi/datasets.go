@@ -25,6 +25,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/bus"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
+	"github.com/rootxkit/uspace-cisp/internal/outline"
 	"github.com/rootxkit/uspace-cisp/internal/publication"
 	"github.com/rootxkit/uspace-cisp/internal/store"
 )
@@ -68,6 +69,7 @@ const (
 	CounterStaleRefused         = "stale_refused"
 	CounterSignatureEvicted     = "signature_cache_evicted"
 	CounterStalePublisherServed = "stale_publisher_served"
+	CounterOutlineFailed        = "outline_failed"
 )
 
 // MemberPublisherStaleSince is the top-level member of a restrictions
@@ -746,6 +748,9 @@ func (r *Reads) filtered(ctx context.Context, ds publication.Dataset, f filter, 
 			annotate(&fc.Features[i], r.judge(&fc.Features[i], *f.appliesAt))
 		}
 	}
+	for i := range fc.Features {
+		r.drawCircles(ctx, &fc.Features[i])
+	}
 	body, err := publication.Snapshot(ds, cur.Version, cur.ReceivedAt, cur.Publisher, fc)
 	if err != nil {
 		return r.failure(ctx, ds, err)
@@ -768,15 +773,39 @@ func (r *Reads) judge(f *ed318.Feature, at time.Time) applicability.Verdict {
 	return v
 }
 
-// annotate writes the verdict into the feature's copy (the stored row is
-// never touched).
-func annotate(f *ed318.Feature, v applicability.Verdict) {
+// drawCircles writes extendedProperties.cis_display_geometry into the
+// copy of a feature that holds a circle: its drawable outline (section 15
+// Q43). A drawing, never a judgement. A circle that cannot be drawn is
+// served without the member and counted; the feature itself is never
+// dropped.
+func (r *Reads) drawCircles(ctx context.Context, f *ed318.Feature) {
+	raw, ok, err := outline.Display(f.Geometry)
+	if err != nil {
+		r.count(CounterOutlineFailed)
+		r.logger().LogAttrs(ctx, slog.LevelWarn, "circle outline not drawn",
+			slog.String("identifier", f.Properties.Identifier), slog.String("error", err.Error()))
+		return
+	}
+	if ok {
+		setExtended(f, outline.Member, raw)
+	}
+}
+
+// setExtended writes one member into the feature's copy of
+// extendedProperties (the stored row is never touched).
+func setExtended(f *ed318.Feature, member string, value json.RawMessage) {
 	ext := make(map[string]json.RawMessage, len(f.Properties.ExtendedProperties)+1)
 	for k, x := range f.Properties.ExtendedProperties {
 		ext[k] = x
 	}
-	ext[applicability.Member] = json.RawMessage(strconv.Quote(v.Annotation()))
+	ext[member] = value
 	f.Properties.ExtendedProperties = ext
+}
+
+// annotate writes the verdict into the feature's copy (the stored row is
+// never touched).
+func annotate(f *ed318.Feature, v applicability.Verdict) {
+	setExtended(f, applicability.Member, json.RawMessage(strconv.Quote(v.Annotation())))
 }
 
 // collectionOf parses stored features back into one collection, through

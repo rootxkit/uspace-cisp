@@ -1,6 +1,8 @@
 // The one hand-written mapping from the API's features to the kit's view
 // models (uspace-ui PLAN §3.14). It copies what the API said and decides
-// nothing: the geometry is passed as published, the limits are passed
+// nothing: the geometry is passed as published, or, for a circle, as the
+// outline the CISP drew (extendedProperties.cis_display_geometry, Q43);
+// the limits are passed
 // only when published in metres (the kit's view model holds metres, and
 // a limit in feet is never converted: the panel shows it as published),
 // and `applies` is the CISP's own cis_applicability.
@@ -16,6 +18,14 @@ export interface MapFeature {
   view: RestrictionView;
   /** The feature as the API sent it. */
   raw: Record<string, unknown>;
+  /** The map draws the CISP's outline of a circle (cis_display_geometry). */
+  drawnFromOutline: boolean;
+}
+
+/** The CISP's drawable outline of a feature with a circle, or null. */
+export function displayGeometryOf(properties: unknown): Record<string, unknown> | null {
+  const g = obj(obj(obj(properties)?.["extendedProperties"])?.["cis_display_geometry"]);
+  return g !== null && (g["type"] === "Polygon" || g["type"] === "GeometryCollection") ? g : null;
 }
 
 function metres(layer: unknown) {
@@ -46,6 +56,7 @@ export function toView(
   const type = p["type"];
   if (id === null || !isZoneType(type)) return null;
   const geometry = obj(f["geometry"]);
+  const outline = displayGeometryOf(p);
   const layer = geometry?.["type"] === "GeometryCollection" ? null : geometry?.["layer"];
   const lim = obj(layer);
   const verdict = applicabilityOf(p);
@@ -61,7 +72,7 @@ export function toView(
     ...metres(layer),
     lowerRef: refOf(lim?.["lowerReference"]),
     upperRef: refOf(lim?.["upperReference"]),
-    geometry: (geometry ?? { type: "GeometryCollection", geometries: [] }) as unknown as ZoneView["geometry"],
+    geometry: (outline ?? geometry ?? { type: "GeometryCollection", geometries: [] }) as unknown as ZoneView["geometry"],
     applies: verdict === "applies" ? true : verdict === "not_applicable" ? false : null,
     restrictionState: isRestrictionState(state) ? state : null,
     version: meta.version,
@@ -69,5 +80,5 @@ export function toView(
     startsAt: typeof restriction?.["starts_at"] === "string" ? restriction["starts_at"] : null,
     endsAt: typeof restriction?.["ends_at"] === "string" ? restriction["ends_at"] : null,
   };
-  return { id, dataset, view, raw: f };
+  return { id, dataset, view, raw: f, drawnFromOutline: outline !== null };
 }

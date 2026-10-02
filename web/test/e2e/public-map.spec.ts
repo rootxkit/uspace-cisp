@@ -70,11 +70,12 @@ test("clicking a zone opens the panel with its identifier and limits as publishe
   await expect(panel.locator("[data-limits]")).toHaveText("0 m AGL – 600 m above the WGS 84 ellipsoid");
   await expect(panel.locator("[data-schedule]")).toContainText("08:00:00+04:00 to 18:00:00+04:00");
 
-  // Feet stay feet; a circle is listed with its radius, not drawn.
+  // Feet stay feet; a circle is drawn from the CIS's outline.
   await item(page, "TSD001").click();
   const tsd = page.locator('[data-panel="TSD001"]');
   await expect(tsd.locator("[data-limits]")).toHaveText("0 ft AGL – 2,500 ft AMSL");
   await expect(tsd).toContainText("Circle of radius 1,500 m");
+  await expect(tsd).toContainText("draws the outline the CIS computed");
   await expect(tsd).toContainText("morning civil twilight (BMCT) to evening civil twilight (EECT)");
   await expect(tsd).toContainText("Planned");
 
@@ -218,4 +219,18 @@ test("the map makes no request off the origin and loads under the CSP", async ({
   expect(off).toEqual([]);
   expect(failed).toEqual([]);
   expect(violations).toEqual([]);
+});
+
+test("circle zones are drawn from the CIS's outline, and say so when it is missing", async ({ page, request }) => {
+  await page.goto("/en");
+  for (const id of ["TSN001", "TSD001"]) {
+    await expect(item(page, id)).toHaveAttribute("data-drawn", "outline");
+    await expect(item(page, id)).toContainText("circle, outline drawn by the CIS");
+  }
+  await expect(item(page, "TSR001")).toHaveAttribute("data-drawn", "as-published");
+  // An API without the outline: the circle is still listed, and says it is not drawn.
+  await mock(request, "state", { outlines: false });
+  await page.getByLabel("Chosen instant (your local time)").fill("2026-10-12T06:00");
+  await expect(item(page, "TSN001")).toHaveAttribute("data-drawn", "not-drawn");
+  await expect(item(page, "TSN001")).toContainText("circle, not drawn on the map");
 });

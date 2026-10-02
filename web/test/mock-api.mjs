@@ -17,7 +17,7 @@
 // Control (tests only):
 //   GET  /__mock/requests                 the API requests answered
 //   POST /__mock/reset                    stream on, every dataset served at version 1
-//   POST /__mock/state {stream?, unavailable?: [dataset], publisherStaleSince?}
+//   POST /__mock/state {stream?, unavailable?: [dataset], publisherStaleSince?, outlines?}
 //   POST /__mock/bump {dataset}           a new version of one dataset
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -131,6 +131,8 @@ function reset() {
     stream: true,
     unavailable: new Set(),
     publisherStaleSince: undefined,
+    // false: serve circles without cis_display_geometry (an API before Q43).
+    outlines: true,
     versions: { zones: 1, uspace_airspace: 1, restrictions: 1, ussp_list: 1 },
   };
 }
@@ -138,13 +140,40 @@ reset();
 const requests = [];
 const clients = new Set();
 
-function body(dataset, appliesAt) {
+/**
+ * The fixture's stand-in for the CISP's cis_display_geometry of a circle
+ * (internal/outline draws the real one on WGS84 with uspace-core): 64
+ * vertices on a sphere, closed, counterclockwise. A test fixture, not a
+ * drawing anything relies on.
+ */
+const EARTH_RADIUS_M = 6371008.8;
+function fixtureOutline(geometry) {
+  if (geometry.type !== "Point" || geometry.extent?.radius === undefined) return null;
+  const [lon0, lat0] = geometry.coordinates;
+  const d = geometry.extent.radius / EARTH_RADIUS_M;
+  const phi1 = (lat0 * Math.PI) / 180;
+  const ring = [];
+  for (let k = 0; k < 64; k++) {
+    const az = ((360 - (360 * k) / 64) % 360) * (Math.PI / 180);
+    const phi2 = Math.asin(Math.sin(phi1) * Math.cos(d) + Math.cos(phi1) * Math.sin(d) * Math.cos(az));
+    const dl = Math.atan2(Math.sin(az) * Math.sin(d) * Math.cos(phi1), Math.cos(d) - Math.sin(phi1) * Math.sin(phi2));
+    ring.push([lon0 + (dl * 180) / Math.PI, (phi2 * 180) / Math.PI]);
+  }
+  ring.push(ring[0]);
+  return { type: "Polygon", coordinates: [ring] };
+}
+
+function body(dataset, appliesAt, filtered) {
   const cis = { cis_dataset: dataset, cis_version: state.versions[dataset], cis_updated_at: UPDATED_AT };
   if (dataset === "ussp_list") return { ...USSP_LIST, ...cis };
   const at = appliesAt === null ? null : new Date(appliesAt);
-  const features = FEATURES[dataset].map((f) =>
-    at === null || Number.isNaN(at.getTime()) ? f : withExtended(f, { cis_applicability: verdict(f.properties.identifier, at) }),
-  );
+  const features = FEATURES[dataset].map((f) => {
+    let out = at === null || Number.isNaN(at.getTime()) ? f : withExtended(f, { cis_applicability: verdict(f.properties.identifier, at) });
+    // Like the CISP: the outline only on filtered reads, only for a circle.
+    const outline = filtered && state.outlines ? fixtureOutline(f.geometry) : null;
+    if (outline !== null) out = withExtended(out, { cis_display_geometry: outline });
+    return out;
+  });
   const extra =
     dataset === "restrictions" && state.publisherStaleSince !== undefined
       ? { cis_publisher_stale_since: state.publisherStaleSince }
@@ -190,7 +219,8 @@ function publicRead(req, res, url, dataset) {
     res.end();
     return;
   }
-  json(res, 200, body(dataset, url.searchParams.get("applies_at")), { ...headers, "Content-Type": type });
+  const filtered = ["bbox", "at", "applies_at"].some((k) => url.searchParams.has(k));
+  json(res, 200, body(dataset, url.searchParams.get("applies_at"), filtered), { ...headers, "Content-Type": type });
 }
 
 function readJson(req) {
@@ -222,6 +252,7 @@ async function control(req, res, path) {
     }
     if (Array.isArray(input.unavailable)) state.unavailable = new Set(input.unavailable);
     if ("publisherStaleSince" in input) state.publisherStaleSince = input.publisherStaleSince;
+    if (typeof input.outlines === "boolean") state.outlines = input.outlines;
   } else if (path === "/__mock/bump") {
     if (typeof input.dataset === "string" && input.dataset in state.versions) state.versions[input.dataset] += 1;
   } else {

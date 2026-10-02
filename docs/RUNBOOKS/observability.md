@@ -112,6 +112,7 @@ section 9) where it names one.
 | `cisp_nats_degraded_s` | gauge | `component` | Seconds the broker connection has been down (0 when connected). | above 60 |
 | `cisp_nats_reconnects_total` | counter | `component` | Reconnections to the broker after a loss. | — |
 | `cisp_nats_slow_consumer_total` | counter | `component` | NATS slow-consumer errors on this process's subscriptions (messages dropped by the client). | any increase |
+| `cisp_outline_failed_total` | counter | `component` | Circles served without cis_display_geometry because no outline could be drawn. | any increase |
 | `cisp_publication_seconds` | histogram | `dataset`, `outcome` | PUT /v1/publications/{dataset} from the body read to the answer, by outcome (accepted, unchanged, refused, failed). | p95 of outcome="accepted" above 10 s (docs/PLAN.md section 9) |
 | `cisp_publications_accepted_total` | counter | `component` | Publication intake outcomes (component = the dataset). | — |
 | `cisp_publications_refused_total` | counter | `component` | Publication intake outcomes (component = the dataset). | — |

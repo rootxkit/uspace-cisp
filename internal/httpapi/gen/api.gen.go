@@ -405,6 +405,24 @@ func (e DeliveryListLog) Valid() bool {
 	}
 }
 
+// Defines values for DisplayGeometryType.
+const (
+	GeometryCollection DisplayGeometryType = "GeometryCollection"
+	Polygon            DisplayGeometryType = "Polygon"
+)
+
+// Valid indicates whether the value is a known member of the DisplayGeometryType enum.
+func (e DisplayGeometryType) Valid() bool {
+	switch e {
+	case GeometryCollection:
+		return true
+	case Polygon:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok HealthStatus = "ok"
@@ -1961,6 +1979,29 @@ type DeliveryList struct {
 // DeliveryListLog Whether the attempts of the delivery log were read.
 type DeliveryListLog string
 
+// DisplayGeometry The drawable outline of a feature that holds an ED-318 circle (a
+// Point with extent.radius), written into its copy on filtered
+// reads (bbox, at, applies_at; docs/PLAN.md section 15 Q43). A
+// circle becomes a GeoJSON Polygon of 64 vertices on the geodesic
+// circle (WGS84, uspace-core geodesy; each vertex at the radius
+// within 5 mm), counterclockwise from due north and closed; in a
+// GeometryCollection the other parts are copied as published.
+// Positions are [longitude, latitude]; there is no layer. It is a
+// drawing for maps, never a judgement: a consumer judges the
+// circle as published. Absent for a feature without a circle, and
+// on unfiltered reads, which serve the published bytes.
+type DisplayGeometry struct {
+	// Coordinates Polygon only. Rings of [longitude, latitude] positions, exterior first.
+	Coordinates *[][][]float32 `json:"coordinates,omitempty"`
+
+	// Geometries GeometryCollection only. One Polygon per published part.
+	Geometries *[]DisplayGeometry  `json:"geometries,omitempty"`
+	Type       DisplayGeometryType `json:"type"`
+}
+
+// DisplayGeometryType defines model for DisplayGeometry.Type.
+type DisplayGeometryType string
+
 // FieldProblem defines model for FieldProblem.
 type FieldProblem struct {
 	// Field The JSON path or parameter name.
@@ -2645,13 +2686,28 @@ type Warning struct {
 
 // ZoneFeature One ED-318 UASZone feature as published. The CISP adds only
 // extendedProperties.cis_applicability (at and applies_at reads)
-// to its copy, never to the stored feature, and to a restriction
-// extendedProperties.cis_restriction (CisRestriction).
+// and extendedProperties.cis_display_geometry (filtered reads, a
+// feature with a circle) to its copy, never to the stored feature,
+// and to a restriction extendedProperties.cis_restriction
+// (CisRestriction).
 type ZoneFeature struct {
 	Geometry   map[string]interface{} `json:"geometry"`
 	Properties struct {
 		ExtendedProperties *struct {
 			CisApplicability *ZoneFeaturePropertiesExtendedPropertiesCisApplicability `json:"cis_applicability,omitempty"`
+
+			// CisDisplayGeometry The drawable outline of a feature that holds an ED-318 circle (a
+			// Point with extent.radius), written into its copy on filtered
+			// reads (bbox, at, applies_at; docs/PLAN.md section 15 Q43). A
+			// circle becomes a GeoJSON Polygon of 64 vertices on the geodesic
+			// circle (WGS84, uspace-core geodesy; each vertex at the radius
+			// within 5 mm), counterclockwise from due north and closed; in a
+			// GeometryCollection the other parts are copied as published.
+			// Positions are [longitude, latitude]; there is no layer. It is a
+			// drawing for maps, never a judgement: a consumer judges the
+			// circle as published. Absent for a feature without a circle, and
+			// on unfiltered reads, which serve the published bytes.
+			CisDisplayGeometry *DisplayGeometry `json:"cis_display_geometry,omitempty"`
 
 			// CisRestriction extendedProperties.cis_restriction of a served restriction
 			// feature: the only member the CISP adds to a published feature

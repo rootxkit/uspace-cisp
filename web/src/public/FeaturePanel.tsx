@@ -83,7 +83,11 @@ export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClos
           </ul>
         </Row>
         {circle !== null && (
-          <Row label={t("cisp.panel.shape")}>{t("cisp.panel.circle", { radius: fmtNumber(circle.radiusM, lang) })}</Row>
+          <Row label={t("cisp.panel.shape")}>
+            {t(feature.drawnFromOutline ? "cisp.panel.circle_drawn" : "cisp.panel.circle", {
+              radius: fmtNumber(circle.radiusM, lang),
+            })}
+          </Row>
         )}
         <Row label={t("cisp.panel.applicability")}>
           <ul data-schedule>

@@ -52,7 +52,7 @@
 // returned (D6). An unchanged publication of a dataset already at a
 // version writes nothing and returns ErrUnchanged with the current
 // version. Geometry is built in SQL from the published coordinates: a
-// circle's buffer on geography is a drawing and prefilter shape only
+// circle's buffer on geography is a prefilter shape only
 // (Z-11), and the feature column holds the feature as published. NoopSigner
 // (empty signature) is refused unless Options.AllowNoopSigner, which
 // only tests set.

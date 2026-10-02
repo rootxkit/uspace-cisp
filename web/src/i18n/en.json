@@ -114,5 +114,7 @@
   "cisp.ussps.no_limitations": "None published",
   "cisp.ussps.contact": "Contact",
   "cisp.ussps.terms": "Terms",
-  "cisp.ussps.terms_link": "Terms and conditions"
+  "cisp.ussps.terms_link": "Terms and conditions",
+  "cisp.list.circle_drawn": "circle, outline drawn by the CIS",
+  "cisp.panel.circle_drawn": "Circle of radius {radius} m about its published centre. The map draws the outline the CIS computed from it (64 points on the circle); the circle as published is what applies."
 }

@@ -37,8 +37,9 @@ const (
 	EnvTimeseriesMaxConns        = "CISP_TIMESERIES_MAX_CONNS"
 	EnvNATSURL                   = "CISP_NATS_URL"
 	EnvNATSCredsFile             = "CISP_NATS_CREDS_FILE" //nolint:gosec // G101: a variable name, not a credential
-	EnvTokenIssuer               = "CISP_TOKEN_ISSUER"    //nolint:gosec // G101: a variable name, not a credential
-	EnvTokenJWKSURL              = "CISP_TOKEN_JWKS_URL"  //nolint:gosec // G101: a variable name, not a credential
+	EnvNATSConnectTimeoutS       = "CISP_NATS_CONNECT_TIMEOUT_S"
+	EnvTokenIssuer               = "CISP_TOKEN_ISSUER"   //nolint:gosec // G101: a variable name, not a credential
+	EnvTokenJWKSURL              = "CISP_TOKEN_JWKS_URL" //nolint:gosec // G101: a variable name, not a credential
 	EnvLabIssuer                 = "CISP_LAB_ISSUER"
 	EnvLabJWKSURL                = "CISP_LAB_JWKS_URL"
 	EnvJWKSCacheFile             = "CISP_JWKS_CACHE_FILE"
@@ -69,6 +70,13 @@ const (
 	EnvMaxRestrictionBytes       = "CISP_MAX_RESTRICTION_BYTES"
 	EnvExpiryIntervalS           = "CISP_RESTRICTION_EXPIRY_INTERVAL_S"
 	EnvExpiryStaleAfterS         = "CISP_RESTRICTION_EXPIRY_STALE_AFTER_S"
+	EnvStreamMaxClients          = "CISP_STREAM_MAX_CLIENTS"
+	EnvStreamSendBufferFrames    = "CISP_STREAM_SEND_BUFFER_FRAMES"
+	EnvStreamStatusIntervalS     = "CISP_STREAM_STATUS_INTERVAL_S"
+	EnvStreamWriteTimeoutS       = "CISP_STREAM_WRITE_TIMEOUT_S"
+	EnvStreamLiveMaxAgeS         = "CISP_STREAM_LIVE_MAX_AGE_S"
+	EnvStreamAllowedOrigins      = "CISP_STREAM_ALLOWED_ORIGINS"
+	EnvStreamPublic              = "CISP_STREAM_PUBLIC"
 )
 
 // Catalogue is every CISP_* variable with its default, in the order
@@ -87,6 +95,7 @@ var Catalogue = []Var{
 	{Name: EnvTimeseriesMaxConns, Default: "2"},
 	{Name: EnvNATSURL, Default: "", SecretURL: true},
 	{Name: EnvNATSCredsFile, Default: ""},
+	{Name: EnvNATSConnectTimeoutS, Default: "5"},
 
 	// api.
 	{Name: EnvHTTPAddr, Default: ":8080"},
@@ -122,6 +131,13 @@ var Catalogue = []Var{
 	{Name: EnvMaxRestrictionBytes, Default: "262144"},
 	{Name: EnvExpiryIntervalS, Default: "5"},
 	{Name: EnvExpiryStaleAfterS, Default: "30"},
+	{Name: EnvStreamMaxClients, Default: "1000"},
+	{Name: EnvStreamSendBufferFrames, Default: "64"},
+	{Name: EnvStreamStatusIntervalS, Default: "2"},
+	{Name: EnvStreamWriteTimeoutS, Default: "5"},
+	{Name: EnvStreamLiveMaxAgeS, Default: "6"},
+	{Name: EnvStreamAllowedOrigins, Default: ""},
+	{Name: EnvStreamPublic, Default: "true"},
 
 	// deliver.
 	{Name: EnvDeliverHTTPAddr, Default: ":8081"},

@@ -45,6 +45,9 @@ type API struct {
 	TimeseriesURL string
 	NATSURL       string
 	NATSCredsFile string
+	// NATSConnectTimeout bounds the wait for the broker at start; the
+	// process starts degraded when it has not answered by then.
+	NATSConnectTimeout time.Duration
 
 	DatabaseMaxConns   int64
 	TimeseriesMaxConns int64
@@ -94,6 +97,20 @@ type API struct {
 	// is how old its last run may be before the status line errs.
 	ExpiryInterval   time.Duration
 	ExpiryStaleAfter time.Duration
+
+	// The WS change stream (WP-7): the clients per instance, each one's
+	// send buffer in frames, the console/status/v1 period, the deadline
+	// of one frame's write, the live_max_age_s a console is told, the
+	// Origins a browser may upgrade from beside CISP_PUBLIC_BASE_URL's,
+	// and whether the stream is public (false: a console session cookie
+	// is required, and a missing or invalid one closes with 4401).
+	StreamMaxClients       int64
+	StreamSendBufferFrames int64
+	StreamStatusInterval   time.Duration
+	StreamWriteTimeout     time.Duration
+	StreamLiveMaxAge       time.Duration
+	StreamAllowedOrigins   []string
+	StreamPublic           bool
 }
 
 // Deliver is the configuration of cmd/deliver.
@@ -106,6 +123,8 @@ type Deliver struct {
 	TimeseriesURL string
 	NATSURL       string
 	NATSCredsFile string
+	// NATSConnectTimeout bounds the wait for the broker at start.
+	NATSConnectTimeout time.Duration
 
 	DatabaseMaxConns   int64
 	TimeseriesMaxConns int64
@@ -166,6 +185,7 @@ func LoadAPI(environ []string) (*API, error) {
 		NATSURL:       e.str(EnvNATSURL),
 		NATSCredsFile: e.str(EnvNATSCredsFile),
 
+		NATSConnectTimeout: e.seconds(EnvNATSConnectTimeoutS),
 		DatabaseMaxConns:   e.integer(EnvDatabaseMaxConns),
 		TimeseriesMaxConns: e.integer(EnvTimeseriesMaxConns),
 
@@ -203,6 +223,13 @@ func LoadAPI(environ []string) (*API, error) {
 		MaxRestrictionBytes:       e.integer(EnvMaxRestrictionBytes),
 		ExpiryInterval:            e.seconds(EnvExpiryIntervalS),
 		ExpiryStaleAfter:          e.seconds(EnvExpiryStaleAfterS),
+		StreamMaxClients:          e.integer(EnvStreamMaxClients),
+		StreamSendBufferFrames:    e.integer(EnvStreamSendBufferFrames),
+		StreamStatusInterval:      e.seconds(EnvStreamStatusIntervalS),
+		StreamWriteTimeout:        e.seconds(EnvStreamWriteTimeoutS),
+		StreamLiveMaxAge:          e.seconds(EnvStreamLiveMaxAgeS),
+		StreamAllowedOrigins:      e.list(EnvStreamAllowedOrigins),
+		StreamPublic:              e.boolean(EnvStreamPublic),
 	}
 	return c, finish(e, &c.Common, c.Validate)
 }
@@ -219,6 +246,7 @@ func LoadDeliver(environ []string) (*Deliver, error) {
 		NATSURL:       e.str(EnvNATSURL),
 		NATSCredsFile: e.str(EnvNATSCredsFile),
 
+		NATSConnectTimeout: e.seconds(EnvNATSConnectTimeoutS),
 		DatabaseMaxConns:   e.integer(EnvDatabaseMaxConns),
 		TimeseriesMaxConns: e.integer(EnvTimeseriesMaxConns),
 
@@ -425,7 +453,32 @@ func (c *API) Validate() error {
 		p = append(p, core.Fieldf(EnvExpiryStaleAfterS, "%d s is not above %s (%d s): every healthy tick would read as a dead ticker",
 			int64(c.ExpiryStaleAfter/time.Second), EnvExpiryIntervalS, int64(c.ExpiryInterval/time.Second)))
 	}
+	p = durationIn(p, EnvNATSConnectTimeoutS, c.NATSConnectTimeout, 0, time.Minute)
+	p = intIn(p, EnvStreamMaxClients, c.StreamMaxClients, 1, 100_000)
+	p = intIn(p, EnvStreamSendBufferFrames, c.StreamSendBufferFrames, 1, 4096)
+	p = durationIn(p, EnvStreamStatusIntervalS, c.StreamStatusInterval, time.Second, time.Minute)
+	p = durationIn(p, EnvStreamWriteTimeoutS, c.StreamWriteTimeout, time.Second, time.Minute)
+	p = durationIn(p, EnvStreamLiveMaxAgeS, c.StreamLiveMaxAge, time.Second, time.Hour)
+	if c.StreamLiveMaxAge < c.StreamStatusInterval {
+		p = append(p, core.Fieldf(EnvStreamLiveMaxAgeS, "%d s is below %s (%d s): a healthy stream would read as not live between two status frames",
+			int64(c.StreamLiveMaxAge/time.Second), EnvStreamStatusIntervalS, int64(c.StreamStatusInterval/time.Second)))
+	}
+	for i, o := range c.StreamAllowedOrigins {
+		if !originOK(o) {
+			p = append(p, core.Fieldf(EnvStreamAllowedOrigins+"["+strconv.Itoa(i)+"]", "%q is not an origin (scheme://host[:port], no path)", o))
+		}
+	}
 	return orNil(p)
+}
+
+// originOK accepts an http or https origin: a scheme, a host, an
+// optional port and nothing else.
+func originOK(o string) bool {
+	u, err := url.Parse(o)
+	if err != nil || u.Host == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+		return false
+	}
+	return strings.EqualFold(u.Scheme, "http") || strings.EqualFold(u.Scheme, "https")
 }
 
 // TrustedProxies is TrustedProxyCIDR parsed; Validate has refused a
@@ -449,6 +502,7 @@ func (c *Deliver) Validate() error {
 	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)
 	p = intIn(p, EnvTimeseriesMaxConns, c.TimeseriesMaxConns, 1, 1000)
 	p = urlOK(p, EnvNATSURL, c.NATSURL, "nats", "tls")
+	p = durationIn(p, EnvNATSConnectTimeoutS, c.NATSConnectTimeout, 0, time.Minute)
 	if c.SigningKID != "" && !idPattern.MatchString(c.SigningKID) {
 		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
 	}

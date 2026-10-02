@@ -237,6 +237,21 @@ func TestListPublicationAttempts(t *testing.T) {
 	if rec := h.get("/v1/publications/zones/attempts?since="+future, authority); !strings.Contains(rec.Body.String(), `"attempts":[]`) {
 		t.Errorf("since the future: %s", rec.Body.String())
 	}
+	// The publisher's sub without the dataset's publish scope: 403
+	// (scope and sub are both required), beside the token with it above.
+	rec = h.get("/v1/publications/zones/attempts", h.token(authorityID, auth.ScopeRead, auth.ScopePublishUSpace))
+	if p := decodeProblem(t, rec); rec.Code != http.StatusForbidden || p.Type != ProblemTypeBase+auth.SlugForbidden || !hasProblem(p, "scope", auth.ScopePublishZones) {
+		t.Errorf("authority without the zones scope = %d %s", rec.Code, rec.Body.String())
+	}
+	// The scope from another client: 403 not_a_publisher.
+	rec = h.get("/v1/publications/zones/attempts", h.token(usspID, auth.ScopePublishZones))
+	if p := decodeProblem(t, rec); rec.Code != http.StatusForbidden || p.Type != ProblemTypeBase+auth.SlugNotAPublisher {
+		t.Errorf("the scope without the sub = %d %s", rec.Code, rec.Body.String())
+	}
+	// The ANSP reads restrictions' attempts with its own scope.
+	if rec := h.get("/v1/publications/restrictions/attempts", h.token(anspID, auth.ScopePublishRestrictions)); rec.Code != http.StatusOK {
+		t.Errorf("ansp on restrictions = %d %s", rec.Code, rec.Body.String())
+	}
 	// Another client, even with cis.read: 403. The ANSP on zones: 403.
 	for _, tok := range []string{h.token(usspID, auth.ScopeRead), h.token(anspID, auth.ScopePublishRestrictions, auth.ScopeRead)} {
 		if rec := h.get("/v1/publications/zones/attempts", tok); rec.Code != http.StatusForbidden {

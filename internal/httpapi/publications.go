@@ -176,7 +176,7 @@ type PublicationAuth struct {
 //     body (before anything else reads it), then the verified bytes are
 //     kept for the handler.
 //   - GET history: cis.read or the dataset's publisher.
-//   - GET attempts: the dataset's publisher only.
+//   - GET attempts: the dataset's publish scope and its publisher.
 //   - POST heartbeat: any cis.publish:* scope, sub a configured
 //     publisher, and for the ANSP its client certificate subject.
 func (a PublicationAuth) Routes() map[string]func(http.Handler) http.Handler {
@@ -203,11 +203,12 @@ func (a PublicationAuth) Routes() map[string]func(http.Handler) http.Handler {
 			return []auth.Middleware{g.RequireScopes(), readerOrPublisher(g.ClientID(pub))}
 		}),
 		publicationAttemptsRoute: perDataset(func(ds publication.Dataset) []auth.Middleware {
-			pub, ok := auth.PublisherOf(ds)
-			if !ok {
+			pub, okPub := auth.PublisherOf(ds)
+			scope, okScope := auth.PublishScope(ds)
+			if !okPub || !okScope {
 				return []auth.Middleware{g.RequireScopes()}
 			}
-			return []auth.Middleware{g.RequirePublisher(pub)}
+			return []auth.Middleware{g.RequireScopes(scope), g.RequirePublisher(pub)}
 		}),
 		publisherHeartbeatRoute: func(next http.Handler) http.Handler {
 			return auth.Chain(next,

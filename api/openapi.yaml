@@ -269,8 +269,9 @@ paths:
       description: |
         The refused attempts of the calling publisher on this dataset,
         newest first, each with every problem by path. Only the dataset's
-        publisher may read them (403 for another client); the console's
-        admin view arrives with WP-8.
+        publisher may read them, with the dataset's publish scope (403
+        for another client or without the scope); the console's admin
+        view arrives with WP-8.
       parameters:
         - name: dataset
           in: path

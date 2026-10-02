@@ -185,9 +185,16 @@ type ChangeMessage struct {
 	BBox []float64 `json:"bbox,omitempty"`
 }
 
-// Message is the cis/change/v1 body of a change. pull_url asks for the
-// delta from the previous version.
+// Message is the cis/change/v1 body of a change (MessageOf on the
+// bus's CISP_PUBLIC_BASE_URL).
 func (b *Bus) Message(c publication.Change) ChangeMessage {
+	return MessageOf(c, b.cfg.PublicBaseURL)
+}
+
+// MessageOf is the cis/change/v1 body of a change: the same record on
+// the bus, in GET /v1/changes and (WP-6) in a webhook. pull_url asks
+// publicBaseURL for the delta from the previous version.
+func MessageOf(c publication.Change, publicBaseURL string) ChangeMessage {
 	m := ChangeMessage{
 		Schema:     SchemaChange,
 		MsgID:      strconv.FormatInt(c.ID, 10),
@@ -199,7 +206,7 @@ func (b *Bus) Message(c publication.Change) ChangeMessage {
 		RemovedIDs: nonNil(c.RemovedIDs),
 		Reason:     string(c.Reason),
 		At:         c.At.UTC(),
-		PullURL:    strings.TrimSuffix(b.cfg.PublicBaseURL, "/") + "/v1/" + string(c.Dataset) + "?since_version=" + strconv.FormatInt(max(c.Version-1, 0), 10),
+		PullURL:    strings.TrimSuffix(publicBaseURL, "/") + "/v1/" + string(c.Dataset) + "?since_version=" + strconv.FormatInt(max(c.Version-1, 0), 10),
 	}
 	if c.BBox != nil {
 		m.BBox = []float64{c.BBox.MinLon, c.BBox.MinLat, c.BBox.MaxLon, c.BBox.MaxLat}

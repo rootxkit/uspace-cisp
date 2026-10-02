@@ -234,3 +234,38 @@ func publisherStatus(r store.Publisher, now time.Time) statusPublisher {
 	p.StaleSince = &since
 	return p
 }
+
+// PublisherReading is one publisher's heartbeat as GET /v1/status reads
+// it, for the stream's status (which reads the table off the request
+// path).
+type PublisherReading struct {
+	ClientID        string
+	Kind            string
+	LastHeartbeatAt *time.Time
+	StaleAfter      time.Duration
+	Stale           bool
+}
+
+// ReadPublishers merges the configured publishers with the table rows
+// at now, by client id: a configured publisher never heard from is
+// stale, with no heartbeat.
+func ReadPublishers(configured []ConfiguredPublisher, rows []store.Publisher, now time.Time) []PublisherReading {
+	byID := map[string]statusPublisher{}
+	for _, c := range configured {
+		if c.ClientID != "" {
+			byID[c.ClientID] = statusPublisher{ClientID: c.ClientID, Kind: c.Kind, StaleAfterS: int(DefaultStaleAfter / time.Second), Stale: true}
+		}
+	}
+	for _, r := range rows {
+		byID[r.ClientID] = publisherStatus(r, now)
+	}
+	out := make([]PublisherReading, 0, len(byID))
+	for _, p := range byID {
+		out = append(out, PublisherReading{
+			ClientID: p.ClientID, Kind: p.Kind, LastHeartbeatAt: p.LastHeartbeatAt,
+			StaleAfter: time.Duration(p.StaleAfterS) * time.Second, Stale: p.Stale,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ClientID < out[j].ClientID })
+	return out
+}

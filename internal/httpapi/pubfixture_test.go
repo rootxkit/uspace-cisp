@@ -391,6 +391,7 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 		routes[op] = read
 	}
 	maps.Copy(routes, PublicReadAuth(h.limiter))
+	maps.Copy(routes, StreamAuth(h.limiter))
 	for _, o := range opts {
 		o(h.pubs, server)
 	}

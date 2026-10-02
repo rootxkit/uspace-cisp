@@ -45,6 +45,12 @@ type Config struct {
 	// PublicBaseURL prefixes pull_url (CISP_PUBLIC_BASE_URL).
 	PublicBaseURL string
 
+	// ConnectTimeout is how long Connect waits for the broker's first
+	// answer (CISP_NATS_CONNECT_TIMEOUT_S); past it Connect returns the
+	// handle anyway, never connected, and keeps trying in the
+	// background. Zero does not wait.
+	ConnectTimeout time.Duration
+
 	AckWait        time.Duration
 	ReconnectWait  time.Duration
 	StreamMaxAge   time.Duration
@@ -53,6 +59,12 @@ type Config struct {
 
 	// OnState, when set, is told every connection state change.
 	OnState func(connected bool, state string)
+	// OnSlowConsumer, when set, is told every NATS slow-consumer error
+	// (a subscription whose pending buffer overflowed and dropped
+	// messages); it is counted and logged by the caller, never fatal.
+	OnSlowConsumer func(err error)
+	// Now is the clock of the state's since-times; nil is time.Now.
+	Now func() time.Time
 }
 
 func (c *Config) defaults() {
@@ -71,6 +83,12 @@ func (c *Config) defaults() {
 	if c.Duplicates <= 0 {
 		c.Duplicates = DefaultDuplicates
 	}
+	if c.ConnectTimeout < 0 {
+		c.ConnectTimeout = 0
+	}
+	if c.Now == nil {
+		c.Now = time.Now
+	}
 }
 
 // Bus is a JetStream connection.
@@ -81,18 +99,31 @@ type Bus struct {
 
 	mu      sync.Mutex
 	ensured bool
+
+	state     State
+	watchers  map[int]func(prev, next State)
+	watcherID int
+	// owners maps a NATS subscription to the Subscription that made it,
+	// for the slow-consumer error.
+	owners map[*nats.Subscription]*Subscription
 }
 
-// Connect connects without blocking on an absent broker and without ever
-// giving up reconnecting.
-func Connect(_ context.Context, cfg Config) (*Bus, error) {
+// Connect connects without blocking on an absent broker for longer than
+// ConnectTimeout and without ever giving up reconnecting (LESSONS B-08):
+// with the broker down it returns a handle whose State is never
+// connected, and the connection keeps trying in the background.
+func Connect(ctx context.Context, cfg Config) (*Bus, error) {
 	cfg.defaults()
 	if cfg.URL == "" {
 		return nil, errors.New("bus: no NATS URL")
 	}
-	tell := func(connected bool, state string) {
-		if cfg.OnState != nil {
-			cfg.OnState(connected, state)
+	b := &Bus{cfg: cfg, watchers: map[int]func(prev, next State){}, owners: map[*nats.Subscription]*Subscription{},
+		state: State{Kind: StateNeverConnected, Since: cfg.Now().UTC()}}
+	up := make(chan struct{}, 1)
+	signal := func() {
+		select {
+		case up <- struct{}{}:
+		default:
 		}
 	}
 	opts := []nats.Option{
@@ -100,14 +131,32 @@ func Connect(_ context.Context, cfg Config) (*Bus, error) {
 		nats.RetryOnFailedConnect(true),
 		nats.MaxReconnects(-1),
 		nats.ReconnectWait(cfg.ReconnectWait),
-		nats.ConnectHandler(func(*nats.Conn) { tell(true, "connected") }),
-		nats.ReconnectHandler(func(*nats.Conn) { tell(true, "reconnected") }),
+		nats.ConnectHandler(func(*nats.Conn) {
+			b.transition(StateConnected, "")
+			signal()
+		}),
+		nats.ReconnectHandler(func(*nats.Conn) { b.transition(StateConnected, "") }),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
-			state := "disconnected"
+			reason := ""
 			if err != nil {
-				state += ": " + err.Error()
+				reason = err.Error()
 			}
-			tell(false, state)
+			b.transition(StateReconnecting, reason)
+		}),
+		nats.ClosedHandler(func(*nats.Conn) { b.transition(StateClosed, "") }),
+		nats.ErrorHandler(func(_ *nats.Conn, sub *nats.Subscription, err error) {
+			if !errors.Is(err, nats.ErrSlowConsumer) {
+				return
+			}
+			if cfg.OnSlowConsumer != nil {
+				cfg.OnSlowConsumer(err)
+			}
+			b.mu.Lock()
+			owner := b.owners[sub]
+			b.mu.Unlock()
+			if owner != nil {
+				owner.Dropped()
+			}
 		}),
 	}
 	if cfg.CredsFile != "" {
@@ -122,11 +171,20 @@ func Connect(_ context.Context, cfg Config) (*Bus, error) {
 		nc.Close()
 		return nil, fmt.Errorf("bus: jetstream: %w", err)
 	}
-	b := &Bus{cfg: cfg, nc: nc, js: js}
+	b.nc, b.js = nc, js
 	if nc.IsConnected() {
-		tell(true, "connected")
+		b.transition(StateConnected, "")
 	} else {
-		tell(false, "connecting")
+		b.tell(b.State())
+		if cfg.ConnectTimeout > 0 {
+			wait := time.NewTimer(cfg.ConnectTimeout)
+			defer wait.Stop()
+			select {
+			case <-up:
+			case <-wait.C:
+			case <-ctx.Done():
+			}
+		}
 	}
 	return b, nil
 }
@@ -134,12 +192,14 @@ func Connect(_ context.Context, cfg Config) (*Bus, error) {
 // Close closes the connection.
 func (b *Bus) Close() { b.nc.Close() }
 
-// Conn is the underlying connection (WP-7's subscribe side).
+// Conn is the underlying connection.
 func (b *Bus) Conn() *nats.Conn { return b.nc }
 
-// Status reports whether the connection is up and its state.
+// Status reports whether the connection is up and its state, as State
+// says it ("connected", "reconnecting since T", "never connected").
 func (b *Bus) Status() (connected bool, state string) {
-	return b.nc.IsConnected(), strings.ToLower(b.nc.Status().String())
+	st := b.State()
+	return st.Kind == StateConnected, st.String()
 }
 
 // StreamConfig is CIS_CHANGES as Config sets it.

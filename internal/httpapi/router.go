@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -62,6 +63,13 @@ type Options struct {
 	// that is no operation, which would be a typo guarding nothing). A
 	// header only an mTLS route checks is read nowhere else.
 	RouteMiddleware map[string]func(http.Handler) http.Handler
+	// RouteHandlers serve an operation in place of the generated strict
+	// handler, keyed by its pattern ("GET /v1/stream": the WebSocket
+	// upgrade needs the connection, which the strict server does not
+	// give). They still run inside the whole chain and behind the
+	// route's RouteMiddleware entry; an entry for no operation is
+	// refused like a RouteMiddleware one.
+	RouteHandlers map[string]http.Handler
 	// Now is the clock for durations; nil: time.Now.
 	Now func() time.Time
 	// RouteAliases names a registered ServeMux pattern by the operation it
@@ -87,7 +95,7 @@ var PublicRoutes = map[string]bool{
 // does not start) when an operation outside PublicRoutes has no
 // RouteMiddleware entry, or an entry names no operation.
 func NewRouter(server gen.StrictServerInterface, opts Options) (http.Handler, error) {
-	mux := &recordingMux{ServeMux: http.NewServeMux(), aliases: map[string]string{}}
+	mux := &recordingMux{ServeMux: http.NewServeMux(), aliases: map[string]string{}, handlers: opts.RouteHandlers}
 	strict := gen.NewStrictHandlerWithOptions(server, nil, gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestError,
 		ResponseErrorHandlerFunc: responseError(opts.Logger),
@@ -98,6 +106,11 @@ func NewRouter(server gen.StrictServerInterface, opts Options) (http.Handler, er
 	})
 	if err := CheckRouteAuth(mux.patterns, opts.RouteMiddleware); err != nil {
 		return nil, err
+	}
+	for p := range opts.RouteHandlers {
+		if !slices.Contains(mux.patterns, p) {
+			return nil, fmt.Errorf("a route handler for no operation: %s", p)
+		}
 	}
 	opts.RouteAliases = mux.aliases
 	return Wrap(mux.ServeMux, opts), nil
@@ -119,6 +132,8 @@ type recordingMux struct {
 	patterns []string
 	// aliases maps an expanded pattern to the operation's pattern.
 	aliases map[string]string
+	// handlers replace the generated handler of their pattern.
+	handlers map[string]http.Handler
 }
 
 // HandleFunc registers and records pattern; a datasetFirst pattern is
@@ -126,6 +141,9 @@ type recordingMux struct {
 // the generated code reads.
 func (m *recordingMux) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Request)) {
 	m.patterns = append(m.patterns, pattern)
+	if own, ok := m.handlers[pattern]; ok {
+		h = own.ServeHTTP
+	}
 	method, path, _ := strings.Cut(pattern, " ")
 	for _, prefix := range datasetFirst {
 		if path != prefix && !strings.HasPrefix(path, prefix+"/") {

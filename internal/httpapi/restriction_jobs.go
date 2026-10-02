@@ -88,6 +88,7 @@ type RestrictionStatusReport struct {
 	RefMissing     []string     `json:"heartbeat_ref_missing,omitempty"`
 	staleANSP      bool
 	expiryStale    bool
+	expiryAge      time.Duration
 }
 
 type expiryStatus struct {
@@ -124,6 +125,7 @@ func (rs *Restrictions) Report(ctx context.Context) (*RestrictionStatusReport, e
 	}
 	out.Expiry.Stale = age > rs.staleAfter()
 	out.expiryStale = out.Expiry.Stale
+	out.expiryAge = age
 	pubs, err := rs.Store.PublishersRefs(ctx)
 	if err != nil {
 		return nil, err
@@ -175,6 +177,7 @@ func (rs *Restrictions) Probe(ctx context.Context) {
 		return
 	}
 	st.Component(restrictionsComponent).Gauge(GaugeRestrictionsActive, "Active restrictions.").Set(float64(rep.Active))
+	exp.Gauge(GaugeExpiryJobAgeS, "Seconds since the restriction expiry last ran (the database's clock).").Set(max(rep.expiryAge.Seconds(), 0))
 	switch {
 	case rep.expiryStale && rep.Expiry.LastRunAt == nil:
 		exp.SetDegraded("the restriction expiry has not run since the start; active restrictions are not expired at their ends_at")
@@ -202,6 +205,10 @@ func (rs *Restrictions) Probe(ctx context.Context) {
 // GaugeExpiryFailures is the restrictions the last expiry tick could
 // not expire.
 const GaugeExpiryFailures = "expiry_last_tick_failures"
+
+// GaugeExpiryJobAgeS is the age of the expiry's last run, in seconds
+// (before the first run, this process's uptime).
+const GaugeExpiryJobAgeS = "restriction_expiry_job_age_s"
 
 func (rs *Restrictions) failuresGauge() *obs.Gauge {
 	return rs.status().Component(ExpiryComponent).Gauge(GaugeExpiryFailures, "Restrictions the last expiry tick could not expire.")

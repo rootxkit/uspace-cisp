@@ -328,6 +328,18 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvExpiryIntervalS, "0", "1", loadAPIErr},
 		{EnvExpiryStaleAfterS, "0", "6", loadAPIErr},
 		{EnvExpiryStaleAfterS, "5", "3600", loadAPIErr},
+		{EnvNATSConnectTimeoutS, "61", "0", loadAPIErr},
+		{EnvNATSConnectTimeoutS, "-1", "60", loadDeliverErr},
+		{EnvStreamMaxClients, "0", "1", loadAPIErr},
+		{EnvStreamMaxClients, "100001", "100000", loadAPIErr},
+		{EnvStreamSendBufferFrames, "0", "4096", loadAPIErr},
+		{EnvStreamStatusIntervalS, "0", "1", loadAPIErr},
+		{EnvStreamWriteTimeoutS, "61", "60", loadAPIErr},
+		{EnvStreamLiveMaxAgeS, "1", "2", loadAPIErr},
+		{EnvStreamAllowedOrigins, "https://cisp.example.test/path", "https://cisp.example.test, http://localhost:3000", loadAPIErr},
+		{EnvStreamAllowedOrigins, "null", "https://[::1]:8443", loadAPIErr},
+		{EnvStreamAllowedOrigins, "wss://cisp.example.test", "http://cisp.example.test/", loadAPIErr},
+		{EnvStreamPublic, "maybe", "false", loadAPIErr},
 		{EnvDatabaseMaxConns, "0", "1", loadAPIErr},
 		{EnvTimeseriesMaxConns, "1001", "1000", loadAPIErr},
 		{EnvDatabaseMaxConns, "0", "8", loadDeliverErr},
@@ -548,5 +560,26 @@ func TestExpiryStaleAboveInterval(t *testing.T) {
 	probs = problemsOf(t, loadAPIErr([]string{EnvExpiryIntervalS + "=61", EnvExpiryStaleAfterS + "=3600"}))
 	if _, ok := probs[EnvExpiryIntervalS]; !ok || len(probs) != 1 {
 		t.Errorf("interval 61: %v", probs)
+	}
+}
+
+// live_max_age_s below the status period would read a healthy stream as
+// not live between two frames: refused, naming both (E-01 pair).
+func TestStreamLiveMaxAgeAboveStatusInterval(t *testing.T) {
+	probs := problemsOf(t, loadAPIErr([]string{EnvStreamStatusIntervalS + "=10", EnvStreamLiveMaxAgeS + "=9"}))
+	if r, ok := probs[EnvStreamLiveMaxAgeS]; !ok || len(probs) != 1 || !strings.Contains(r, EnvStreamStatusIntervalS) {
+		t.Errorf("live 9 s, status 10 s: %v", probs)
+	}
+	if err := loadAPIErr([]string{EnvStreamStatusIntervalS + "=10", EnvStreamLiveMaxAgeS + "=10"}); err != nil {
+		t.Errorf("live 10 s, status 10 s: %v", err)
+	}
+	cfg, err := LoadAPI(withBase())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StreamMaxClients != 1000 || cfg.StreamSendBufferFrames != 64 || cfg.StreamStatusInterval != 2*time.Second ||
+		cfg.StreamWriteTimeout != 5*time.Second || cfg.StreamLiveMaxAge != 6*time.Second || !cfg.StreamPublic ||
+		cfg.StreamAllowedOrigins != nil || cfg.NATSConnectTimeout != 5*time.Second {
+		t.Errorf("stream defaults %+v", cfg)
 	}
 }

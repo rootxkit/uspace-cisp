@@ -83,13 +83,13 @@ func (e ChangeReason) Valid() bool {
 
 // Defines values for ChangeSchema.
 const (
-	Cischangev1 ChangeSchema = "cis/change/v1"
+	ChangeSchemaCischangev1 ChangeSchema = "cis/change/v1"
 )
 
 // Valid indicates whether the value is a known member of the ChangeSchema enum.
 func (e ChangeSchema) Valid() bool {
 	switch e {
-	case Cischangev1:
+	case ChangeSchemaCischangev1:
 		return true
 	default:
 		return false
@@ -726,6 +726,39 @@ func (e StatusPublishersKind) Valid() bool {
 	case StatusPublishersKindAnsp:
 		return true
 	case StatusPublishersKindAuthority:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StreamFrameSchema.
+const (
+	StreamFrameSchemaCischangev1     StreamFrameSchema = "cis/change/v1"
+	StreamFrameSchemaConsolestatusv1 StreamFrameSchema = "console/status/v1"
+)
+
+// Valid indicates whether the value is a known member of the StreamFrameSchema enum.
+func (e StreamFrameSchema) Valid() bool {
+	switch e {
+	case StreamFrameSchemaCischangev1:
+		return true
+	case StreamFrameSchemaConsolestatusv1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StreamFrameTimeSource.
+const (
+	System StreamFrameTimeSource = "system"
+)
+
+// Valid indicates whether the value is a known member of the StreamFrameTimeSource enum.
+func (e StreamFrameTimeSource) Valid() bool {
+	switch e {
+	case System:
 		return true
 	default:
 		return false
@@ -1964,6 +1997,75 @@ type StatusMtlsMode string
 // StatusPublishersKind defines model for Status.Publishers.Kind.
 type StatusPublishersKind string
 
+// StreamFrame One WS /v1/stream frame: the common envelope (uspace-lab
+// schemas/common envelope/v1, M29) around the body named by schema.
+// Times are RFC 3339 UTC with Z and milliseconds, on the CISP's
+// clock (time_source system). producer is cisp/api. msg_id is a
+// ULID per frame (a change's own id is the body's msg_id).
+type StreamFrame struct {
+	Backlog    bool                  `json:"backlog"`
+	Body       StreamFrame_Body      `json:"body"`
+	CapturedAt string                `json:"captured_at"`
+	MsgId      string                `json:"msg_id"`
+	Producer   string                `json:"producer"`
+	RxTs       string                `json:"rx_ts"`
+	Schema     StreamFrameSchema     `json:"schema"`
+	TimeSource StreamFrameTimeSource `json:"time_source"`
+	Ts         *string               `json:"ts"`
+}
+
+// StreamFrame_Body defines model for StreamFrame.Body.
+type StreamFrame_Body struct {
+	union json.RawMessage
+}
+
+// StreamFrameSchema defines model for StreamFrame.Schema.
+type StreamFrameSchema string
+
+// StreamFrameTimeSource defines model for StreamFrame.TimeSource.
+type StreamFrameTimeSource string
+
+// StreamStatus The console/status/v1 body (uspace-lab schemas/common, M29) with
+// the CISP's extras. degraded names database, nats, jwks and
+// publisher_stale; degraded_since says since when. nats is
+// connected, reconnecting, never_connected, closed or
+// not_configured, with nats_since while it is not connected.
+// datasets holds each dataset's current version (decimal) and its
+// age; cis_age_s is the age of the newest change. resync_since is
+// set on the first status after the bus returns and on no other.
+// sources is empty: the CISP's data comes from its publishers,
+// listed with their heartbeats in publishers (stale after
+// stale_after_s, 60 s).
+type StreamStatus struct {
+	CisAgeS      *float32 `json:"cis_age_s,omitempty"`
+	ConnectionId string   `json:"connection_id"`
+	Datasets     *map[string]struct {
+		AgeS    float32 `json:"age_s"`
+		Version string  `json:"version"`
+	} `json:"datasets,omitempty"`
+	Degraded      []string           `json:"degraded"`
+	DegradedSince *map[string]string `json:"degraded_since,omitempty"`
+	DroppedFrames int                `json:"dropped_frames"`
+	LiveMaxAgeS   float32            `json:"live_max_age_s"`
+	Nats          *string            `json:"nats,omitempty"`
+	NatsSince     *string            `json:"nats_since,omitempty"`
+
+	// PolicyVersion A hash of the instance's configuration (the CISP has no display thresholds of its own).
+	PolicyVersion string `json:"policy_version"`
+	Publishers    []struct {
+		ClientId        string   `json:"client_id"`
+		HeartbeatAgeS   *float32 `json:"heartbeat_age_s"`
+		Kind            string   `json:"kind"`
+		LastHeartbeatAt *string  `json:"last_heartbeat_at"`
+		Stale           bool     `json:"stale"`
+		StaleAfterS     float32  `json:"stale_after_s"`
+	} `json:"publishers"`
+	ResyncSince *string                  `json:"resync_since,omitempty"`
+	ServerTs    string                   `json:"server_ts"`
+	Sources     []map[string]interface{} `json:"sources"`
+	StaleAfterS float32                  `json:"stale_after_s"`
+}
+
 // Subscription defines model for Subscription.
 type Subscription struct {
 	Bbox                *[]float64             `json:"bbox,omitempty"`
@@ -2371,6 +2473,13 @@ type PatchRestrictionParams struct {
 // PatchRestrictionParamsBy defines parameters for PatchRestriction.
 type PatchRestrictionParamsBy string
 
+// GetStreamParams defines parameters for GetStream.
+type GetStreamParams struct {
+	// Datasets Comma-separated datasets whose changes to receive; absent or empty is every dataset.
+	Datasets *string `form:"datasets,omitempty" json:"datasets,omitempty"`
+	Origin   *string `json:"Origin,omitempty"`
+}
+
 // ListDeliveriesParams defines parameters for ListDeliveries.
 type ListDeliveriesParams struct {
 	// Since RFC 3339 instant with an offset.
@@ -2511,6 +2620,68 @@ func (t *DatasetDocument) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsStreamStatus returns the union data inside the StreamFrame_Body as a StreamStatus
+func (t StreamFrame_Body) AsStreamStatus() (StreamStatus, error) {
+	var body StreamStatus
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromStreamStatus overwrites any union data inside the StreamFrame_Body as the provided StreamStatus
+func (t *StreamFrame_Body) FromStreamStatus(v StreamStatus) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeStreamStatus performs a merge with any union data inside the StreamFrame_Body, using the provided StreamStatus
+func (t *StreamFrame_Body) MergeStreamStatus(v StreamStatus) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsChange returns the union data inside the StreamFrame_Body as a Change
+func (t StreamFrame_Body) AsChange() (Change, error) {
+	var body Change
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromChange overwrites any union data inside the StreamFrame_Body as the provided Change
+func (t *StreamFrame_Body) FromChange(v Change) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeChange performs a merge with any union data inside the StreamFrame_Body, using the provided Change
+func (t *StreamFrame_Body) MergeChange(v Change) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t StreamFrame_Body) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *StreamFrame_Body) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetJWKS The CISP's signing keys (JWKS)
@@ -2558,6 +2729,9 @@ type ServerInterface interface {
 	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(w http.ResponseWriter, r *http.Request)
+	// GetStream The WebSocket change stream
+	// (GET /v1/stream)
+	GetStream(w http.ResponseWriter, r *http.Request, params GetStreamParams)
 	// ListSubscriptions The caller's subscriptions
 	// (GET /v1/subscriptions)
 	ListSubscriptions(w http.ResponseWriter, r *http.Request)
@@ -3351,6 +3525,60 @@ func (siw *ServerInterfaceWrapper) GetStatus(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetStream operation middleware
+func (siw *ServerInterfaceWrapper) GetStream(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetStreamParams
+
+	// ------------- Optional query parameter "datasets" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "datasets", r.URL.Query(), &params.Datasets, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "datasets"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "datasets", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Origin" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Origin")]; found {
+		var Origin string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Origin", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Origin", valueList[0], &Origin, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Origin", Err: err})
+			return
+		}
+
+		params.Origin = &Origin
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStream(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListSubscriptions operation middleware
 func (siw *ServerInterfaceWrapper) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
 
@@ -3975,6 +4203,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions", wrapper.ListDatasetVersions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions/{version}", wrapper.GetDatasetVersion)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/changes", wrapper.ListChanges)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/stream", wrapper.GetStream)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/public/v1/{dataset}", wrapper.GetPublicDataset)
 	m.HandleFunc(http.MethodHead+" "+options.BaseURL+"/public/v1/{dataset}", wrapper.HeadPublicDataset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/.well-known/jwks.json", wrapper.GetJWKS)
@@ -5811,6 +6040,127 @@ func (response GetStatusdefaultApplicationProblemPlusJSONResponse) VisitGetStatu
 	return err
 }
 
+type GetStreamRequestObject struct {
+	Params GetStreamParams
+}
+
+type GetStreamResponseObject interface {
+	VisitGetStreamResponse(w http.ResponseWriter) error
+}
+
+type GetStream101JSONResponse StreamFrame
+
+func (response GetStream101JSONResponse) VisitGetStreamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(101)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStream400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetStream400ApplicationProblemPlusJSONResponse) VisitGetStreamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStream403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetStream403ApplicationProblemPlusJSONResponse) VisitGetStreamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStream426ApplicationProblemPlusJSONResponse Problem
+
+func (response GetStream426ApplicationProblemPlusJSONResponse) VisitGetStreamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(426)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStream429ApplicationProblemPlusJSONResponse struct {
+	RateLimitedApplicationProblemPlusJSONResponse
+}
+
+func (response GetStream429ApplicationProblemPlusJSONResponse) VisitGetStreamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStream503ApplicationProblemPlusJSONResponse struct {
+	UnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response GetStream503ApplicationProblemPlusJSONResponse) VisitGetStreamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStreamdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetStreamdefaultApplicationProblemPlusJSONResponse) VisitGetStreamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListSubscriptionsRequestObject struct {
 }
 
@@ -7328,6 +7678,9 @@ type StrictServerInterface interface {
 	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(ctx context.Context, request GetStatusRequestObject) (GetStatusResponseObject, error)
+	// GetStream The WebSocket change stream
+	// (GET /v1/stream)
+	GetStream(ctx context.Context, request GetStreamRequestObject) (GetStreamResponseObject, error)
 	// ListSubscriptions The caller's subscriptions
 	// (GET /v1/subscriptions)
 	ListSubscriptions(ctx context.Context, request ListSubscriptionsRequestObject) (ListSubscriptionsResponseObject, error)
@@ -7825,6 +8178,32 @@ func (sh *strictHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetStatusResponseObject); ok {
 		if err := validResponse.VisitGetStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetStream operation middleware
+func (sh *strictHandler) GetStream(w http.ResponseWriter, r *http.Request, params GetStreamParams) {
+	var request GetStreamRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStream(ctx, request.(GetStreamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStream")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStreamResponseObject); ok {
+		if err := validResponse.VisitGetStreamResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

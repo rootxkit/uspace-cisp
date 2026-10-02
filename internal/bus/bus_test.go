@@ -87,7 +87,7 @@ func TestBrokerDownGivesAHandleAndAFastFailure(t *testing.T) {
 		t.Errorf("status %v %q", ok, state)
 	}
 	mu.Lock()
-	if len(states) == 0 || states[0] != "connecting" {
+	if len(states) == 0 || !strings.HasPrefix(states[0], "never connected") {
 		t.Errorf("states %v", states)
 	}
 	mu.Unlock()

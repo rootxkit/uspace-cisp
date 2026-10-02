@@ -1,0 +1,6 @@
+# Read-only copy of uspace-lab schemas/common (decision record M14, M29):
+# the frame contract of WS /v1/stream. Never edited here; refreshed from
+# the commit below when the lab changes them.
+repo = https://github.com/rootxkit/uspace-lab.git
+commit = e62f076c3e7dea7b6150d145b03960340b4a1d78
+paths = schemas/common/envelope/v1/schema.json schemas/common/console/status/v1/schema.json schemas/common/source/status/v1/schema.json schemas/common/console/status/v1/examples/cisp-resync.json

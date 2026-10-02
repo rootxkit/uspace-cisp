@@ -84,14 +84,42 @@ type NewSession struct {
 	ExpiresAt time.Time
 }
 
+// NewLoginChallenge is a login_challenges row the password step opens:
+// the SHA-256 (hex) of the token, never the token.
+type NewLoginChallenge struct {
+	TokenHash string
+	AccountID string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+// LoginChallenge is a login_challenges row as stored.
+type LoginChallenge struct {
+	TokenHash string
+	AccountID string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	Attempts  int
+	UsedAt    *time.Time
+}
+
 // LoginOutcome is what a login decided: the row update, the session to
-// insert, the audit rows, and the refusal returned after the commit
-// (the failed-login counter must be committed with it).
+// insert, the MFA challenge to open (password step) or what to write to
+// the challenge being exchanged (code step), the audit rows, and the
+// refusal returned after the commit (the failed-login counter and a
+// challenge's attempts must be committed with it).
 type LoginOutcome struct {
 	Update  *AccountLoginUpdate
 	Session *NewSession
-	Events  []Event
-	Refusal error
+	// Challenge opens an MFA challenge; the account's spent and expired
+	// ones are deleted first (E-10).
+	Challenge *NewLoginChallenge
+	// ChallengeAttempt counts a wrong code on the challenge exchanged.
+	ChallengeAttempt bool
+	// ChallengeUsed spends the challenge exchanged.
+	ChallengeUsed bool
+	Events        []Event
+	Refusal       error
 }
 
 // Login runs decide on the account named username, locked FOR UPDATE
@@ -119,27 +147,8 @@ func (s *Store) Login(ctx context.Context, username string, decide func(a *Accou
 		if err != nil {
 			return err
 		}
-		if out.Update != nil && acc != nil {
-			u := out.Update
-			if err := q.UpdateAccountLogin(ctx, relational.UpdateAccountLoginParams{
-				ID: acc.ID, FailedLogins: int32(min(max(u.FailedLogins, 0), 1<<30)), LockedUntil: u.LockedUntil,
-				LastLoginAt: u.LastLoginAt, PasswordHash: u.PasswordHash, TotpLastStep: u.TOTPLastStep,
-			}); err != nil {
-				return fmt.Errorf("account login: %w", err)
-			}
-		}
-		for _, e := range out.Events {
-			if _, err := AppendEvent(ctx, q, e); err != nil {
-				return err
-			}
-		}
-		if out.Session != nil {
-			ns := out.Session
-			if err := q.InsertSession(ctx, relational.InsertSessionParams{
-				Jti: ns.JTI, AccountID: ns.AccountID, IssuedAt: ns.IssuedAt, ExpiresAt: ns.ExpiresAt,
-			}); err != nil {
-				return fmt.Errorf("insert session: %w", err)
-			}
+		if err := writeLoginOutcome(ctx, q, acc, "", now, out); err != nil {
+			return err
 		}
 		refusal = out.Refusal
 		return nil
@@ -148,6 +157,121 @@ func (s *Store) Login(ctx context.Context, username string, decide func(a *Accou
 		return err
 	}
 	return refusal
+}
+
+// ExchangeChallenge runs decide on the MFA challenge stored under
+// tokenHash and its account, both locked FOR UPDATE in the password
+// step's order (the account, then the challenge), with the database's
+// clock, and writes its outcome in the same transaction. An unknown
+// challenge reaches decide as nil with a nil account; a challenge whose
+// account is gone (never: accounts are not deleted) the same. Errors and
+// refusals are as Login's.
+func (s *Store) ExchangeChallenge(ctx context.Context, tokenHash string, decide func(ch *LoginChallenge, a *Account, now time.Time) (LoginOutcome, error)) error {
+	var refusal error
+	err := s.Tx(ctx, func(q *relational.Queries) error {
+		now, err := q.ConsoleNow(ctx)
+		if err != nil {
+			return fmt.Errorf("database clock: %w", err)
+		}
+		var ch *LoginChallenge
+		var acc *Account
+		peek, err := q.GetLoginChallenge(ctx, tokenHash)
+		switch {
+		case err == nil:
+			row, err := q.GetAccountForUpdate(ctx, peek.AccountID)
+			switch {
+			case err == nil:
+				a := accountOf(row)
+				acc = &a
+			case !errors.Is(err, pgx.ErrNoRows):
+				return fmt.Errorf("account: %w", err)
+			}
+			locked, err := q.GetLoginChallengeForUpdate(ctx, tokenHash)
+			switch {
+			case err == nil && acc != nil:
+				c := challengeOf(locked)
+				ch = &c
+			case err != nil && !errors.Is(err, pgx.ErrNoRows):
+				return fmt.Errorf("login challenge: %w", err)
+			default:
+				acc = nil
+			}
+		case !errors.Is(err, pgx.ErrNoRows):
+			return fmt.Errorf("login challenge: %w", err)
+		}
+		out, err := decide(ch, acc, now.UTC())
+		if err != nil {
+			return err
+		}
+		hash := ""
+		if ch != nil {
+			hash = ch.TokenHash
+		}
+		if err := writeLoginOutcome(ctx, q, acc, hash, now, out); err != nil {
+			return err
+		}
+		refusal = out.Refusal
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return refusal
+}
+
+func challengeOf(c relational.LoginChallenge) LoginChallenge {
+	return LoginChallenge{
+		TokenHash: c.TokenHash, AccountID: c.AccountID, CreatedAt: c.CreatedAt.UTC(), ExpiresAt: c.ExpiresAt.UTC(),
+		Attempts: int(c.Attempts), UsedAt: utcPtr(c.UsedAt),
+	}
+}
+
+// writeLoginOutcome writes a login's or an exchange's outcome on acc and
+// the challenge stored under challengeHash ("" for none).
+func writeLoginOutcome(ctx context.Context, q *relational.Queries, acc *Account, challengeHash string, now time.Time, out LoginOutcome) error {
+	if out.Update != nil && acc != nil {
+		u := out.Update
+		if err := q.UpdateAccountLogin(ctx, relational.UpdateAccountLoginParams{
+			ID: acc.ID, FailedLogins: int32(min(max(u.FailedLogins, 0), 1<<30)), LockedUntil: u.LockedUntil,
+			LastLoginAt: u.LastLoginAt, PasswordHash: u.PasswordHash, TotpLastStep: u.TOTPLastStep,
+		}); err != nil {
+			return fmt.Errorf("account login: %w", err)
+		}
+	}
+	if challengeHash != "" && out.ChallengeAttempt {
+		if err := q.CountLoginChallengeAttempt(ctx, challengeHash); err != nil {
+			return fmt.Errorf("login challenge attempt: %w", err)
+		}
+	}
+	if challengeHash != "" && out.ChallengeUsed {
+		if err := q.UseLoginChallenge(ctx, relational.UseLoginChallengeParams{TokenHash: challengeHash, UsedAt: &now}); err != nil {
+			return fmt.Errorf("use login challenge: %w", err)
+		}
+	}
+	if c := out.Challenge; c != nil {
+		if _, err := q.DeleteSpentLoginChallenges(ctx, relational.DeleteSpentLoginChallengesParams{AccountID: c.AccountID, Now: now}); err != nil {
+			return fmt.Errorf("delete spent login challenges: %w", err)
+		}
+		if err := q.InsertLoginChallenge(ctx, relational.InsertLoginChallengeParams{
+			TokenHash: c.TokenHash, AccountID: c.AccountID, CreatedAt: c.CreatedAt, ExpiresAt: c.ExpiresAt,
+		}); err != nil {
+			return fmt.Errorf("insert login challenge: %w", err)
+		}
+	}
+	for _, e := range out.Events {
+		if _, err := AppendEvent(ctx, q, e); err != nil {
+			return err
+		}
+	}
+	if out.Session != nil {
+		ns := out.Session
+		if err := q.InsertSession(ctx, relational.InsertSessionParams{
+			Jti: ns.JTI, AccountID: ns.AccountID, IssuedAt: ns.IssuedAt, ExpiresAt: ns.ExpiresAt,
+		}); err != nil {
+			return fmt.Errorf("insert session: %w", err)
+		}
+	}
+	return nil
 }
 
 // CreateAccount inserts an account with its audit row.

@@ -165,7 +165,7 @@ func TestMigrationTreesUpDownUp(t *testing.T) {
 		tables []string
 		files  int
 	}{
-		{TreeRelational, "CISP_TEST_DATABASE_URL", []string{"datasets", "publications", "publication_attempts", "features", "features_current", "snapshots", "changes", "restrictions", "restriction_events", "publishers", "subscriptions", "deliveries", "accounts", "sessions", "events"}, 6},
+		{TreeRelational, "CISP_TEST_DATABASE_URL", []string{"datasets", "publications", "publication_attempts", "features", "features_current", "snapshots", "changes", "restrictions", "restriction_events", "publishers", "subscriptions", "deliveries", "accounts", "sessions", "events"}, 7},
 		{TreeTimeseries, "CISP_TEST_TIMESERIES_URL", []string{"delivery_attempts"}, 2},
 	}
 	for _, c := range cases {
@@ -625,8 +625,9 @@ func TestSnapshotCacheServesWhenTheDatabaseIsGone(t *testing.T) {
 	t.Logf("stale since %s, still serving zones:%d", since.Format(time.RFC3339Nano), again.Version)
 }
 
-// The ussp_list dataset: the snapshot is the body; the same body is
-// unchanged, another is a version.
+// The ussp_list dataset: the snapshot is the canonical list with the
+// cis_* members (WP-3); the same list, also re-spaced, is unchanged;
+// another is a version.
 func TestPublishUSSPListByBody(t *testing.T) {
 	ctx := context.Background()
 	s := testStore(t, Options{})
@@ -637,11 +638,28 @@ func TestPublishUSSPListByBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	snap, _ := s.Snapshot(ctx, publication.DatasetUSSPList, res.Version)
-	if raw, _ := gunzip(snap.BodyGz); !bytes.Equal(raw, body) {
-		t.Error("the ussp_list snapshot is not the body")
+	want, err := publication.UsspListSnapshot(res.Version, snap.BuiltAt, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := gunzip(snap.BodyGz)
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil || got["cis_version"] != float64(res.Version) || got["cis_dataset"] != "ussp_list" || got["n"] == nil {
+		t.Errorf("the ussp_list snapshot %s is not the canonical list with cis_* members (%v)", raw, err)
+	}
+	if !bytes.Equal(raw, want) {
+		t.Errorf("snapshot %s, want the canonical form %s", raw, want)
+	}
+	if pub, err := relational.New(s.pool).GetPublication(ctx, relational.GetPublicationParams{Dataset: string(publication.DatasetUSSPList), Version: res.Version}); err != nil || !bytes.Equal(pub.Body, body) {
+		t.Errorf("the stored body is not the bytes received: %v", err)
 	}
 	if _, err := s.PublishTx(ctx, in, NoopSigner{}); !errors.Is(err, ErrUnchanged) {
 		t.Errorf("same body: %v", err)
+	}
+	respaced := in
+	respaced.Body = append([]byte(" \n"), body...)
+	if _, err := s.PublishTx(ctx, respaced, NoopSigner{}); !errors.Is(err, ErrUnchanged) {
+		t.Errorf("the same list re-spaced: %v", err)
 	}
 	in.Body = append(slices.Clone(body[:len(body)-1]), []byte(`,"m":1}`)...)
 	if r2, err := s.PublishTx(ctx, in, NoopSigner{}); err != nil || r2.Version != res.Version+1 {

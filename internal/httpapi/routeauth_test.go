@@ -14,7 +14,13 @@ func passthrough(h http.Handler) http.Handler { return h }
 // openRoutes gives every non-public operation a passthrough entry, for
 // the tests that exercise handlers rather than authentication.
 func openRoutes() map[string]func(http.Handler) http.Handler {
-	return map[string]func(http.Handler) http.Handler{"GET /v1/status": passthrough}
+	return map[string]func(http.Handler) http.Handler{
+		"GET /v1/status":                          passthrough,
+		"PUT /v1/publications/{dataset}":          passthrough,
+		"GET /v1/publications/{dataset}":          passthrough,
+		"GET /v1/publications/{dataset}/attempts": passthrough,
+		"POST /v1/publishers/heartbeat":           passthrough,
+	}
 }
 
 func mustRouter(t *testing.T, s *Server, opts Options) http.Handler {

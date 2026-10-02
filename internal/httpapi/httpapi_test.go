@@ -36,7 +36,7 @@ var (
 
 // spec loads api/openapi.yaml once; every handler test validates its
 // request and response against it, so the file is the contract.
-func spec(t *testing.T) routers.Router {
+func spec(t testing.TB) routers.Router {
 	t.Helper()
 	specOnce.Do(func() {
 		loader := openapi3.NewLoader()
@@ -59,14 +59,14 @@ func spec(t *testing.T) routers.Router {
 
 // conform fails the test when req or the recorded response is not what
 // api/openapi.yaml describes.
-func conform(t *testing.T, req *http.Request, rec *httptest.ResponseRecorder) {
+func conform(t testing.TB, req *http.Request, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	if err := conformErr(t, req, rec); err != nil {
 		t.Errorf("%s %s: %v\n%s", req.Method, req.URL.Path, err, rec.Body.String())
 	}
 }
 
-func conformErr(t *testing.T, req *http.Request, rec *httptest.ResponseRecorder) error {
+func conformErr(t testing.TB, req *http.Request, rec *httptest.ResponseRecorder) error {
 	t.Helper()
 	route, params, err := spec(t).FindRoute(req)
 	if err != nil {
@@ -157,7 +157,7 @@ func (f fixture) do(req *http.Request) *httptest.ResponseRecorder {
 	return rec
 }
 
-func decodeProblem(t *testing.T, rec *httptest.ResponseRecorder) gen.Problem {
+func decodeProblem(t testing.TB, rec *httptest.ResponseRecorder) gen.Problem {
 	t.Helper()
 	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
 		t.Fatalf("Content-Type = %q, want application/problem+json; body %s", ct, rec.Body.String())

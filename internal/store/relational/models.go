@@ -147,13 +147,15 @@ type PublicationAttempt struct {
 }
 
 type Publisher struct {
-	ClientID          string
-	Kind              string
-	MtlsSubject       *string
-	LastHeartbeatAt   *time.Time
-	LastPublicationAt *time.Time
-	StaleAfterS       int32
-	Enabled           bool
+	ClientID            string
+	Kind                string
+	MtlsSubject         *string
+	LastHeartbeatAt     *time.Time
+	LastPublicationAt   *time.Time
+	StaleAfterS         int32
+	Enabled             bool
+	LastHeartbeatSentAt *time.Time
+	ActiveRefs          []byte
 }
 
 type Restriction struct {

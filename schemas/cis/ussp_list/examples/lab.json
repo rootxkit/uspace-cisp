@@ -1,0 +1,52 @@
+{
+  "schema": "cis/ussp_list/v1",
+  "issued": "2026-10-02T08:00:00Z",
+  "ussps": [
+    {
+      "ussp_id": "USSP-DEV",
+      "name": "Lab USSP",
+      "contact": {
+        "email": "ops@ussp.example.test",
+        "phone": "+995 32 200 00 00",
+        "url": "https://ussp.example.test/contact"
+      },
+      "certificate_id": "GCAA-USSP-0001",
+      "base_url": "https://ussp.example.test",
+      "services": [
+        "network_identification",
+        "geo_awareness",
+        "flight_authorisation",
+        "traffic_information"
+      ],
+      "certification_limitations": [
+        "VLOS operations only until 2027-01-01"
+      ],
+      "valid_from": "2026-10-01T00:00:00Z",
+      "valid_until": "2027-10-01T00:00:00Z",
+      "terms_url": "https://ussp.example.test/terms",
+      "status": "operating"
+    },
+    {
+      "ussp_id": "USSP-B2",
+      "name": "Second lab USSP",
+      "contact": {
+        "email": "noc@second.example.test"
+      },
+      "certificate_id": "GCAA-USSP-0002",
+      "base_url": "https://second.example.test/uss",
+      "services": [
+        "network_identification",
+        "geo_awareness",
+        "flight_authorisation",
+        "traffic_information",
+        "weather",
+        "conformance_monitoring"
+      ],
+      "certification_limitations": [],
+      "valid_from": "2026-09-01T00:00:00+04:00",
+      "valid_until": "2027-09-01T00:00:00+04:00",
+      "terms_url": "https://second.example.test/terms",
+      "status": "limited"
+    }
+  ]
+}

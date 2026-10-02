@@ -3,6 +3,7 @@
 #   api/openapi.yaml -> internal/httpapi/gen/api.gen.go  (oapi-codegen, go:generate)
 #   sqlc.yaml        -> internal/store/**.sql.go          (sqlc; from WP-1)
 #   api/openapi.yaml -> web/src/api/types.ts              (openapi-typescript; from WP-9)
+#   api/openapi.yaml -> schemas/cis/*/v1.json             (tools/export-schemas.go; from WP-3)
 # The Go tools run from the module cache through `go tool` (the tool
 # directives in go.mod), so the versions are the ones go.sum pins.
 # openapi-typescript is pinned in the Makefile (OPENAPI_TYPESCRIPT_VERSION).
@@ -13,6 +14,9 @@ GO="${GO:-go}"
 OPENAPI_TYPESCRIPT_VERSION="${OPENAPI_TYPESCRIPT_VERSION:?set by the Makefile}"
 
 "$GO" generate ./...
+
+# The JSON Schemas this repository produces, from their OpenAPI components.
+"$GO" run tools/export-schemas.go
 
 if [ -f sqlc.yaml ]; then
   "$GO" tool sqlc generate

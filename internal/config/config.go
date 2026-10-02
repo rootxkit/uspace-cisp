@@ -35,6 +35,10 @@ type API struct {
 	HTTPAddr       string
 	HandlerTimeout time.Duration
 	MaxBodyBytes   int64
+	// BodyReadMinBytesPerS is the slowest upload accepted: a body gets
+	// its route cap divided by this rate (at least HandlerTimeout) to
+	// arrive, before the handler deadline starts.
+	BodyReadMinBytesPerS int64
 
 	DatabaseURL   string
 	TimeseriesURL string
@@ -135,6 +139,8 @@ func LoadAPI(environ []string) (*API, error) {
 		HTTPAddr:       e.str(EnvHTTPAddr),
 		HandlerTimeout: e.seconds(EnvHandlerTimeoutS),
 		MaxBodyBytes:   e.integer(EnvMaxBodyBytes),
+
+		BodyReadMinBytesPerS: e.integer(EnvBodyReadMinBytesPerS),
 
 		DatabaseURL:   e.str(EnvDatabaseURL),
 		TimeseriesURL: e.str(EnvTimeseriesURL),
@@ -335,6 +341,7 @@ func (c *API) Validate() error {
 	p = addrOK(p, EnvHTTPAddr, c.HTTPAddr)
 	p = durationIn(p, EnvHandlerTimeoutS, c.HandlerTimeout, time.Second, 5*time.Minute)
 	p = intIn(p, EnvMaxBodyBytes, c.MaxBodyBytes, 1024, 1<<30)
+	p = intIn(p, EnvBodyReadMinBytesPerS, c.BodyReadMinBytesPerS, 1024, 1<<30)
 	p = urlOK(p, EnvDatabaseURL, c.DatabaseURL, "postgres", "postgresql")
 	p = urlOK(p, EnvTimeseriesURL, c.TimeseriesURL, "postgres", "postgresql")
 	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)

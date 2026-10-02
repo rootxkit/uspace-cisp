@@ -1,0 +1,22 @@
+{
+  "uas_requirements": {
+    "remote_identification": "network and direct",
+    "geo_awareness": "required",
+    "min_c_class": "C1"
+  },
+  "service_performance": {
+    "nid_update_hz": 1,
+    "ti_update_hz": 1,
+    "cis_latency_s": 1,
+    "fa_response_s": 30
+  },
+  "operational_conditions": {
+    "flight_authorisation_lead_time_s": 600,
+    "night_operations": false
+  },
+  "airspace_constraints": {
+    "max_height_agl_m": 120
+  },
+  "services_required": ["NID", "GEO", "FA", "TI", "WX"],
+  "adjacent": []
+}

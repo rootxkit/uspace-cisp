@@ -61,6 +61,7 @@ jobs:
               - 'tools/**'
               - 'sqlc.yaml'
               - 'migrations/**'
+              - 'schemas/**'
               - 'web/**'
               - 'Makefile'
               - '.github/workflows/ci.yml'

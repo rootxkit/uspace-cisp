@@ -74,12 +74,13 @@ cover:
 	$(GO) test -count=1 -shuffle=on -coverprofile=coverage.out -covermode=atomic $(PKGS)
 	$(GO) tool cover -func=coverage.out | tail -n 1
 
-# oapi-codegen (go:generate), sqlc (from WP-1), openapi-typescript.
+# oapi-codegen (go:generate), sqlc (from WP-1), openapi-typescript, and
+# the exported JSON Schemas (tools/export-schemas.go, from WP-3).
 generate:
 	GO=$(GO) OPENAPI_TYPESCRIPT_VERSION=$(OPENAPI_TYPESCRIPT_VERSION) tools/generate.sh
 
 # The committed generated files are exactly what the sources produce.
-GENERATED = internal/httpapi/gen internal/store web/src/api
+GENERATED = internal/httpapi/gen internal/store web/src/api schemas/cis
 generate-check: generate
 	@out="$$(git status --porcelain --untracked-files=all -- $(GENERATED))"; \
 	if [ -n "$$out" ]; then echo "$$out"; \

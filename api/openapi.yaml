@@ -101,6 +101,251 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /v1/publications/{dataset}:
+    put:
+      operationId: putPublication
+      tags: [publications]
+      summary: Publish a whole dataset (F1)
+      description: |
+        The authority publishes the whole of zones, uspace_airspace or
+        ussp_list. Token scope cis.publish:zones, cis.publish:uspace or
+        cis.publish:ussp_list for the dataset, and sub the configured
+        authority client id. The body is at most
+        CISP_MAX_PUBLICATION_BYTES, application/geo+json or
+        application/json (415 otherwise), and carries the authority's
+        detached JWS over its exact bytes in X-JWS-Signature; a missing
+        or refused signature is 403 signature before anything else is
+        read (docs/PLAN.md section 15 Q30).
+
+        If-Match must name the current version ("<dataset>:<version>",
+        "zones:0" before the first publication): absent is 428
+        precondition_required, another version is 412
+        precondition_failed with the current one in the ETag header.
+
+        The publication is accepted whole or refused whole (spec 06 T9):
+        a refusal is 400 with every problem named by its JSON path in
+        errors[] (at most 100; truncated says more existed and detail
+        gives the count), and is recorded as an attempt the publisher
+        can read back. Zones and U-space airspace are ED-318 collections
+        parsed by uspace-core/ed318 and then held to the dataset rules
+        (no USPACE in zones, only USPACE in uspace_airspace, no DAR
+        reason, identifiers unique across zones, uspace_airspace and
+        restrictions, every zone buildable by ed318.ToZones, the
+        UspaceRequirements block on every USPACE feature); ussp_list is
+        the closed UsspList schema. A body equal by canonical content to
+        the current version is 200 with unchanged true and no new
+        version; otherwise 201 with the new version and what changed.
+        The bytes stored are the bytes received.
+      parameters:
+        - name: dataset
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [zones, uspace_airspace, ussp_list]
+        - name: If-Match
+          in: header
+          required: false
+          description: The current ETag; required by the server (428 when absent).
+          schema:
+            type: string
+            examples: ['"zones:4"']
+        - name: X-JWS-Signature
+          in: header
+          required: false
+          description: |
+            RFC 7515 Appendix F detached JWS with RFC 7797 b64 false over
+            the exact body bytes (alg RS256, kid, iat, crit ["b64"]);
+            required by the server (403 signature when absent).
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: The whole dataset, verbatim.
+        content:
+          application/geo+json:
+            schema:
+              $ref: "#/components/schemas/PublicationBody"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicationBody"
+      responses:
+        "200":
+          description: Equal to the current version; nothing was written.
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicationResult"
+        "201":
+          description: Accepted as a new version.
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicationResult"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "415":
+          $ref: "#/components/responses/Problem"
+        "428":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+    get:
+      operationId: listPublications
+      tags: [publications]
+      summary: The version history of a dataset
+      description: |
+        Every version of the dataset, newest first, with its publisher,
+        time, counts, reason and warnings; no bodies (they are served by
+        the datasets reads). Token scope cis.read, or the dataset's
+        publisher. Page with before (versions below it) and limit.
+      parameters:
+        - name: dataset
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [zones, uspace_airspace, ussp_list, restrictions]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: before
+          in: query
+          required: false
+          description: Only versions below this one.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        "200":
+          description: The versions, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicationVersionList"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/publications/{dataset}/attempts:
+    get:
+      operationId: listPublicationAttempts
+      tags: [publications]
+      summary: The caller's refused publications (Annex III A(5))
+      description: |
+        The refused attempts of the calling publisher on this dataset,
+        newest first, each with every problem by path. Only the dataset's
+        publisher may read them, with the dataset's publish scope (403
+        for another client or without the scope); the console's admin
+        view arrives with WP-8.
+      parameters:
+        - name: dataset
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [zones, uspace_airspace, ussp_list, restrictions]
+        - name: since
+          in: query
+          required: false
+          description: Only attempts received after this instant.
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: The refused attempts, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicationAttemptList"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/publishers/heartbeat:
+    post:
+      operationId: postPublisherHeartbeat
+      tags: [publications]
+      summary: Publisher heartbeat (every 15 s)
+      description: |
+        Every publisher sends this every 15 s with any cis.publish:*
+        scope; the CISP records the time it arrived as last_heartbeat_at
+        for the caller's sub and stores active_refs verbatim (the ANSP's
+        ansp_refs; the authority sends none). A publisher silent for 60 s
+        is stale (docs/PLAN.md section 15 Q3). The heartbeat never
+        changes a restriction's state. 403 when sub is not a configured
+        publisher; the ANSP's heartbeat is bound to its client
+        certificate subject like its other routes (section 8.3).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublisherHeartbeat"
+      responses:
+        "204":
+          description: Recorded.
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /.well-known/jwks.json:
     get:
       operationId: getJWKS
@@ -162,6 +407,16 @@ components:
   responses:
     Problem:
       description: An error, as RFC 9457 problem details.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PreconditionFailed:
+      description: If-Match does not name the current version; ETag is the current one.
+      headers:
+        ETag:
+          schema:
+            type: string
       content:
         application/problem+json:
           schema:
@@ -241,6 +496,397 @@ components:
         e:
           type: string
           description: The exponent, base64url without padding.
+
+    PublicationBody:
+      type: object
+      description: |
+        The whole dataset as the publisher signed it: an ED-318
+        FeatureCollection (zones, uspace_airspace) or a UsspList
+        (ussp_list). The server validates it (uspace-core/ed318, the
+        dataset rules, the UsspList schema) and stores the bytes as
+        received.
+      x-go-type: json.RawMessage
+    Warning:
+      type: object
+      description: |
+        Something a consumer can still judge safely, such as a daylight
+        schedule without end dates that only ed318.Applies evaluates.
+        Anything about geometry or limits is a refusal, never a warning.
+      required: [field, reason]
+      properties:
+        field:
+          type: string
+          description: The JSON path of the feature or member.
+        reason:
+          type: string
+    PublicationResult:
+      type: object
+      description: |
+        The outcome of an accepted PUT: the new version (201) or the
+        current one with unchanged true (200). added, changed and
+        removed list at most 1000 identifiers each; truncated counts the
+        rest.
+      required: [dataset, version, etag]
+      properties:
+        dataset:
+          type: string
+          enum: [zones, uspace_airspace, ussp_list]
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        etag:
+          type: string
+          examples: ['"zones:5"']
+        unchanged:
+          type: boolean
+        received_at:
+          type: string
+          format: date-time
+        feature_count:
+          type: integer
+          minimum: 0
+        added_count:
+          type: integer
+          minimum: 0
+        changed_count:
+          type: integer
+          minimum: 0
+        removed_count:
+          type: integer
+          minimum: 0
+        added:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+        changed:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+        removed:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+        truncated:
+          type: object
+          description: How many identifiers each list left out.
+          required: [added, changed, removed]
+          properties:
+            added:
+              type: integer
+              minimum: 0
+            changed:
+              type: integer
+              minimum: 0
+            removed:
+              type: integer
+              minimum: 0
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    PublicationVersion:
+      type: object
+      required: [dataset, version, etag, publisher, received_at, feature_count, added, changed, removed, reason, warnings, body_sha256, bytes, content_type]
+      properties:
+        dataset:
+          type: string
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        etag:
+          type: string
+        publisher:
+          type: string
+          description: The client id that published the version.
+        received_at:
+          type: string
+          format: date-time
+        feature_count:
+          type: integer
+          minimum: 0
+        added:
+          type: integer
+          minimum: 0
+        changed:
+          type: integer
+          minimum: 0
+        removed:
+          type: integer
+          minimum: 0
+        supersedes_version:
+          type: integer
+          format: int64
+          minimum: 0
+        reason:
+          type: string
+          enum: [publication, restriction_created, restriction_activated, restriction_extended, restriction_ended, restriction_cancelled, restriction_expired, republished]
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+        signature_kid:
+          type: string
+          description: The kid of the publisher's detached JWS; absent for versions the CISP made.
+        body_sha256:
+          type: string
+          description: SHA-256 of the verbatim body, lower-case hex.
+          pattern: "^[0-9a-f]{64}$"
+        bytes:
+          type: integer
+          format: int64
+          minimum: 0
+        content_type:
+          type: string
+    PublicationVersionList:
+      type: object
+      required: [dataset, versions]
+      properties:
+        dataset:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationVersion"
+        next_before:
+          type: integer
+          format: int64
+          description: Pass as before for the next page; absent on the last page.
+    PublicationAttempt:
+      type: object
+      required: [id, dataset, received_at, outcome, problems, bytes]
+      properties:
+        id:
+          type: string
+        dataset:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        outcome:
+          type: string
+          enum: [accepted, refused]
+        publication_id:
+          type: string
+        problems:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/FieldProblem"
+        truncated:
+          type: integer
+          minimum: 0
+          description: How many problems beyond the 100 listed were found.
+        body_sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        bytes:
+          type: integer
+          format: int64
+          minimum: 0
+    PublicationAttemptList:
+      type: object
+      required: [dataset, attempts]
+      properties:
+        dataset:
+          type: string
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationAttempt"
+    PublisherHeartbeat:
+      type: object
+      required: [sent_at]
+      properties:
+        sent_at:
+          type: string
+          format: date-time
+          description: The publisher's clock when it sent the heartbeat.
+        active_refs:
+          type: array
+          maxItems: 1000
+          description: The ANSP's active ansp_refs, stored verbatim; the authority sends none.
+          items:
+            type: string
+
+    UsspList:
+      type: object
+      description: |
+        cis/ussp_list/v1: the national list of certified USSPs and their
+        terms (spec 02 F1, Annex III; docs/PLAN.md section 15 Q5),
+        produced by the authority and published as the ussp_list
+        dataset. A closed schema: an unknown member anywhere is refused.
+        The cis_* members are written by the CISP when it serves the
+        list and are refused in a publication.
+      additionalProperties: false
+      required: [schema, issued, ussps]
+      properties:
+        schema:
+          type: string
+          const: cis/ussp_list/v1
+        issued:
+          type: string
+          format: date-time
+        ussps:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/Ussp"
+        cis_dataset:
+          type: string
+          const: ussp_list
+          description: Served only; refused in a publication.
+        cis_version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Served only; refused in a publication.
+        cis_updated_at:
+          type: string
+          format: date-time
+          description: Served only; refused in a publication.
+    Ussp:
+      type: object
+      description: One certified USSP. ussp_id is unique in the list.
+      additionalProperties: false
+      required: [ussp_id, name, contact, certificate_id, base_url, services, certification_limitations, valid_from, valid_until, terms_url, status]
+      properties:
+        ussp_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: The authority's certificate code, also the USSP's USSP_SYSTEM_ID (Q5).
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        contact:
+          $ref: "#/components/schemas/UsspContact"
+        certificate_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        base_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: https, no userinfo, host at most 253 characters.
+        services:
+          type: array
+          description: The Annex VI services the USSP is certified for.
+          maxItems: 6
+          items:
+            type: string
+            enum: [network_identification, geo_awareness, flight_authorisation, traffic_information, weather, conformance_monitoring]
+        certification_limitations:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            maxLength: 1000
+        valid_from:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+          description: Not before valid_from.
+        terms_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: https, no userinfo.
+        status:
+          type: string
+          enum: [operating, suspended, limited]
+    UsspContact:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          minLength: 3
+          maxLength: 254
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 50
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: https, no userinfo.
+
+    UspaceRequirements:
+      type: object
+      description: |
+        cis/uspace_requirements/v1: the 2021/664 Art. 3(4) requirements
+        of a U-space airspace (spec 02 F1, 03 section 1
+        uspace_airspaces; docs/PLAN.md section 15 Q6). It travels in the
+        extendedProperties of every USPACE feature under the member
+        uspace_requirements (section 15 Q32); other extendedProperties
+        members pass through. The block is closed at its top level:
+        an unknown member is refused. adjacent names U-space airspaces
+        published in the same publication.
+      additionalProperties: false
+      required: [uas_requirements, service_performance, operational_conditions, airspace_constraints, services_required, adjacent]
+      properties:
+        uas_requirements:
+          type: object
+          description: Art. 3(4)(a) UAS performance and equipment requirements (free form).
+        service_performance:
+          $ref: "#/components/schemas/ServicePerformance"
+        operational_conditions:
+          type: object
+          description: Art. 3(4)(b) operational conditions and constraints (free form).
+        airspace_constraints:
+          $ref: "#/components/schemas/AirspaceConstraints"
+        services_required:
+          type: array
+          minItems: 4
+          maxItems: 6
+          uniqueItems: true
+          description: The U-space services required; NID, GEO, FA and TI always (Art. 3(3)).
+          items:
+            type: string
+            enum: [NID, GEO, FA, TI, WX, CM]
+        adjacent:
+          type: array
+          description: Identifiers of the adjacent U-space airspaces in the same publication.
+          maxItems: 1000
+          items:
+            type: string
+            minLength: 1
+            maxLength: 7
+    ServicePerformance:
+      type: object
+      description: Art. 3(4)(c) service performance; the three named members are required, others pass.
+      required: [nid_update_hz, ti_update_hz, cis_latency_s]
+      properties:
+        nid_update_hz:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+        ti_update_hz:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+        cis_latency_s:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+    AirspaceConstraints:
+      type: object
+      description: Art. 3(4)(d) airspace constraints; max_height_agl_m is optional, others pass.
+      properties:
+        max_height_agl_m:
+          type: number
+          format: double
+          exclusiveMinimum: 0
 
     Health:
       type: object

@@ -3,10 +3,12 @@ package deliver
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -766,4 +768,48 @@ func waitFor(t *testing.T, within time.Duration, what string, ok func() bool) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("not within %s: %s", within, what)
+}
+
+// The webhook's claims are core's compact delivery form, as the brief
+// now says: exactly iss, aud, sub, iat, jti and body, no exp; the
+// bound exp would have given is the verifier's: a token whose iat is
+// more than 5 min old is refused, one just inside is accepted (E-01).
+func TestJWSClaimsAreIATAndJTI(t *testing.T) {
+	h := newHarness(t, nil)
+	cl := store.Claim{DeliveryID: "D9", SubscriptionID: "S9", CallbackURL: "https://ussp.example.ge/hook"}
+	now := time.Now()
+	tok, err := h.s.Sign(cl, bus.ChangeMessage{Schema: bus.SchemaChange}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(tok, ".")
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var claims map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		t.Fatal(err)
+	}
+	var keys []string
+	for k := range claims {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	if strings.Join(keys, ",") != "aud,body,iat,iss,jti,sub" {
+		t.Errorf("claims %v", keys)
+	}
+	v := verifier(t, "cisp-1", h.key, "ussp.example.ge")
+	got, _, err := v.Verify(context.Background(), tok)
+	if err != nil || got.JTI != "D9" || got.Subject != "S9" {
+		t.Fatalf("fresh token: %+v %v", got, err)
+	}
+	inside, _ := h.s.Sign(cl, bus.ChangeMessage{Schema: bus.SchemaChange}, now.Add(-4*time.Minute))
+	if _, _, err := v.Verify(context.Background(), inside); err != nil {
+		t.Errorf("iat 4 min old refused: %v", err)
+	}
+	stale, _ := h.s.Sign(cl, bus.ChangeMessage{Schema: bus.SchemaChange}, now.Add(-6*time.Minute))
+	if _, _, err := v.Verify(context.Background(), stale); err == nil || !strings.Contains(err.Error(), "iat") {
+		t.Errorf("iat 6 min old accepted: %v", err)
+	}
 }

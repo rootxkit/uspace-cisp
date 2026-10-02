@@ -1,8 +1,9 @@
 // Command cispctl is the CISP's operations tool: the version, the
 // configuration check, the migrations of the two trees, the rebuild of
 // the materialised current version, the delivery log's retention, the
-// signing key rotation, and two dev helpers that sign a body and verify
-// a detached signature with a local key.
+// signing key rotation, the console's accounts, audit export and
+// verification and events partitions (WP-8), and two dev helpers that
+// sign a body and verify a detached signature with a local key.
 // It is never long-running and never on the request path.
 package main
 
@@ -59,6 +60,21 @@ commands:
                   generate an RSA-3072 signing key, write signing-<kid>.pem
                   (0600) and print the CISP_SIGNING_* lines to set; refuses
                   a directory outside local/ unless --force
+  create-account --username U --role viewer|publisher_admin|admin [--mfa]
+                  create a console account (the first admin of a fresh
+                  deployment); print its one-time password and, with MFA
+                  (always for admin), the otpauth URL, each once
+  export-audit --out FILE [--from T] [--to T]
+                  write the events rows of [from, to) with their chain
+                  hashes as JSON lines, and a detached JWS of the file by
+                  the CISP's signing key to FILE.jws
+  verify-audit [--from T] [--to T]
+                  recompute the events hash chain over [from, to); exit 0
+                  with the count verified, 1 naming the first row that
+                  breaks it
+  partitions [--ensure-months N]
+                  create the monthly events partitions from this month
+                  through N months ahead (default 3; run monthly)
   sign --key FILE --kid K < body
                   print the X-JWS-Signature value of the body (dev helper)
   verify-signature --key FILE --kid K --sig SIG < body
@@ -98,6 +114,14 @@ func runIO(ctx context.Context, args, environ []string, stdin io.Reader, stdout,
 		return rebuildCurrent(ctx, args[1:], environ, stdout, stderr)
 	case len(args) >= 1 && args[0] == "set-retention":
 		return setRetention(ctx, args[1:], environ, stdout, stderr)
+	case len(args) >= 1 && args[0] == "create-account":
+		return createAccount(ctx, args[1:], environ, stdout, stderr)
+	case len(args) >= 1 && args[0] == "verify-audit":
+		return verifyAudit(ctx, args[1:], environ, stdout, stderr, now)
+	case len(args) >= 1 && args[0] == "export-audit":
+		return exportAudit(ctx, args[1:], environ, stdout, stderr, now)
+	case len(args) >= 1 && args[0] == "partitions":
+		return partitions(ctx, args[1:], environ, stdout, stderr)
 	default:
 		_, _ = fmt.Fprint(stderr, usage)
 		return exitUsage

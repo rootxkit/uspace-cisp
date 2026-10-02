@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -257,4 +259,165 @@ func equalJSON(t *testing.T, a, b []byte) bool {
 func itoa(i int) string {
 	b, _ := json.Marshal(i)
 	return string(b)
+}
+
+// zoneWithApplicability is an ED-318 zones collection of one zone,
+// TAP001, carrying an ED-269 applicability list mapped by core
+// (ed269.Parse, ed318.FromED269): the zone the applicability vectors
+// put through the read.
+func zoneWithApplicability(t testing.TB, applicability json.RawMessage) []byte {
+	t.Helper()
+	zone := map[string]any{
+		"identifier": "TAP001", "country": "GEO", "name": "Applicability vector", "type": "COMMON",
+		"restriction": "PROHIBITED", "reason": []any{"SENSITIVE"}, "applicability": applicability,
+		"zoneAuthority": []any{map[string]any{"name": "Test authority", "purpose": "AUTHORIZATION"}},
+		"geometry": []any{map[string]any{
+			"uomDimensions": "M", "lowerLimit": 0, "lowerVerticalReference": "AGL", "upperLimit": 120, "upperVerticalReference": "AGL",
+			"horizontalProjection": map[string]any{"type": "Polygon", "coordinates": []any{[]any{
+				[]any{44.80, 41.70}, []any{44.82, 41.70}, []any{44.82, 41.72}, []any{44.80, 41.72}, []any{44.80, 41.70},
+			}}},
+		}},
+	}
+	d, probs := ed269.Parse(jsonBytes(t, map[string]any{"features": []any{zone}}), ed269.Limits{})
+	if probs != nil {
+		t.Fatalf("ed269.Parse: %v", probs)
+	}
+	fc, err := ed318.FromED269(d, ed318.Metadata{}, "en-GB")
+	if err != nil {
+		t.Fatalf("ed318.FromED269: %v", err)
+	}
+	out, err := ed318.Export(fc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// TestVectorsZonesApplicability runs the 32 zones_applicability.json
+// cases the cisp owns through the read: zones holds the case's zone, and
+// GET /v1/zones?at=<the case's instant> includes it exactly when the
+// vector says it applies (internal/applicability runs the same cases on
+// At).
+func TestVectorsZonesApplicability(t *testing.T) {
+	f := vectors.Load(t, "zones_applicability.json")
+	h := newPubHarness(t, nil)
+	ran := 0
+	f.RunOwned(t, "cisp", func(t *testing.T, c vectors.Case) {
+		ran++
+		var in struct {
+			Applicability json.RawMessage `json:"applicability"`
+			At            string          `json:"at"`
+		}
+		var exp struct {
+			Applies bool `json:"applies"`
+		}
+		c.Decode(t, &in, &exp)
+		if rec := h.put("zones", zoneWithApplicability(t, in.Applicability)); rec.Code != 201 && rec.Code != 200 {
+			t.Fatalf("PUT = %d %s", rec.Code, rec.Body.String())
+		}
+		rec := h.read(http.MethodGet, "/v1/zones?at="+url.QueryEscape(in.At))
+		_, byID := collection(t, rec)
+		if got := byID["TAP001"] != nil; got != exp.Applies || rec.Code != 200 {
+			t.Errorf("GET ?at=%s: %d, TAP001 present %v, want %v", in.At, rec.Code, got, exp.Applies)
+		}
+		if f := byID["TAP001"]; f != nil && annotation(f) != nil {
+			t.Errorf("an evaluated zone was marked %v", annotation(f))
+		}
+	})
+	t.Logf("%d zones_applicability cases ran through GET /v1/zones?at=", ran)
+}
+
+// geodesyZone is a zones collection of one zone, TGE001, with the
+// vector case's polygon (rings in [lng, lat]) or circle (centre in
+// [lat, lng], radius in metres).
+func geodesyZone(t testing.TB, rings [][][2]float64, center []float64, radiusM float64) []byte {
+	t.Helper()
+	geom := map[string]any{"layer": map[string]any{"lower": 0, "lowerReference": "AGL", "upper": 120, "upperReference": "AGL", "uom": "m"}}
+	if rings != nil {
+		geom["type"], geom["coordinates"] = "Polygon", rings
+	} else {
+		geom["type"], geom["coordinates"] = "Point", []float64{center[1], center[0]}
+		geom["extent"] = map[string]any{"subType": "Circle", "radius": radiusM}
+	}
+	return jsonBytes(t, map[string]any{"type": "FeatureCollection", "features": []any{map[string]any{
+		"type": "Feature", "geometry": geom,
+		"properties": map[string]any{
+			"identifier": "TGE001", "country": "GEO", "type": "PROHIBITED", "variant": "COMMON", "reason": []any{"SENSITIVE"},
+			"zoneAuthority": []any{map[string]any{"name": []any{map[string]any{"lang": "en-GB", "text": "Test authority"}}, "purpose": "AUTHORIZATION"}},
+		},
+	}}})
+}
+
+// runGeodesyVectors puts the in_polygon and in_circle cases of
+// geodesy.json the cisp owns through the bbox prefilter: a zone with the
+// case's ring or circle, and GET /v1/zones?bbox= of a box of 1e-6
+// degrees around the point. The prefilter is conservative, so only the
+// presence direction is asserted: whenever the point is inside, the zone
+// is returned; a zone returned for a point outside is logged, not
+// failed (Z-11: a prefilter, never a judgement). It returns how many
+// cases ran.
+func runGeodesyVectors(t *testing.T, h *pubHarness) int {
+	t.Helper()
+	f := vectors.Load(t, "geodesy.json")
+	// Only the containment cases: the distances are core's, run by core.
+	containment := *f
+	containment.Cases = nil
+	for _, c := range f.Cases {
+		var head struct {
+			Function string `json:"function"`
+		}
+		if err := json.Unmarshal(c.Input, &head); err != nil {
+			t.Fatal(err)
+		}
+		if head.Function == "in_polygon" || head.Function == "in_circle" {
+			containment.Cases = append(containment.Cases, c)
+		}
+	}
+	ran := 0
+	containment.RunOwned(t, "cisp", func(t *testing.T, c vectors.Case) {
+		ran++
+		var in struct {
+			Function    string         `json:"function"`
+			RingsLonLat [][][2]float64 `json:"rings_lon_lat"`
+			Center      []float64      `json:"center"`
+			Radius      float64        `json:"radius"`
+			RadiusUnit  string         `json:"radius_unit"`
+			Point       []float64      `json:"point"`
+		}
+		var exp struct {
+			Inside    bool     `json:"inside"`
+			DistanceM *float64 `json:"distance_m"`
+		}
+		c.Decode(t, &in, &exp)
+		if in.Function == "in_circle" && in.RadiusUnit != "m" {
+			t.Fatalf("radius_unit %q", in.RadiusUnit)
+		}
+		if rec := h.put("zones", geodesyZone(t, in.RingsLonLat, in.Center, in.Radius)); rec.Code != 201 && rec.Code != 200 {
+			t.Fatalf("PUT = %d %s", rec.Code, rec.Body.String())
+		}
+		lat, lng := in.Point[0], in.Point[1]
+		const d = 1e-6
+		box := fmt.Sprintf("%.7f,%.7f,%.7f,%.7f", lng-d, lat-d, lng+d, lat+d)
+		rec := h.read(http.MethodGet, "/v1/zones?bbox="+box)
+		_, byID := collection(t, rec)
+		present := byID["TGE001"] != nil
+		switch {
+		case exp.Inside && !present:
+			t.Errorf("the point (%v, %v) is inside, yet bbox=%s left the zone out", lat, lng, box)
+		case !exp.Inside && present:
+			t.Logf("the point is outside and the prefilter kept the zone (conservative, allowed): bbox=%s", box)
+		}
+	})
+	return ran
+}
+
+// TestVectorsGeodesy runs the containment cases through the read on the
+// fake store, whose prefilter is core's bounding box; the integration
+// test TestVectorsGeodesyStore runs them on PostGIS's &&.
+func TestVectorsGeodesy(t *testing.T) {
+	n := runGeodesyVectors(t, newPubHarness(t, nil))
+	if n != 7 {
+		t.Errorf("%d containment cases ran, want 7", n)
+	}
+	t.Logf("%d geodesy containment cases ran through GET /v1/zones?bbox=", n)
 }

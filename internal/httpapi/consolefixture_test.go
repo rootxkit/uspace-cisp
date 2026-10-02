@@ -3,7 +3,6 @@ package httpapi
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -380,6 +379,6 @@ func (h *pubHarness) consoleDo(t testing.TB, req *http.Request) *httptest.Respon
 	return rec
 }
 
-// k32 is a CISP_SECRETS_KEY for tests: 32 bytes in standard base64,
-// built at run time so no key-shaped literal sits in the repository.
-func k32() string { return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x5a}, 32)) }
+// k32 is a secrets key for tests: 32 bytes built at run time so no
+// key-shaped literal sits in the repository.
+func k32() []byte { return bytes.Repeat([]byte{0x5a}, 32) }

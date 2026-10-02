@@ -4,8 +4,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -67,7 +69,7 @@ func tamper(t *testing.T, s *store.Store, id int64, entity string) {
 // exits 0; with one row tampered it names that row and exits 1; with
 // the row restored it is clean again (E-02: both printed).
 func TestCreateAccountAndVerifyAudit(t *testing.T) {
-	env := append(testEnv(t), "CISP_SECRETS_KEY="+k32())
+	env := append(testEnv(t), "CISP_SECRETS_KEY_FILE="+secretsKeyFile(t))
 	s := dbPool(t)
 	ctx := context.Background()
 	start, err := s.DatabaseNow(ctx)
@@ -94,7 +96,7 @@ func TestCreateAccountAndVerifyAudit(t *testing.T) {
 	if code, _, _ := runCtl([]string{"create-account", "--username", name + "x", "--role", "owner"}, env); code != exitFailed {
 		t.Errorf("bad role = %d", code)
 	}
-	if code, _, errOut := runCtl([]string{"create-account", "--username", name + "y", "--role", "viewer"}, testEnv(t)); code != exitConfig || !strings.Contains(errOut, "CISP_SECRETS_KEY is not set") {
+	if code, _, errOut := runCtl([]string{"create-account", "--username", name + "y", "--role", "viewer"}, testEnv(t)); code != exitConfig || !strings.Contains(errOut, "CISP_SECRETS_KEY_FILE is not set") {
 		t.Errorf("no secrets key = %d %q", code, errOut)
 	}
 	code, out, errOut = runCtl([]string{"verify-audit", "--from", from}, env)
@@ -142,7 +144,7 @@ func TestExportAudit(t *testing.T) {
 	if err := os.WriteFile(keyFile, pemBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	env := append(testEnv(t), "CISP_SECRETS_KEY="+k32(), "CISP_SIGNING_KEY_FILE="+keyFile, "CISP_SIGNING_KID=cisp-export-1")
+	env := append(testEnv(t), "CISP_SECRETS_KEY_FILE="+secretsKeyFile(t), "CISP_SIGNING_KEY_FILE="+keyFile, "CISP_SIGNING_KID=cisp-export-1")
 	s := dbPool(t)
 	start, _ := s.DatabaseNow(context.Background())
 	if code, _, errOut := runCtl([]string{"create-account", "--username", "exp-" + strings.ToLower(store.NewID(time.Now())[20:]), "--role", "viewer"}, env); code != exitOK {
@@ -211,4 +213,19 @@ func TestPartitions(t *testing.T) {
 	if code, _, _ := runCtl([]string{"partitions", "--ensure-months", "-1"}, env); code != exitUsage {
 		t.Errorf("negative = %d", code)
 	}
+}
+
+// k32 is a secrets key for tests: 32 bytes built at run time so no
+// key-shaped literal sits in the repository.
+func k32() []byte { return bytes.Repeat([]byte{0x5a}, 32) }
+
+// secretsKeyFile writes k32 as a CISP_SECRETS_KEY_FILE (one key, standard
+// base64) and returns its path.
+func secretsKeyFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "secrets.key")
+	if err := os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(k32())+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

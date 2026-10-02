@@ -13,7 +13,7 @@ type Account struct {
 	Username     string
 	PasswordHash string
 	Role         string
-	// TOTP secret, AES-256-GCM under CISP_SECRETS_KEY: 12-byte nonce || ciphertext, the account id as associated data.
+	// TOTP secret, AES-256-GCM under a key of CISP_SECRETS_KEY_FILE: 8-byte key id || 12-byte nonce || ciphertext, the key id and the account id as associated data.
 	TotpSecretEnc []byte
 	MfaRequired   bool
 	Status        string

@@ -29,7 +29,7 @@ const maxSessionKeyBytes = 64 << 10
 // consoleNotConfigured is the console component's warning while the
 // console variables are unset.
 const consoleNotConfigured = "not configured (" + config.EnvSessionKeyFile + ", " + config.EnvConsoleIssuer + ", " +
-	config.EnvSecretsKey + "): every /v1/console/* operation answers 503"
+	config.EnvSecretsKeyFile + "): every /v1/console/* operation answers 503"
 
 // consoleKeys are the console's keys, loaded at start: the session
 // issuer and the TOTP sealer. Both nil when the console is not
@@ -45,7 +45,7 @@ func loadConsoleKeys(cfg *config.API) (consoleKeys, error) {
 	if !cfg.ConsoleConfigured() {
 		return consoleKeys{}, nil
 	}
-	sealer, err := console.NewSealer(cfg.SecretsKey)
+	sealer, err := console.LoadSealer(cfg.SecretsKeyFile)
 	if err != nil {
 		return consoleKeys{}, err
 	}
@@ -144,6 +144,7 @@ func startConsole(ctx context.Context, cfg *config.API, keys consoleKeys, sec *s
 		Report: server.Status, Registry: status, PublicBaseURL: cfg.PublicBaseURL, Logger: logger,
 	}
 	comp.SetHealthy()
-	logger.InfoContext(ctx, "console ready", "issuer", keys.issuer.Issuer(), "session_kid", keys.issuer.KID())
+	logger.InfoContext(ctx, "console ready", "issuer", keys.issuer.Issuer(), "session_kid", keys.issuer.KID(),
+		"secrets_kid", keys.sealer.KeyID(), "secrets_kids", keys.sealer.KeyIDs())
 	return consoleParts{server: c, guard: guard, routes: routes}, nil
 }

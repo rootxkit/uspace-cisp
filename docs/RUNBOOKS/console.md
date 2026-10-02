@@ -17,7 +17,28 @@ configured`.
 |---|---|
 | `CISP_SESSION_KEY_FILE` | RSA private key (PEM, at least 3072 bits) that signs console sessions; separate from the signing key. Its `kid` is derived from the key (`session-<16 hex>`), printed at start (`console ready`). Generate one with `cispctl rotate-key --out local/ --kid session` and point the variable at the file. |
 | `CISP_CONSOLE_ISSUER` | the `iss` of console sessions, a URL of this CISP's own (for example `https://uspace-cisp.chikox.net/console`), never the ecosystem issuer. |
-| `CISP_SECRETS_KEY` | 32 random bytes in standard base64 (`openssl rand -base64 32`); encrypts the TOTP secrets at rest. Losing it means every admin's MFA must be reset. |
+| `CISP_SECRETS_KEY_FILE` | a file of keys encrypting the TOTP secrets at rest: one key per line, 32 random bytes in standard base64 or hex (`openssl rand -base64 32 > secrets.key`), `#` comments and blank lines ignored. The first key seals; every key opens what it sealed. Each key's id is the first 8 bytes of its SHA-256 in hex, printed at start (`console ready`, `secrets_kid`). Losing a key that still seals a secret means those accounts' MFA must be reset. |
+
+### Rotating the secrets key
+
+Every sealed secret starts with the id of the key that sealed it, so
+old secrets keep opening while new ones are sealed under the new key:
+
+1. Generate a key and put it on the **first** line of the file, above
+   the current one (`openssl rand -base64 32`); restart the api. New
+   enrolments and MFA resets seal under it (`secrets_kid` at start).
+2. Keep the old key below it while any secret is still sealed under it.
+   Count them with the old key's id (from the start line):
+
+   ```
+   SELECT count(*) FROM accounts WHERE substring(totp_secret_enc FROM 1 FOR 8) = decode('<old kid>', 'hex');
+   ```
+
+   An MFA reset (`PATCH /v1/console/accounts/{id}` with `reset_mfa`)
+   reseals that account under the current key.
+3. When the count is zero, remove the old line and restart. A secret
+   whose key has left the file is refused as an unknown key, and that
+   account needs an MFA reset.
 
 ## The first admin of a fresh deployment
 

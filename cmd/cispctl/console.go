@@ -44,7 +44,7 @@ func createAccount(ctx context.Context, args, environ []string, stdout, stderr i
 	if printProblems(stderr, "cispctl", err) {
 		return exitConfig
 	}
-	sealer, err := console.NewSealer(cfg.SecretsKey)
+	sealer, err := console.LoadSealer(cfg.SecretsKeyFile)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cispctl: %v\n", err)
 		return exitConfig

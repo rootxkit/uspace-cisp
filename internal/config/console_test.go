@@ -1,8 +1,6 @@
 package config
 
 import (
-	"bytes"
-	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -13,7 +11,7 @@ func consoleEnv(extra ...string) []string {
 		"CISP_DATABASE_URL=postgres://db/cisp",
 		"CISP_SESSION_KEY_FILE=/run/secrets/session.pem",
 		"CISP_CONSOLE_ISSUER=https://cisp.example.test/console",
-		"CISP_SECRETS_KEY=" + k32(),
+		"CISP_SECRETS_KEY_FILE=/run/secrets/secrets.key",
 	}, extra...)...)
 }
 
@@ -32,7 +30,7 @@ func TestConsoleVariables(t *testing.T) {
 	if err != nil || none.ConsoleConfigured() {
 		t.Fatalf("no console variable: %v, configured %v", err, none != nil && none.ConsoleConfigured())
 	}
-	for _, missing := range []string{EnvSessionKeyFile, EnvConsoleIssuer, EnvSecretsKey, EnvDatabaseURL} {
+	for _, missing := range []string{EnvSessionKeyFile, EnvConsoleIssuer, EnvSecretsKeyFile, EnvDatabaseURL} {
 		env := []string{}
 		for _, kv := range consoleEnv() {
 			if !strings.HasPrefix(kv, missing+"=") {
@@ -48,14 +46,11 @@ func TestConsoleVariables(t *testing.T) {
 }
 
 func TestConsoleVariablesRefused(t *testing.T) {
-	const notBase64 = "not base64 at all, a secret"
 	for name, c := range map[string]struct {
 		env   []string
 		field string
 	}{
-		"secrets key not base64": {[]string{"CISP_SECRETS_KEY=" + notBase64}, EnvSecretsKey},
-		"secrets key 16 bytes":   {[]string{"CISP_SECRETS_KEY=" + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x5a}, 16))}, EnvSecretsKey},
-		"issuer not a URL":       {[]string{"CISP_CONSOLE_ISSUER=console"}, EnvConsoleIssuer},
+		"issuer not a URL": {[]string{"CISP_CONSOLE_ISSUER=console"}, EnvConsoleIssuer},
 		"issuer is the token issuer": {
 			[]string{"CISP_CONSOLE_ISSUER=" + strings.TrimPrefix(apiBaseValue(EnvTokenIssuer), EnvTokenIssuer+"=")}, EnvConsoleIssuer,
 		},
@@ -64,9 +59,6 @@ func TestConsoleVariablesRefused(t *testing.T) {
 		probs := problemsOf(t, err)
 		if _, ok := probs[c.field]; !ok || len(probs) != 1 {
 			t.Errorf("%s: %v", name, probs)
-		}
-		if strings.Contains(probs[c.field], notBase64) {
-			t.Errorf("%s: the problem repeats the secret: %s", name, probs[c.field])
 		}
 	}
 }
@@ -79,7 +71,3 @@ func apiBaseValue(name string) string {
 	}
 	return name + "="
 }
-
-// k32 is a CISP_SECRETS_KEY for tests: 32 bytes in standard base64,
-// built at run time so no key-shaped literal sits in the repository.
-func k32() string { return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x5a}, 32)) }

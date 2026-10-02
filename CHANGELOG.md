@@ -173,7 +173,9 @@ additively within `/v1`.
   (argon2id in PHC form, 64 MiB / 3 / 4, re-hashed on login when the
   parameters change; TOTP for every admin with a code never accepted
   twice, `accounts.totp_last_step`; secrets sealed with AES-256-GCM
-  under `CISP_SECRETS_KEY`); `POST /v1/console/session` issues the
+  under the keys of `CISP_SECRETS_KEY_FILE`, one per line, the first
+  sealing and every one opening, each sealed value carrying its key id,
+  so the key rotates); `POST /v1/console/session` issues the
   ecosystem's session token through core `Issuer.IssueSession` (scope
   `session`, `roles[]`, realm `console`, 12 h), five failures lock 15
   minutes on the database's clock, 20 attempts per address per 15

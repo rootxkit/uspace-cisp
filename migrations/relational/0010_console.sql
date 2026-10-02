@@ -18,7 +18,7 @@
 -- +goose Up
 ALTER TABLE accounts ADD COLUMN totp_last_step bigint CHECK (totp_last_step >= 0);
 COMMENT ON COLUMN accounts.totp_last_step IS 'RFC 6238 step of the last accepted TOTP code; a code at or below it is a replay.';
-COMMENT ON COLUMN accounts.totp_secret_enc IS 'TOTP secret, AES-256-GCM under CISP_SECRETS_KEY: 12-byte nonce || ciphertext, the account id as associated data.';
+COMMENT ON COLUMN accounts.totp_secret_enc IS 'TOTP secret, AES-256-GCM under a key of CISP_SECRETS_KEY_FILE: 8-byte key id || 12-byte nonce || ciphertext, the key id and the account id as associated data.';
 
 CREATE INDEX sessions_revoked_idx ON sessions (expires_at) WHERE revoked_at IS NOT NULL;
 CREATE INDEX events_actor_idx ON events (actor_id, id);

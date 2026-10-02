@@ -340,7 +340,7 @@ type Created struct {
 // Create makes an account: the username (lower case, 3-64 of a-z 0-9 .
 // _ -), the role, a generated one-time password and, for admin (always)
 // or when asked, MFA with a new TOTP secret sealed under
-// CISP_SECRETS_KEY.
+// CISP_SECRETS_KEY_FILE.
 func (a *Accounts) Create(ctx context.Context, actor Actor, username, role string, mfa bool) (Created, error) {
 	username = NormaliseUsername(username)
 	if !usernamePattern.MatchString(username) {

@@ -76,25 +76,25 @@ func TestRunConsoleNotConfigured(t *testing.T) {
 	}
 }
 
-// A console with a session key but no CISP_SECRETS_KEY refuses to start
+// A console with a session key but no CISP_SECRETS_KEY_FILE refuses to start
 // and names the variable; a short session key refuses to start too.
 func TestRunConsoleRefusals(t *testing.T) {
 	logs := &syncBuffer{}
 	env := baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL=postgres://cisp_api:x@"+closedPort(t)+"/cisp",
 		"CISP_SESSION_KEY_FILE="+sessionKeyFile(t, 3072), "CISP_CONSOLE_ISSUER=https://cisp.example.test/console")
-	if c := run(context.Background(), nil, env, logs, io.Discard); c != 2 || !strings.Contains(logs.String(), "CISP_SECRETS_KEY") {
+	if c := run(context.Background(), nil, env, logs, io.Discard); c != 2 || !strings.Contains(logs.String(), "CISP_SECRETS_KEY_FILE") {
 		t.Errorf("no secrets key: exit %d %s", c, logs.String())
 	}
 	t.Logf("refused: %s", lastLine(logs.String()))
 	logs = &syncBuffer{}
 	env = baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL=postgres://cisp_api:x@"+closedPort(t)+"/cisp",
-		"CISP_SESSION_KEY_FILE="+sessionKeyFile(t, 2048), "CISP_CONSOLE_ISSUER=https://cisp.example.test/console", "CISP_SECRETS_KEY="+k32())
+		"CISP_SESSION_KEY_FILE="+sessionKeyFile(t, 2048), "CISP_CONSOLE_ISSUER=https://cisp.example.test/console", "CISP_SECRETS_KEY_FILE="+secretsKeyFile(t))
 	if c := run(context.Background(), nil, env, logs, io.Discard); c != 1 || !strings.Contains(logs.String(), "shorter than 3072") {
 		t.Errorf("short key: exit %d %s", c, logs.String())
 	}
 	logs = &syncBuffer{}
 	env = baseEnv(t, "CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL=postgres://cisp_api:x@"+closedPort(t)+"/cisp",
-		"CISP_SESSION_KEY_FILE="+filepath.Join(t.TempDir(), "missing.pem"), "CISP_CONSOLE_ISSUER=https://cisp.example.test/console", "CISP_SECRETS_KEY="+k32())
+		"CISP_SESSION_KEY_FILE="+filepath.Join(t.TempDir(), "missing.pem"), "CISP_CONSOLE_ISSUER=https://cisp.example.test/console", "CISP_SECRETS_KEY_FILE="+secretsKeyFile(t))
 	if c := run(context.Background(), nil, env, logs, io.Discard); c != 1 || !strings.Contains(logs.String(), "CISP_SESSION_KEY_FILE") {
 		t.Errorf("missing key: exit %d %s", c, logs.String())
 	}
@@ -105,6 +105,17 @@ func lastLine(s string) string {
 	return lines[len(lines)-1]
 }
 
-// k32 is a CISP_SECRETS_KEY for tests: 32 bytes in standard base64,
-// built at run time so no key-shaped literal sits in the repository.
-func k32() string { return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x5a}, 32)) }
+// k32 is a secrets key for tests: 32 bytes built at run time so no
+// key-shaped literal sits in the repository.
+func k32() []byte { return bytes.Repeat([]byte{0x5a}, 32) }
+
+// secretsKeyFile writes k32 as a CISP_SECRETS_KEY_FILE (one key, standard
+// base64) and returns its path.
+func secretsKeyFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "secrets.key")
+	if err := os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(k32())+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}

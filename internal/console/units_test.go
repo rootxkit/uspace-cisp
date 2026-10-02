@@ -2,8 +2,12 @@ package console_test
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -51,16 +55,104 @@ func TestSealer(t *testing.T) {
 	}
 }
 
-// CISP_SECRETS_KEY absent stops the start with a message naming it;
-// a malformed one too, without repeating the value.
+// CISP_SECRETS_KEY_FILE absent stops the start with a message naming
+// it; a missing file, an empty one, a malformed or repeated key and too
+// many keys too, never repeating a value. The pair: a file of base64 and
+// hex keys, comments and blank lines loads, the first key sealing.
 func TestSealerKey(t *testing.T) {
-	if _, err := console.NewSealer(""); !errors.Is(err, console.ErrSecretsKeyMissing) || !strings.Contains(err.Error(), "CISP_SECRETS_KEY is not set") {
+	if _, err := console.LoadSealer(""); !errors.Is(err, console.ErrSecretsKeyMissing) || !strings.Contains(err.Error(), "CISP_SECRETS_KEY_FILE is not set") {
 		t.Errorf("missing: %v", err)
 	}
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
 	const bad = "c2hvcnQta2V5" // "short-key"
-	_, err := console.NewSealer(bad)
-	if err == nil || !strings.Contains(err.Error(), "CISP_SECRETS_KEY must be 32 bytes") || strings.Contains(err.Error(), bad) {
-		t.Errorf("malformed: %v", err)
+	k1, k2 := k32(), bytes.Repeat([]byte{0x33}, 32)
+	b64, hx := base64.StdEncoding.EncodeToString(k1), hex.EncodeToString(k2)
+	refused := map[string]struct{ path, want string }{
+		"no file":       {filepath.Join(dir, "absent.key"), "CISP_SECRETS_KEY_FILE"},
+		"empty":         {write("empty.key", "# no key yet\n\n"), "holds no key"},
+		"short key":     {write("short.key", b64+"\n"+bad+"\n"), "line 2: a key must be 32 bytes"},
+		"listed twice":  {write("twice.key", b64+"\n"+b64+"\n"), "listed twice"},
+		"too many keys": {write("many.key", strings.Repeat(b64+"\n", 17)), "at most 16"},
+	}
+	for name, c := range refused {
+		_, err := console.LoadSealer(c.path)
+		if err == nil || !strings.Contains(err.Error(), c.want) || strings.Contains(err.Error(), bad) || strings.Contains(err.Error(), b64) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	s, err := console.LoadSealer(write("ok.key", "# current\n"+b64+"\n\n# retired\n  "+hx+"  \n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.KeyID() != console.SecretsKeyID(k1) || len(s.KeyIDs()) != 2 || s.KeyIDs()[1] != console.SecretsKeyID(k2) || len(s.KeyID()) != 16 {
+		t.Errorf("kids %s %v", s.KeyID(), s.KeyIDs())
+	}
+	if console.SecretsKeyID(k1) == console.SecretsKeyID(k2) {
+		t.Error("two keys share a kid")
+	}
+}
+
+// Rotation: a secret sealed under the old key opens after a new key is
+// put first in the file; new seals carry the new kid and open under the
+// rotated file but not under the old one; a sealed value naming a key
+// that has left the file is refused as unknown, and so is one relabelled
+// with another key's id.
+func TestSealerRotation(t *testing.T) {
+	oldKey, newKey := k32(), bytes.Repeat([]byte{0x33}, 32)
+	before, err := console.NewSealer(oldKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealedOld, err := before.Seal("acc-1", []byte("JBSWY3DPEHPK3PXP"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := console.NewSealer(newKey, oldKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pt, err := after.Open("acc-1", sealedOld); err != nil || string(pt) != "JBSWY3DPEHPK3PXP" {
+		t.Errorf("old secret after rotation: %q %v", pt, err)
+	}
+	sealedNew, err := after.Seal("acc-1", []byte("JBSWY3DPEHPK3PXP"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := console.SealedKeyID(sealedNew); got != console.SecretsKeyID(newKey) || got != after.KeyID() {
+		t.Errorf("new seal kid %s, want the current %s", got, console.SecretsKeyID(newKey))
+	}
+	if got := console.SealedKeyID(sealedOld); got != console.SecretsKeyID(oldKey) {
+		t.Errorf("old seal kid %s", got)
+	}
+	if pt, err := after.Open("acc-1", sealedNew); err != nil || string(pt) != "JBSWY3DPEHPK3PXP" {
+		t.Errorf("new secret: %q %v", pt, err)
+	}
+	// The old key retired from the file: its secrets are unknown, not
+	// garbage; and the new seal does not open under the old file.
+	retired, err := console.NewSealer(newKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := retired.Open("acc-1", sealedOld); !errors.Is(err, console.ErrUnknownSecretsKey) || !strings.Contains(err.Error(), console.SecretsKeyID(oldKey)) {
+		t.Errorf("a retired kid: %v", err)
+	}
+	if _, err := before.Open("acc-1", sealedNew); !errors.Is(err, console.ErrUnknownSecretsKey) {
+		t.Errorf("the new kid under the old file: %v", err)
+	}
+	// Relabelled: the old ciphertext with the new kid does not open.
+	relabelled := append([]byte{}, sealedOld...)
+	newKID, _ := hex.DecodeString(console.SecretsKeyID(newKey))
+	copy(relabelled, newKID)
+	if _, err := after.Open("acc-1", relabelled); err == nil {
+		t.Error("a relabelled ciphertext opened")
 	}
 }
 

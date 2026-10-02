@@ -135,7 +135,7 @@ func ConsoleOffRoutes() map[string]func(http.Handler) http.Handler {
 	off := func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			WriteProblem(w, http.StatusServiceUnavailable, SlugConsoleUnavailable, "Console unavailable",
-				"the console is not configured (CISP_SESSION_KEY_FILE, CISP_CONSOLE_ISSUER, CISP_SECRETS_KEY)")
+				"the console is not configured (CISP_SESSION_KEY_FILE, CISP_CONSOLE_ISSUER, CISP_SECRETS_KEY_FILE)")
 		})
 	}
 	out := map[string]func(http.Handler) http.Handler{ConsoleLoginRoute: off}

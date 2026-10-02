@@ -65,7 +65,7 @@ func TestRunConsoleOnPostgres(t *testing.T) {
 	a := newAuthRig(t)
 	r := startRun(t, a.env("CISP_HTTP_ADDR=127.0.0.1:0", "CISP_DATABASE_URL="+dbURL,
 		"CISP_SESSION_KEY_FILE="+sessionKeyFile(t, 3072), "CISP_CONSOLE_ISSUER=https://uspace-cisp.example.test/console",
-		"CISP_SECRETS_KEY="+k32()))
+		"CISP_SECRETS_KEY_FILE="+secretsKeyFile(t)))
 	waitForLine(t, r.logs, "console ready")
 	status, body := do(t, http.MethodPost, r.base+"/v1/console/session", "", map[string]any{"username": name, "password": created.Password, "totp": code})
 	if status != http.StatusCreated {

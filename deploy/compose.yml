@@ -106,15 +106,37 @@ services:
         limits: {cpus: "0.5", memory: 64M}
 
   web:
-    # Enabled by WP-9 (`--profile web`); the image does not exist before.
+    # The Next.js public map and console (WP-9): `--profile web`. It
+    # renders and runs the three BFF routes; it holds no database URL, no
+    # NATS URL and no key, so it takes no env_file. Caddy routes /_bff/*
+    # and every page here, /public/*, /v1/* and /basemap/* elsewhere.
     profiles: [web]
     image: ghcr.io/rootxkit/uspace-cisp-web:${CISP_IMAGE_TAG:?set CISP_IMAGE_TAG to a short SHA or tag}
     restart: unless-stopped
     networks: [cisp]
+    read_only: true
+    tmpfs: [/tmp, /app/.next/cache]
+    security_opt: ["no-new-privileges:true"]
     environment:
+      # The API as the BFF reaches it inside the network.
+      CISP_API_INTERNAL_URL: ${WEB_API_INTERNAL_URL:-http://api:8080}
+      # Where the browser reaches the API; empty is same-origin (Caddy).
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+      # One Caddy in front of Next.js appends to X-Forwarded-For.
+      CISP_WEB_TRUSTED_PROXY_HOPS: ${WEB_TRUSTED_PROXY_HOPS:-1}
+      CISP_WEB_SESSION_MAX_AGE_S: ${WEB_SESSION_MAX_AGE_S:-43200}
+      CISP_WEB_UPSTREAM_TIMEOUT_MS: ${WEB_UPSTREAM_TIMEOUT_MS:-10000}
+      # Branding JSON inside the container (mount it read-only); empty
+      # uses the code-name defaults.
+      CISP_BRANDING_FILE: ${WEB_BRANDING_FILE:-}
     depends_on:
       api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits: {cpus: "0.5", memory: 256M}

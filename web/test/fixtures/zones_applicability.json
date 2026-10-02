@@ -1,0 +1,965 @@
+{
+ "description": "When an ED-269 zone applies (UASZoneVersion.applicability). Evaluated at the aircraft's placed time in UTC, never at a naive time (the old code raises on one). Every input here is a valid applicability; invalid ones are in ed269_parse.json.",
+ "source": [
+  "utm airspace/tests/test_ed269.py",
+  "utm airspace/ed269.py Period, DailyPeriod, applies()"
+ ],
+ "units": {
+  "times": "ISO 8601 with offset"
+ },
+ "tolerance": {
+  "applies": "exact"
+ },
+ "owners": [
+  "cisp",
+  "authority",
+  "ussp"
+ ],
+ "generated": "Expected values computed by knowledge/tools/gen_vectors.py, which runs the old Python implementation (rootxkit/utm @ 484cd228035f) on these inputs. Regenerate rather than edit.",
+ "utm_commit": "484cd228035f2f424530e233ce72100d0fc1842a",
+ "cases": [
+  {
+   "name": "permanent-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "YES"
+     }
+    ],
+    "at": "1999-01-01T00:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Permanent applies at any time.",
+   "source": "test_ed269.py::test_permanent_applies_at_any_time"
+  },
+  {
+   "name": "date-window-with-offset-end-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-10-01T07:00:00Z",
+      "endDateTime": "2026-10-01T10:00:00+02:00"
+     }
+    ],
+    "at": "2026-10-01T06:59:59Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "Both ends included. 10:00+02:00 is 08:00Z: offsets are converted, never read as UTC.",
+   "source": "test_ed269.py::test_a_date_window_applies_inside_and_not_outside"
+  },
+  {
+   "name": "date-window-with-offset-end-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-10-01T07:00:00Z",
+      "endDateTime": "2026-10-01T10:00:00+02:00"
+     }
+    ],
+    "at": "2026-10-01T07:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Both ends included. 10:00+02:00 is 08:00Z: offsets are converted, never read as UTC.",
+   "source": "test_ed269.py::test_a_date_window_applies_inside_and_not_outside"
+  },
+  {
+   "name": "date-window-with-offset-end-3",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-10-01T07:00:00Z",
+      "endDateTime": "2026-10-01T10:00:00+02:00"
+     }
+    ],
+    "at": "2026-10-01T08:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Both ends included. 10:00+02:00 is 08:00Z: offsets are converted, never read as UTC.",
+   "source": "test_ed269.py::test_a_date_window_applies_inside_and_not_outside"
+  },
+  {
+   "name": "date-window-with-offset-end-4",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-10-01T07:00:00Z",
+      "endDateTime": "2026-10-01T10:00:00+02:00"
+     }
+    ],
+    "at": "2026-10-01T08:00:01Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "Both ends included. 10:00+02:00 is 08:00Z: offsets are converted, never read as UTC.",
+   "source": "test_ed269.py::test_a_date_window_applies_inside_and_not_outside"
+  },
+  {
+   "name": "weekly-mon-wed-nine-to-five-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "WED"
+        ],
+        "startTime": "09:00Z",
+        "endTime": "17:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-05T12:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "2026-10-05 is a Monday. Only listed days and hours; both ends included.",
+   "source": "test_ed269.py::test_a_weekly_schedule_applies_only_on_its_days_and_hours"
+  },
+  {
+   "name": "weekly-mon-wed-nine-to-five-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "WED"
+        ],
+        "startTime": "09:00Z",
+        "endTime": "17:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-05T17:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "2026-10-05 is a Monday. Only listed days and hours; both ends included.",
+   "source": "test_ed269.py::test_a_weekly_schedule_applies_only_on_its_days_and_hours"
+  },
+  {
+   "name": "weekly-mon-wed-nine-to-five-3",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "WED"
+        ],
+        "startTime": "09:00Z",
+        "endTime": "17:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-05T17:00:01Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "2026-10-05 is a Monday. Only listed days and hours; both ends included.",
+   "source": "test_ed269.py::test_a_weekly_schedule_applies_only_on_its_days_and_hours"
+  },
+  {
+   "name": "weekly-mon-wed-nine-to-five-4",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "WED"
+        ],
+        "startTime": "09:00Z",
+        "endTime": "17:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-06T12:00:00Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "2026-10-05 is a Monday. Only listed days and hours; both ends included.",
+   "source": "test_ed269.py::test_a_weekly_schedule_applies_only_on_its_days_and_hours"
+  },
+  {
+   "name": "weekly-mon-wed-nine-to-five-5",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "WED"
+        ],
+        "startTime": "09:00Z",
+        "endTime": "17:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-07T09:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "2026-10-05 is a Monday. Only listed days and hours; both ends included.",
+   "source": "test_ed269.py::test_a_weekly_schedule_applies_only_on_its_days_and_hours"
+  },
+  {
+   "name": "weekly-mon-wed-nine-to-five-6",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "WED"
+        ],
+        "startTime": "09:00Z",
+        "endTime": "17:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-07T08:59:59Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "2026-10-05 is a Monday. Only listed days and hours; both ends included.",
+   "source": "test_ed269.py::test_a_weekly_schedule_applies_only_on_its_days_and_hours"
+  },
+  {
+   "name": "night-across-midnight-utc-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "FRI"
+        ],
+        "startTime": "22:00Z",
+        "endTime": "02:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-09T21:59:59Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "A period whose end is before its start runs past midnight and belongs to the day it STARTS: FRI 22:00 to SAT 02:00. Friday 01:00 belongs to Thursday's night, which is not listed.",
+   "source": "test_ed269.py::test_a_night_period_runs_past_midnight_utc_into_the_next_day"
+  },
+  {
+   "name": "night-across-midnight-utc-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "FRI"
+        ],
+        "startTime": "22:00Z",
+        "endTime": "02:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-09T22:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "A period whose end is before its start runs past midnight and belongs to the day it STARTS: FRI 22:00 to SAT 02:00. Friday 01:00 belongs to Thursday's night, which is not listed.",
+   "source": "test_ed269.py::test_a_night_period_runs_past_midnight_utc_into_the_next_day"
+  },
+  {
+   "name": "night-across-midnight-utc-3",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "FRI"
+        ],
+        "startTime": "22:00Z",
+        "endTime": "02:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-09T23:59:59Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "A period whose end is before its start runs past midnight and belongs to the day it STARTS: FRI 22:00 to SAT 02:00. Friday 01:00 belongs to Thursday's night, which is not listed.",
+   "source": "test_ed269.py::test_a_night_period_runs_past_midnight_utc_into_the_next_day"
+  },
+  {
+   "name": "night-across-midnight-utc-4",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "FRI"
+        ],
+        "startTime": "22:00Z",
+        "endTime": "02:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-10T00:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "A period whose end is before its start runs past midnight and belongs to the day it STARTS: FRI 22:00 to SAT 02:00. Friday 01:00 belongs to Thursday's night, which is not listed.",
+   "source": "test_ed269.py::test_a_night_period_runs_past_midnight_utc_into_the_next_day"
+  },
+  {
+   "name": "night-across-midnight-utc-5",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "FRI"
+        ],
+        "startTime": "22:00Z",
+        "endTime": "02:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-10T02:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "A period whose end is before its start runs past midnight and belongs to the day it STARTS: FRI 22:00 to SAT 02:00. Friday 01:00 belongs to Thursday's night, which is not listed.",
+   "source": "test_ed269.py::test_a_night_period_runs_past_midnight_utc_into_the_next_day"
+  },
+  {
+   "name": "night-across-midnight-utc-6",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "FRI"
+        ],
+        "startTime": "22:00Z",
+        "endTime": "02:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-10T02:00:01Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "A period whose end is before its start runs past midnight and belongs to the day it STARTS: FRI 22:00 to SAT 02:00. Friday 01:00 belongs to Thursday's night, which is not listed.",
+   "source": "test_ed269.py::test_a_night_period_runs_past_midnight_utc_into_the_next_day"
+  },
+  {
+   "name": "night-across-midnight-utc-7",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "FRI"
+        ],
+        "startTime": "22:00Z",
+        "endTime": "02:00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-09T01:00:00Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "A period whose end is before its start runs past midnight and belongs to the day it STARTS: FRI 22:00 to SAT 02:00. Friday 01:00 belongs to Thursday's night, which is not listed.",
+   "source": "test_ed269.py::test_a_night_period_runs_past_midnight_utc_into_the_next_day"
+  },
+  {
+   "name": "schedule-in-an-offset-uses-that-offsets-day-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON"
+        ],
+        "startTime": "02:00+04:00",
+        "endTime": "03:00+04:00"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-04T22:30:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Monday 02:30 in Tbilisi is Sunday 22:30 UTC: the weekday is judged in the schedule's own offset.",
+   "source": "test_ed269.py::test_a_schedule_in_an_offset_is_judged_on_that_offsets_day"
+  },
+  {
+   "name": "schedule-in-an-offset-uses-that-offsets-day-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "MON"
+        ],
+        "startTime": "02:00+04:00",
+        "endTime": "03:00+04:00"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-05T22:30:00Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "Monday 02:30 in Tbilisi is Sunday 22:30 UTC: the weekday is judged in the schedule's own offset.",
+   "source": "test_ed269.py::test_a_schedule_in_an_offset_is_judged_on_that_offsets_day"
+  },
+  {
+   "name": "schedule-bounded-by-dates-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-10-06T00:00:00Z",
+      "schedule": [
+       {
+        "day": [
+         "ANY"
+        ],
+        "startTime": "00:00Z",
+        "endTime": "23:59Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-05T12:00:00Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "Dates bound the schedule; ANY is every day.",
+   "source": "test_ed269.py::test_a_schedule_is_bounded_by_its_dates"
+  },
+  {
+   "name": "schedule-bounded-by-dates-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-10-06T00:00:00Z",
+      "schedule": [
+       {
+        "day": [
+         "ANY"
+        ],
+        "startTime": "00:00Z",
+        "endTime": "23:59Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-06T12:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Dates bound the schedule; ANY is every day.",
+   "source": "test_ed269.py::test_a_schedule_is_bounded_by_its_dates"
+  },
+  {
+   "name": "any-of-several-periods-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "endDateTime": "2026-01-01T00:00:00Z"
+     },
+     {
+      "permanent": "NO",
+      "startDateTime": "2027-01-01T00:00:00Z"
+     }
+    ],
+    "at": "2025-06-01T00:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "A zone applies when any of its periods does; open-ended periods are allowed.",
+   "source": "test_ed269.py::test_any_of_several_periods_applies"
+  },
+  {
+   "name": "any-of-several-periods-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "endDateTime": "2026-01-01T00:00:00Z"
+     },
+     {
+      "permanent": "NO",
+      "startDateTime": "2027-01-01T00:00:00Z"
+     }
+    ],
+    "at": "2026-06-01T00:00:00Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "A zone applies when any of its periods does; open-ended periods are allowed.",
+   "source": "test_ed269.py::test_any_of_several_periods_applies"
+  },
+  {
+   "name": "any-of-several-periods-3",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "endDateTime": "2026-01-01T00:00:00Z"
+     },
+     {
+      "permanent": "NO",
+      "startDateTime": "2027-01-01T00:00:00Z"
+     }
+    ],
+    "at": "2027-06-01T00:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "A zone applies when any of its periods does; open-ended periods are allowed.",
+   "source": "test_ed269.py::test_any_of_several_periods_applies"
+  },
+  {
+   "name": "published-end-23-59-59-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "ANY"
+        ],
+        "startTime": "00:00:00.00Z",
+        "endTime": "23:59:59.00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-05T23:59:59Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Published files end days at 23:59:59. The half second before midnight is NOT covered by such a period (a real gap in 'all day' schedules), midnight is.",
+   "source": "airspace/ed269.py DailyPeriod.contains"
+  },
+  {
+   "name": "published-end-23-59-59-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "ANY"
+        ],
+        "startTime": "00:00:00.00Z",
+        "endTime": "23:59:59.00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-05T23:59:59.500000Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "Published files end days at 23:59:59. The half second before midnight is NOT covered by such a period (a real gap in 'all day' schedules), midnight is.",
+   "source": "airspace/ed269.py DailyPeriod.contains"
+  },
+  {
+   "name": "published-end-23-59-59-3",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "schedule": [
+       {
+        "day": [
+         "ANY"
+        ],
+        "startTime": "00:00:00.00Z",
+        "endTime": "23:59:59.00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-06T00:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Published files end days at 23:59:59. The half second before midnight is NOT covered by such a period (a real gap in 'all day' schedules), midnight is.",
+   "source": "airspace/ed269.py DailyPeriod.contains"
+  },
+  {
+   "name": "night-zone-weekdays-fixture-tst003-1",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-09-01T00:00:00.00Z",
+      "endDateTime": "2026-12-31T23:59:59.00Z",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "TUE",
+         "WED",
+         "THU",
+         "FRI"
+        ],
+        "startTime": "22:00:00.00Z",
+        "endTime": "02:00:00.00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-10T00:30:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Saturday 00:30 is Friday's night (applies); Saturday 03:00 is not; Sunday 00:30 belongs to Saturday, not listed; Monday 23:00 applies.",
+   "source": "test_monitor_geozones.py::test_a_weekly_night_zone_across_midnight_utc"
+  },
+  {
+   "name": "night-zone-weekdays-fixture-tst003-2",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-09-01T00:00:00.00Z",
+      "endDateTime": "2026-12-31T23:59:59.00Z",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "TUE",
+         "WED",
+         "THU",
+         "FRI"
+        ],
+        "startTime": "22:00:00.00Z",
+        "endTime": "02:00:00.00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-10T03:00:00Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "Saturday 00:30 is Friday's night (applies); Saturday 03:00 is not; Sunday 00:30 belongs to Saturday, not listed; Monday 23:00 applies.",
+   "source": "test_monitor_geozones.py::test_a_weekly_night_zone_across_midnight_utc"
+  },
+  {
+   "name": "night-zone-weekdays-fixture-tst003-3",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-09-01T00:00:00.00Z",
+      "endDateTime": "2026-12-31T23:59:59.00Z",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "TUE",
+         "WED",
+         "THU",
+         "FRI"
+        ],
+        "startTime": "22:00:00.00Z",
+        "endTime": "02:00:00.00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-11T00:30:00Z"
+   },
+   "expected": {
+    "applies": false
+   },
+   "why": "Saturday 00:30 is Friday's night (applies); Saturday 03:00 is not; Sunday 00:30 belongs to Saturday, not listed; Monday 23:00 applies.",
+   "source": "test_monitor_geozones.py::test_a_weekly_night_zone_across_midnight_utc"
+  },
+  {
+   "name": "night-zone-weekdays-fixture-tst003-4",
+   "owner": [
+    "cisp",
+    "authority",
+    "ussp"
+   ],
+   "input": {
+    "applicability": [
+     {
+      "permanent": "NO",
+      "startDateTime": "2026-09-01T00:00:00.00Z",
+      "endDateTime": "2026-12-31T23:59:59.00Z",
+      "schedule": [
+       {
+        "day": [
+         "MON",
+         "TUE",
+         "WED",
+         "THU",
+         "FRI"
+        ],
+        "startTime": "22:00:00.00Z",
+        "endTime": "02:00:00.00Z"
+       }
+      ]
+     }
+    ],
+    "at": "2026-10-12T23:00:00Z"
+   },
+   "expected": {
+    "applies": true
+   },
+   "why": "Saturday 00:30 is Friday's night (applies); Saturday 03:00 is not; Sunday 00:30 belongs to Saturday, not listed; Monday 23:00 applies.",
+   "source": "test_monitor_geozones.py::test_a_weekly_night_zone_across_midnight_utc"
+  }
+ ]
+}

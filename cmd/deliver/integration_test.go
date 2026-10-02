@@ -182,10 +182,12 @@ func TestDeliverWithoutTheBrokerOnPostgres(t *testing.T) {
 	committed := time.Now()
 	eventually(t, 15*time.Second, "the change delivered by the scan", func() bool { return hits.Load() == 2 })
 	t.Logf("delivered by the scan %s after the commit", time.Since(committed).Round(time.Millisecond))
-	var state string
-	if err := apiPool.QueryRow(ctx, `SELECT state FROM deliveries WHERE change_id = $1 AND subscription_id = $2`, change, sub.ID).Scan(&state); err != nil || state != "delivered" {
-		t.Errorf("delivery %q %v", state, err)
-	}
+	// The receiver answers before deliver records the 2xx.
+	eventually(t, 5*time.Second, "the delivery recorded delivered", func() bool {
+		var state string
+		err := apiPool.QueryRow(ctx, `SELECT state FROM deliveries WHERE change_id = $1 AND subscription_id = $2`, change, sub.ID).Scan(&state)
+		return err == nil && state == "delivered"
+	})
 	line = statusSummary(t, logs, "0 queued, 0 due", 5*time.Second)
 	if d, _ := line["deliver"].(map[string]any); d["deliveries_from_scan"] == float64(0) || d["deliveries_delivered"] == float64(0) {
 		t.Errorf("counters not in the line: %v", d)

@@ -87,17 +87,20 @@ func setup(t *testing.T) *pg {
 }
 
 // change writes a changes row as the api's transaction would, without a
-// bus: the scan's case.
+// bus: the scan's case. Its version is far above any a publication
+// test makes, so a test that finds a change by dataset and version
+// never finds this one.
 func (p *pg) change(t *testing.T, ds publication.Dataset, at time.Time) publication.Change {
 	t.Helper()
+	const version = 1_000_000_000
 	var id int64
 	err := p.api.QueryRow(context.Background(),
 		`INSERT INTO changes (dataset, version, feature_ids, removed_ids, reason, at)
-		 VALUES ($1, 1, ARRAY['ZT1'], ARRAY[]::text[], 'publication', $2) RETURNING id`, string(ds), at).Scan(&id)
+		 VALUES ($1, $2, ARRAY['ZT1'], ARRAY[]::text[], 'publication', $3) RETURNING id`, string(ds), version, at).Scan(&id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return publication.Change{ID: id, Dataset: ds, Version: 1, FeatureIDs: []string{"ZT1"}, RemovedIDs: []string{},
+	return publication.Change{ID: id, Dataset: ds, Version: version, FeatureIDs: []string{"ZT1"}, RemovedIDs: []string{},
 		Reason: publication.ReasonPublication, At: at.UTC()}
 }
 
@@ -386,7 +389,7 @@ func TestTwoInstancesAndAKilledOne(t *testing.T) {
 	}
 	killed := store.New(p.deliver, store.Options{})
 	now := time.Now().UTC()
-	claims, err := killed.ClaimDeliveries(ctx, now, now.Add(time.Second), 100)
+	claims, err := killed.ClaimDeliveries(ctx, now, now.Add(time.Second), 100, 100)
 	if err != nil || len(claims) != 5 {
 		t.Fatalf("killed instance claimed %d %v", len(claims), err)
 	}
@@ -495,4 +498,49 @@ func TestQueueStatsOnPostgres(t *testing.T) {
 	if q := comp.Gauge(GaugeQueued, "").Value(); q != 0 {
 		t.Errorf("queued %v with every subscription deleted", q)
 	}
+}
+
+// The per-subscription cap on the real claim: a slow subscriber with ten
+// due deliveries holds three rows, the other subscriber's delivery goes
+// in the same pass, and a second instance claims none of the slow one's
+// while its three leases are live (the cap counts every instance).
+func TestPerSubscriptionCapOnPostgres(t *testing.T) {
+	p := setup(t)
+	ctx := context.Background()
+	release := make(chan struct{})
+	slowSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(slowSrv.Close)
+	fast := newCounting(t)
+	slow := p.subscribe(t, slowSrv.URL+"/hook", true)
+	p.subscribe(t, fast.srv.URL+"/hook", true, publication.DatasetRestrictions)
+	cfg := func(c *Config) { c.MaxInFlight = 8; c.MaxPerSubscription = 3 }
+	a, _ := p.service(t, "it-cap-a", cfg)
+	b, _ := p.service(t, "it-cap-b", cfg)
+	for range 10 {
+		if _, err := a.Intake(ctx, p.change(t, publication.DatasetZones, time.Now())); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := a.Intake(ctx, p.change(t, publication.DatasetRestrictions, time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := a.Dispatch(ctx); err != nil || n != 4 {
+		t.Fatalf("claimed %d %v, want 3 of the slow subscriber and 1 of the other", n, err)
+	}
+	eventually(t, 5*time.Second, "the other subscriber served beside the slow one", func() bool { return len(fast.snapshot()) == 1 })
+	if n, err := b.Dispatch(ctx); err != nil || n != 0 {
+		t.Errorf("a second instance claimed %d %v of a subscriber at its cap", n, err)
+	}
+	var delivering int
+	if err := p.api.QueryRow(ctx, `SELECT count(*) FROM deliveries WHERE subscription_id = $1 AND state = 'delivering'`, slow.ID).Scan(&delivering); err != nil || delivering != 3 {
+		t.Errorf("slow subscriber delivering %d (%v), want 3", delivering, err)
+	}
+	close(release)
+	a.Wait()
 }

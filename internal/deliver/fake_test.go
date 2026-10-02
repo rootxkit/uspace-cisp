@@ -187,7 +187,7 @@ func (f *fakeStore) DatasetVersions(context.Context) (map[publication.Dataset]in
 	return f.versions, f.err
 }
 
-func (f *fakeStore) ClaimDeliveries(_ context.Context, now, lease time.Time, limit int) ([]store.Claim, error) {
+func (f *fakeStore) ClaimDeliveries(_ context.Context, now, lease time.Time, limit, perSub int) ([]store.Claim, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
@@ -201,10 +201,26 @@ func (f *fakeStore) ClaimDeliveries(_ context.Context, now, lease time.Time, lim
 			due = append(due, d)
 		}
 	}
-	sort.Slice(due, func(i, j int) bool { return due[i].nextRetry.Before(*due[j].nextRetry) || due[i].id < due[j].id })
-	if len(due) > limit {
-		due = due[:limit]
+	sort.Slice(due, func(i, j int) bool {
+		if !due[i].nextRetry.Equal(*due[j].nextRetry) {
+			return due[i].nextRetry.Before(*due[j].nextRetry)
+		}
+		return due[i].id < due[j].id
+	})
+	busy := map[string]int{}
+	for _, d := range f.deliveries {
+		if d.state == store.DeliveryDelivering && d.nextRetry != nil && d.nextRetry.After(now) {
+			busy[d.sub]++
+		}
 	}
+	var capped []*fakeDelivery
+	for _, d := range due {
+		if busy[d.sub] < perSub && len(capped) < limit {
+			busy[d.sub]++
+			capped = append(capped, d)
+		}
+	}
+	due = capped
 	out := make([]store.Claim, 0, len(due))
 	for _, d := range due {
 		d.state = store.DeliveryDelivering

@@ -24,16 +24,20 @@ import (
 
 // Defaults (docs/WORKPACKAGES/WP-6.md, docs/PLAN.md section 9).
 const (
-	DefaultTimeout          = 2 * time.Second
-	DefaultMaxInFlight      = 64
-	DefaultMaxResponseBytes = 1 << 10
-	DefaultPollInterval     = 250 * time.Millisecond
-	DefaultScanInterval     = 10 * time.Second
-	DefaultScanGrace        = 2 * time.Second
-	DefaultScanSettle       = 30 * time.Second
-	DefaultScanBatch        = 500
-	DefaultLease            = 30 * time.Second
-	DefaultDrainTimeout     = 5 * time.Second
+	DefaultTimeout     = 2 * time.Second
+	DefaultMaxInFlight = 64
+	// DefaultMaxPerSubscription bounds one subscription's attempts in
+	// flight, so a slow subscriber holds at most this many of the
+	// MaxInFlight slots.
+	DefaultMaxPerSubscription = 8
+	DefaultMaxResponseBytes   = 1 << 10
+	DefaultPollInterval       = 250 * time.Millisecond
+	DefaultScanInterval       = 10 * time.Second
+	DefaultScanGrace          = 2 * time.Second
+	DefaultScanSettle         = 30 * time.Second
+	DefaultScanBatch          = 500
+	DefaultLease              = 30 * time.Second
+	DefaultDrainTimeout       = 5 * time.Second
 	// DefaultIntakeTimeout bounds one message's matching and writes.
 	DefaultIntakeTimeout = 5 * time.Second
 	// MaxErrorChars bounds an attempt's error as stored.
@@ -90,7 +94,7 @@ type Store interface {
 	ScanChanges(ctx context.Context, since int64, before time.Time, limit int) ([]publication.Change, error)
 	ChangesByID(ctx context.Context, ids []int64) (map[int64]publication.Change, error)
 	DatasetVersions(ctx context.Context) (map[publication.Dataset]int64, error)
-	ClaimDeliveries(ctx context.Context, now, leaseUntil time.Time, limit int) ([]store.Claim, error)
+	ClaimDeliveries(ctx context.Context, now, leaseUntil time.Time, limit, perSubscription int) ([]store.Claim, error)
 	FinishDelivered(ctx context.Context, deliveryID, subscriptionID string, at time.Time, statusCode int) (store.Delivered, error)
 	FinishFailed(ctx context.Context, f store.FailedAttempt) (store.Failed, error)
 	SuspendSubscription(ctx context.Context, id, reason string) (bool, error)
@@ -127,11 +131,14 @@ type Config struct {
 	// Retry is the retry schedule (zero: subscription.DefaultRetry).
 	Retry subscription.Retry
 
-	Timeout          time.Duration
-	MaxInFlight      int
-	MaxResponseBytes int64
-	PollInterval     time.Duration
-	ScanInterval     time.Duration
+	Timeout     time.Duration
+	MaxInFlight int
+	// MaxPerSubscription bounds one subscription's attempts in flight
+	// across every instance (at most MaxInFlight).
+	MaxPerSubscription int
+	MaxResponseBytes   int64
+	PollInterval       time.Duration
+	ScanInterval       time.Duration
 	// ScanGrace is how old a change must be before the scan looks at it
 	// (the bus has had its chance); ScanSettle how old before the
 	// watermark passes it.
@@ -178,6 +185,10 @@ func (c *Config) defaults() error {
 	if c.MaxInFlight <= 0 {
 		c.MaxInFlight = DefaultMaxInFlight
 	}
+	if c.MaxPerSubscription <= 0 {
+		c.MaxPerSubscription = DefaultMaxPerSubscription
+	}
+	c.MaxPerSubscription = min(c.MaxPerSubscription, c.MaxInFlight)
 	if c.MaxResponseBytes <= 0 {
 		c.MaxResponseBytes = DefaultMaxResponseBytes
 	}

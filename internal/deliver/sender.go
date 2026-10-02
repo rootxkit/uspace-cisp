@@ -245,7 +245,7 @@ func (s *Service) Dispatch(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	now := s.now()
-	claims, err := s.store.ClaimDeliveries(ctx, now, now.Add(s.cfg.Lease), free)
+	claims, err := s.store.ClaimDeliveries(ctx, now, now.Add(s.cfg.Lease), free, s.cfg.MaxPerSubscription)
 	if err != nil {
 		if ctx.Err() == nil {
 			s.counter(CounterClaimFailed).Inc()

@@ -657,7 +657,7 @@ func TestPostWritesEndInsideTheLease(t *testing.T) {
 			h.st.hang = true
 			h.st.mu.Unlock()
 			start := time.Now()
-			claims, err := h.st.ClaimDeliveries(context.Background(), h.s.now(), h.s.now().Add(h.s.cfg.Lease), 1)
+			claims, err := h.st.ClaimDeliveries(context.Background(), h.s.now(), h.s.now().Add(h.s.cfg.Lease), 1, 1)
 			if err != nil || len(claims) != 1 {
 				t.Fatalf("claim %v %v", claims, err)
 			}
@@ -677,4 +677,93 @@ func TestPostWritesEndInsideTheLease(t *testing.T) {
 			}
 		})
 	}
+}
+
+// One slow subscriber holds at most MaxPerSubscription of the slots:
+// with ten of its deliveries due, another subscriber's one is still
+// claimed in the same pass and delivered while the slow one hangs
+// (D7). The twin with the cap at the whole pool shows what it prevents.
+func TestPerSubscriptionCap(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		perSub   int
+		wantSlow int
+		fastSent bool
+	}{
+		{"capped", 3, 3, true},
+		{"uncapped", 4, 4, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, func(c *Config) { c.MaxInFlight = 4; c.MaxPerSubscription = tc.perSub })
+			release := make(chan struct{})
+			slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				select {
+				case <-release:
+				case <-r.Context().Done():
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			t.Cleanup(slow.Close)
+			fast := newReceiver(t, http.StatusOK)
+			h.subscribe("SLOW", slow.URL+"/hook", subscription.Active)
+			h.subscribe("FAST", fast.url(), subscription.Active)
+			past := time.Now().Add(-time.Minute)
+			for i := int64(1); i <= 10; i++ {
+				h.queueChange(t, "SLOW", i, past)
+			}
+			// The fast subscriber's delivery is the newest due.
+			h.queueChange(t, "FAST", 11, time.Now())
+			h.st.mu.Lock()
+			for _, d := range h.st.deliveries {
+				if d.sub == "SLOW" {
+					at := past
+					d.nextRetry = &at
+				}
+			}
+			h.st.mu.Unlock()
+			if _, err := h.s.Dispatch(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, time.Second, "the fast delivery decided", func() bool {
+				return !tc.fastSent || fast.hits.Load() == 1
+			})
+			slowInFlight := 0
+			h.st.mu.Lock()
+			for _, d := range h.st.deliveries {
+				if d.sub == "SLOW" && d.state == store.DeliveryDelivering {
+					slowInFlight++
+				}
+			}
+			h.st.mu.Unlock()
+			if slowInFlight != tc.wantSlow {
+				t.Errorf("slow subscriber holds %d slots, want %d", slowInFlight, tc.wantSlow)
+			}
+			if got := fast.hits.Load() == 1; got != tc.fastSent {
+				t.Errorf("fast delivery sent %v, want %v", got, tc.fastSent)
+			}
+			close(release)
+			h.s.Wait()
+		})
+	}
+	if c := (Config{MaxInFlight: 2, MaxPerSubscription: 50}); c.defaultsForTest() != 2 {
+		t.Error("the per-subscription cap is not bounded by MaxInFlight")
+	}
+}
+
+func (c Config) defaultsForTest() int {
+	c.Instance, c.IssuerURL, c.PublicBaseURL = "x", "x", "x"
+	_ = c.defaults()
+	return c.MaxPerSubscription
+}
+
+func waitFor(t *testing.T, within time.Duration, what string, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(within)
+	for time.Now().Before(deadline) {
+		if ok() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("not within %s: %s", within, what)
 }

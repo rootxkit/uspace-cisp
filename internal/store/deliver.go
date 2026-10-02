@@ -171,8 +171,10 @@ type Claim struct {
 // ClaimDeliveries locks and leases at most limit due deliveries of
 // receiving subscriptions, oldest due first: each becomes delivering
 // until leaseUntil. Rows another instance holds are skipped (SKIP
-// LOCKED); a lease that runs out makes its row due again.
-func (s *Store) ClaimDeliveries(ctx context.Context, now, leaseUntil time.Time, limit int) ([]Claim, error) {
+// LOCKED); a lease that runs out makes its row due again. A
+// subscription gets at most perSubscription rows delivering at once,
+// counting those already under a live lease (0 or less: 1).
+func (s *Store) ClaimDeliveries(ctx context.Context, now, leaseUntil time.Time, limit, perSubscription int) ([]Claim, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
@@ -180,6 +182,7 @@ func (s *Store) ClaimDeliveries(ctx context.Context, now, leaseUntil time.Time, 
 	err := s.Tx(ctx, func(q *relational.Queries) error {
 		rows, err := q.ClaimDeliveries(ctx, relational.ClaimDeliveriesParams{
 			Now: now, LeaseUntil: leaseUntil, MaxRows: int32(min(limit, 1<<20)),
+			MaxPerSubscription: int64(max(perSubscription, 1)),
 		})
 		if err != nil {
 			return fmt.Errorf("claim deliveries: %w", err)

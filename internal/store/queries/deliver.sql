@@ -57,15 +57,36 @@ SELECT name, current_version FROM datasets;
 -- The due deliveries of receiving subscriptions, oldest due first, each
 -- locked against every other instance (SKIP LOCKED) and leased: the row
 -- is delivering until lease_until, and a lease that runs out (a process
--- killed mid-attempt) makes it due again, so nothing is lost.
-WITH due AS (
-    SELECT d.id
+-- killed mid-attempt) makes it due again, so nothing is lost. A
+-- subscription gets at most max_per_subscription rows in flight, those
+-- already delivering under a live lease included, so one slow
+-- subscriber never takes every slot (D7).
+WITH busy AS (
+    SELECT subscription_id, count(*) AS n
+    FROM deliveries
+    WHERE state = 'delivering' AND next_retry_at > sqlc.arg(now)::timestamptz
+    GROUP BY subscription_id
+), ranked AS (
+    SELECT d.id, d.next_retry_at,
+           row_number() OVER (PARTITION BY d.subscription_id ORDER BY d.next_retry_at, d.id) AS rn,
+           COALESCE(b.n, 0) AS busy
     FROM deliveries d
     JOIN subscriptions s ON s.id = d.subscription_id
+    LEFT JOIN busy b ON b.subscription_id = d.subscription_id
     WHERE d.next_retry_at <= sqlc.arg(now)::timestamptz
       AND d.state IN ('queued', 'failed', 'delivering')
       AND s.status IN ('active', 'pending_verification')
-    ORDER BY d.next_retry_at
+), due AS (
+    SELECT d.id
+    FROM deliveries d
+    JOIN ranked r ON r.id = d.id
+    -- The due conditions again, on d itself: a row another instance
+    -- claimed and committed while this one waited is rechecked against
+    -- its new version (its lease) and skipped, never claimed twice.
+    WHERE r.rn + r.busy <= sqlc.arg(max_per_subscription)::bigint
+      AND d.next_retry_at <= sqlc.arg(now)::timestamptz
+      AND d.state IN ('queued', 'failed', 'delivering')
+    ORDER BY r.next_retry_at
     LIMIT sqlc.arg(max_rows)
     FOR UPDATE OF d SKIP LOCKED
 )

@@ -235,3 +235,21 @@ additively within `/v1`.
   `CISP_WEB_MFA_CHALLENGE_SECRET` (`WEB_MFA_CHALLENGE_SECRET` in
   compose; at least 32 bytes; without it every `/_bff/*` route answers
   503 naming it); a Playwright test signs in in two steps.
+- WP-11 operator console: `/[locale]/console/login` (the kit's form
+  through the BFF, the TOTP step when the API asks for it, the API's
+  refusals worded in `ka`/`en`, a lockout with the minutes left); the
+  signed-in shell with the status strip (dataset versions, publishers'
+  heartbeat age and stale flag on the API's clock, degraded components,
+  mTLS off, a stale expiry job, the stream), navigation by role and the
+  account menu; publications per dataset with the version page's diff
+  (bounded path lists, truncation said) and a map preview of the current
+  version; restriction heads with their events, the ANSP's staleness and
+  the expiry job's age, "not available" on a 404; every client's
+  subscriptions with the deliveries and attempt log; suspend, resume,
+  retry and republish confirmed with their consequence and a reason;
+  accounts (one-time password and enrolment URL shown once) and the
+  audit log. Times in the viewer's zone with UTC on hover. A test fails
+  on any API path in the console's source other than `/v1/console/*`,
+  `/v1/stream` and the GET-only `/public/v1/{dataset}`. The kit's form
+  peers `react-hook-form` and `zod` are added; the fixture server
+  answers the whole console API (`test/mock-console.mjs`) (§15 Q44).

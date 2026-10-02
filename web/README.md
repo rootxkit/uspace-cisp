@@ -9,7 +9,8 @@ bundle check enforce it).
 
 ```
 app/[locale]/(public)/   the public map (WP-10)
-app/[locale]/(console)/  the console (WP-11)
+app/[locale]/(console)/  the console (WP-11): login, and the signed-in pages under (signed-in)/
+src/console/             the console's pages, status strip and helpers (/_bff/api/v1/console/* only)
 app/%5Fbff/              the three BFF routes: /_bff/login, /_bff/logout, /_bff/api/*
 src/api/                 generated types (uspace-ui-gen-api) and the typed client
 src/bff/handlers.ts      the BFF, on the kit's auth/server helpers
@@ -17,6 +18,7 @@ src/i18n/                ka.json, en.json (every display string)
 src/branding.ts          CISP_BRANDING_FILE
 proxy.ts                 locale routing (/ka, /en) and the per-request CSP
 test/mock-api.mjs        the Playwright fixture server (stands in for Caddy)
+test/mock-console.mjs    its console API (/v1/console/*), roles, lockout and audit
 ```
 
 ## Commands
@@ -100,5 +102,16 @@ double-submit cookie, sent back as `X-CSRF-Token` on every unsafe
 request. The proxy reaches `/v1/console/*` only. The WebSocket
 `/v1/stream` is not proxied: the browser opens it same-origin and the
 cookie rides the upgrade; a `4401` close means "sign in again". An
-account with `mfa_required` cannot yet sign in on the web
-(`docs/PLAN.md` §15 Q41 (3)).
+account with `mfa_required` signs in in two steps, the password and then
+the code (`docs/PLAN.md` §15 Q41 (3)).
+
+## The console
+
+`/<locale>/console` (WP-11, `docs/PLAN.md` §15 Q44): the pages call the
+console API through `/_bff/api/v1/console/*` only, open `/v1/stream` for
+the stream indicator and read `GET /public/v1/{dataset}` for map
+previews; `test/console-paths.test.ts` fails on any other path. No page
+edits content: every action is a re-notification, a subscription or
+delivery action, or an account change, confirmed with its consequence.
+The fixture server's console accounts (test data) are in
+`test/mock-console.mjs`.

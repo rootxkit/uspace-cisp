@@ -1,0 +1,13 @@
+{
+  "schema": "cis/change/v1",
+  "msg_id": "01JB2Q7Z8M3K4N5P6R7S8T9V0W",
+  "producer": "ansp/api",
+  "dataset": "restrictions",
+  "version": 3,
+  "etag": "\"ansp-01:r1:3\"",
+  "feature_ids": ["DAR0A1Z"],
+  "removed_ids": [],
+  "reason": "restriction_created",
+  "at": "2026-10-02T09:20:00Z",
+  "pull_url": "https://uspace-ansp.chikox.net/v1/restrictions/01JB2Q6X5D4C3B2A1Z0Y9X8W7V"
+}

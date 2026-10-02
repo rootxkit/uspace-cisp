@@ -365,7 +365,7 @@ func withEvents(ctx context.Context, q *relational.Queries, recs []RestrictionRe
 	return nil
 }
 
-// ExpiredRestrictions are the ids of the active heads whose ends_at is
+// ExpiredRestrictions are the ids of the planned and active heads whose ends_at is
 // not after now, at most limit, soonest first. now is the database's
 // clock RunJob hands the expiry.
 func (s *Store) ExpiredRestrictions(ctx context.Context, now time.Time, limit int) ([]string, error) {

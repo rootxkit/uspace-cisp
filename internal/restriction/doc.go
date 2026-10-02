@@ -19,6 +19,7 @@
 //	Planned    cancel                Cancelled  restriction_cancelled
 //	Active     extend                Active     restriction_extended
 //	Active     end                   Ended      restriction_ended (ended_by ansp)
+//	Planned    expire (time)         Ended      restriction_expired (ended_by expiry)
 //	Active     expire (time)         Ended      restriction_expired (ended_by expiry)
 //
 // The ANSP is the master of a restriction's state (D5): every accepted op
@@ -30,10 +31,12 @@
 // state. A refusal is a *core.FieldError naming ansp_version or state
 // (the handler answers 409) or the request field at fault (400).
 //
-// The CISP moves a restriction itself only by Expire: an Active head whose
-// ends_at is not after now becomes Ended with ended_by expiry. Nothing
-// else ends a restriction: not a silent ANSP, not a planned head past its
-// starts_at (it stays planned, docs/PLAN.md section 15 Q2).
+// The CISP moves a restriction itself only by Expire: a planned or active
+// head whose ends_at is not after now becomes Ended with ended_by expiry
+// (a planned window that has passed never applies again). Nothing else
+// ends a restriction: not a silent ANSP, not a planned head past its
+// starts_at but before its ends_at (it stays planned, docs/PLAN.md
+// section 15 Q2).
 //
 // # Limits
 //

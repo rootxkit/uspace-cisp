@@ -297,7 +297,7 @@ func (q *Queries) ListActiveRestrictionRefs(ctx context.Context) ([]string, erro
 const listExpiredRestrictions = `-- name: ListExpiredRestrictions :many
 SELECT id
 FROM restrictions
-WHERE state = 'active' AND ends_at <= $1
+WHERE state IN ('planned', 'active') AND ends_at <= $1
 ORDER BY ends_at, id
 LIMIT $2
 `
@@ -307,7 +307,8 @@ type ListExpiredRestrictionsParams struct {
 	MaxRows int32
 }
 
-// The active heads whose ends_at is not after now: the expiry's work.
+// The current heads (planned or active) whose ends_at is not after now:
+// the expiry's work.
 func (q *Queries) ListExpiredRestrictions(ctx context.Context, arg ListExpiredRestrictionsParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, listExpiredRestrictions, arg.Now, arg.MaxRows)
 	if err != nil {

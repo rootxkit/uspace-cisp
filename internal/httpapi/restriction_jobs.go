@@ -211,7 +211,7 @@ func (rs *Restrictions) failuresGauge() *obs.Gauge {
 func (rs *Restrictions) expiryFailures() float64 { return rs.failuresGauge().Value() }
 
 // ExpireTick runs one expiry, as the leader when this replica gets the
-// job's lock: every active head whose ends_at is not after now is ended
+// job's lock: every planned or active head whose ends_at is not after now is ended
 // with ended_by expiry, each through its own version of the restrictions
 // dataset (reason restriction_expired, no publisher signature, event
 // actor system). Nothing else ends a restriction here. It returns how
@@ -264,7 +264,7 @@ func (rs *Restrictions) ExpireTick(ctx context.Context) (int, bool, error) {
 	return expired, true, nil
 }
 
-// expire ends one head if it is still active and past its ends_at under
+// expire ends one head if it is still planned or active and past its ends_at under
 // the lock (the ANSP may have extended or ended it meanwhile).
 func (rs *Restrictions) expire(ctx context.Context, id string, now time.Time) (bool, error) {
 	if rs.Signer == nil {

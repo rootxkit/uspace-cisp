@@ -251,16 +251,18 @@ func extendable(h Head, r Request) error {
 	return nil
 }
 
-// Expire ends an Active head whose ends_at is not after now, with
-// ended_by expiry; any other head is returned unchanged with false.
+// Expire ends a current head (planned or active) whose ends_at is not
+// after now, with ended_by expiry: a planned restriction whose window has
+// passed never applies again, so it leaves the current set like an
+// active one. Any other head is returned unchanged with false.
 func Expire(h Head, now time.Time) (Head, bool) {
 	next, _, err := expire(h, now)
 	return next, err == nil
 }
 
 func expire(h Head, now time.Time) (Head, publication.Reason, error) {
-	if h.State != StateActive {
-		return h, "", core.Fieldf(FieldState, "only an active restriction expires; this one is %q", h.State)
+	if !h.State.Current() {
+		return h, "", core.Fieldf(FieldState, "only a planned or active restriction expires; this one is %q", h.State)
 	}
 	if h.EndsAt.After(now) {
 		return h, "", core.Fieldf(FieldEndsAt, "%s is after now %s: a restriction expires at its ends_at, never before", stamp(h.EndsAt), stamp(now))

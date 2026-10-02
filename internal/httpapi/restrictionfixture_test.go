@@ -237,7 +237,7 @@ func (f *fakeStore) ExpiredRestrictions(_ context.Context, now time.Time, limit 
 	}
 	var out []string
 	for _, h := range f.rs().heads {
-		if h.State == restriction.StateActive && !h.EndsAt.After(now) {
+		if h.State.Current() && !h.EndsAt.After(now) {
 			out = append(out, h.ID)
 		}
 	}

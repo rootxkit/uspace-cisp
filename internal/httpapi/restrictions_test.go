@@ -1002,3 +1002,33 @@ func TestRestrictionExpiryDatabaseClock(t *testing.T) {
 		t.Errorf("database clock 31 s on: stale %v %v", rep.Expiry.Stale, err)
 	}
 }
+
+// A planned restriction that was never activated is expired at its
+// ends_at like an active one, and not one second before (E-01): its
+// window never applies again, so it leaves the current set.
+func TestRestrictionPlannedExpiry(t *testing.T) {
+	h, t0 := restrictionHarness(t)
+	ends := t0.Add(2 * time.Hour)
+	id := decodeRestriction(t, h.postRestriction(createDoc("NOTAM-PE", 1, "planned", "DARPE01", t0.Add(time.Hour), ends))).Restriction.Id
+	h.at(ends.Add(-time.Second))
+	if n, _, err := h.rs.ExpireTick(context.Background()); err != nil || n != 0 || h.fake.rs().heads[id].State != restriction.StatePlanned {
+		t.Fatalf("before ends_at: %d %v %s", n, err, h.fake.rs().heads[id].State)
+	}
+	if _, served := h.servedRestrictions(""); served["DARPE01"].State != restriction.StatePlanned {
+		t.Fatalf("not served before ends_at: %v", served)
+	}
+	h.at(ends)
+	if n, _, err := h.rs.ExpireTick(context.Background()); err != nil || n != 1 {
+		t.Fatalf("at ends_at: %d %v", n, err)
+	}
+	head := h.fake.rs().heads[id]
+	if head.State != restriction.StateEnded || head.EndedBy == nil || *head.EndedBy != restriction.EndedByExpiry {
+		t.Fatalf("head %+v", head.Head)
+	}
+	if c := h.lastChange(); c.Reason != publication.ReasonRestrictionExpired || strings.Join(c.RemovedIDs, ",") != "DARPE01" {
+		t.Errorf("change %+v", c)
+	}
+	if _, served := h.servedRestrictions(""); served["DARPE01"].ID != "" {
+		t.Error("an expired planned restriction is still current")
+	}
+}

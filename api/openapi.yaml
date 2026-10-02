@@ -421,9 +421,10 @@ paths:
         restriction_activated (active) and a change record, in the same
         transaction as the head; 201 with the head and the version. The
         ANSP is the master of the state (section 15 Q2): the CISP moves a
-        restriction itself only from active to ended, with ended_by
-        expiry, when its ends_at passes; a planned restriction past its
-        starts_at stays planned.
+        restriction itself only from planned or active to ended, with
+        ended_by expiry, when its ends_at passes (judged on the
+        database's clock); a planned restriction past its starts_at but
+        before its ends_at stays planned.
       parameters:
         - $ref: "#/components/parameters/JWSSignature"
         - $ref: "#/components/parameters/IdempotencyKey"

@@ -286,10 +286,21 @@ func TestExpire(t *testing.T) {
 	if got, ok := Expire(h, h.EndsAt.Add(time.Second)); !ok || got.State != StateEnded {
 		t.Errorf("one second after: %v %+v", ok, got)
 	}
-	for _, s := range []State{StatePlanned, StateEnded, StateCancelled} {
+	for _, s := range []State{StateEnded, StateCancelled} {
 		if got, ok := Expire(head(s), h.EndsAt.Add(time.Hour)); ok || got.State != s {
 			t.Errorf("%s expired: %+v", s, got)
 		}
+	}
+	// A planned head expires at its ends_at too, never before (E-01).
+	planned := head(StatePlanned)
+	if got, ok := Expire(planned, planned.EndsAt.Add(-time.Second)); ok || got.State != StatePlanned {
+		t.Errorf("planned one second before ends_at: %+v", got)
+	}
+	if got, ok := Expire(planned, planned.EndsAt); !ok || got.State != StateEnded || *got.EndedBy != EndedByExpiry {
+		t.Errorf("planned at ends_at: %v %+v", ok, got)
+	}
+	if got, reason, err := Transition(planned, Request{Op: OpExpire, Now: planned.EndsAt.Add(time.Second)}); err != nil || reason != publication.ReasonRestrictionExpired || got.State != StateEnded {
+		t.Errorf("Transition expire planned: %+v %q %v", got, reason, err)
 	}
 	// Through Transition, with the reason; ansp_version plays no part.
 	got, reason, err := Transition(h, Request{Op: OpExpire, Now: h.EndsAt.Add(time.Second)})

@@ -59,10 +59,11 @@ ORDER BY starts_at DESC, id DESC
 LIMIT sqlc.arg(max_rows);
 
 -- name: ListExpiredRestrictions :many
--- The active heads whose ends_at is not after now: the expiry's work.
+-- The current heads (planned or active) whose ends_at is not after now:
+-- the expiry's work.
 SELECT id
 FROM restrictions
-WHERE state = 'active' AND ends_at <= sqlc.arg(now)
+WHERE state IN ('planned', 'active') AND ends_at <= sqlc.arg(now)
 ORDER BY ends_at, id
 LIMIT sqlc.arg(max_rows);
 

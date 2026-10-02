@@ -288,6 +288,13 @@ func TestRestrictionExpiryOnPostgres(t *testing.T) {
 		t.Fatalf("create = %d %s", rec.Code, rec.Body.String())
 	}
 	goneID := decodeRestriction(t, rec).Restriction.Id
+	// A planned one, never activated, whose window has passed too.
+	plannedGone := darID(t)
+	rec = h.postRestriction(createDoc(anspRefOf("NOTAM-EXPP"), 1, "planned", plannedGone, late.Add(time.Minute), db.Add(-5*time.Second)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create planned = %d %s", rec.Code, rec.Body.String())
+	}
+	plannedID := decodeRestriction(t, rec).Restriction.Id
 	// One that ends in an hour, while the process clock runs two hours
 	// early.
 	h.processAt(db)
@@ -307,6 +314,9 @@ func TestRestrictionExpiryOnPostgres(t *testing.T) {
 	head, err := st.Restriction(ctx, goneID, false)
 	if err != nil || head.State != restriction.StateEnded || head.EndedBy == nil || *head.EndedBy != restriction.EndedByExpiry {
 		t.Fatalf("head %+v %v", head.Head, err)
+	}
+	if p, err := st.Restriction(ctx, plannedID, false); err != nil || p.State != restriction.StateEnded || p.EndedBy == nil || *p.EndedBy != restriction.EndedByExpiry {
+		t.Errorf("planned past ends_at: %+v %v", p.Head, err)
 	}
 	last := head.Events[len(head.Events)-1]
 	if last.Op != restriction.OpExpire || last.Actor != store.SystemActor || last.PublicationID == nil {

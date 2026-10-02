@@ -406,3 +406,52 @@ func TestTransitionBodyHash(t *testing.T) {
 		t.Errorf("create: %+v %v", created, err)
 	}
 }
+
+// SameExceptEnd: the feature as served (with its cis_restriction member)
+// against the one an extend carries: the same but for the period's end
+// is the same; any other change is not (E-01).
+func TestSameExceptEnd(t *testing.T) {
+	end := ed318.DateTime{Time: t0.Add(time.Hour), Text: "2026-10-02T13:00:00Z"}
+	later := ed318.DateTime{Time: t0.Add(2 * time.Hour), Text: "2026-10-02T14:00:00Z"}
+	start := ed318.DateTime{Time: t0, Text: "2026-10-02T12:00:00Z"}
+	feat := func(e ed318.DateTime, name string) ed318.Feature {
+		f := feature("DAR0A1B", nil)
+		f.Properties.Type = "PROHIBITED"
+		f.Properties.Reason = []string{"DAR"}
+		txt := name
+		f.Properties.Name = []ed318.Text{{Text: &txt, Lang: "en-GB"}}
+		f.Geometry = ed318.Geometry{Type: ed318.GeometryPoint, Center: &core.LatLon{LatDeg: 41.7, LonDeg: 44.8}, RadiusM: ptr(500.0)}
+		f.Properties.LimitedApplicability = []ed318.TimePeriod{{StartDateTime: &start, EndDateTime: &e}}
+		return f
+	}
+	stored, err := Stamp(feat(end, "A"), head(StateActive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same, err := SameExceptEnd(stored, feat(later, "A")); err != nil || !same {
+		t.Errorf("only the end moved: %v %v", same, err)
+	}
+	if same, _ := SameExceptEnd(stored, feat(later, "B")); same {
+		t.Error("a renamed feature is the same")
+	}
+	moved := feat(later, "A")
+	moved.Geometry.RadiusM = ptr(600.0)
+	if same, _ := SameExceptEnd(stored, moved); same {
+		t.Error("another radius is the same")
+	}
+	withExt := feat(later, "A")
+	withExt.Properties.ExtendedProperties = map[string]json.RawMessage{"note": json.RawMessage(`1`)}
+	if same, _ := SameExceptEnd(stored, withExt); same {
+		t.Error("an added member is the same")
+	}
+	if stored.Properties.ExtendedProperties[MemberName] == nil {
+		t.Error("the comparison changed the stored feature")
+	}
+	var ce error = &ConflictError{FieldError: core.Fieldf("feature", "x")}
+	var fe *core.FieldError
+	if !errors.As(ce, &fe) || fe.Field != "feature" {
+		t.Error("ConflictError does not unwrap to its field error")
+	}
+}
+
+func ptr(f float64) *float64 { return &f }

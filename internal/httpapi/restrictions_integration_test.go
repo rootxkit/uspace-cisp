@@ -147,6 +147,15 @@ func TestRestrictionLifecycleOnPostgres(t *testing.T) {
 				t.Fatalf("op %d replay %q = %d %+v", i, key, again.Code, r)
 			}
 		}
+		if i == 2 {
+			// An extend that renames the feature is a conflict.
+			renamed := darDoc(fid, starts, newEnd.Add(time.Minute))
+			renamed["properties"].(doc)["name"] = []any{doc{"lang": "en-GB", "text": "Renamed"}}
+			c := h.patchRestriction(id, doc{"op": "extend", "ansp_version": 9, "ends_at": newEnd.Add(time.Minute).Format(time.RFC3339), "feature": renamed})
+			if c.Code != http.StatusConflict || datasetVersion(t, st) != res.Version {
+				t.Fatalf("renamed extend = %d %s", c.Code, c.Body.String())
+			}
+		}
 		// The same version with another body is 409, never a replay.
 		other := doc{"op": "cancel", "ansp_version": op.body["ansp_version"]}
 		if conflict := h.patchRestriction(id, other); conflict.Code != http.StatusConflict || datasetVersion(t, st) != res.Version {

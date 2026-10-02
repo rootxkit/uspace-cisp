@@ -581,8 +581,11 @@ paths:
         ending at the new ends_at (refused otherwise): the published
         period and ends_at are one truth, and the CISP never edits a
         published feature, so the ANSP republishes it (docs/PLAN.md
-        section 15 Q36). Its window is held to 24 h from starts_at. Every
-        other op carries neither.
+        section 15 Q36). Its window is held to 24 h from starts_at. The
+        feature may differ from the published one only in its period's
+        endDateTime: any other difference (identifier, geometry, layer,
+        type, texts, members) is 409 feature_changed. Every other op
+        carries neither.
 
         Each accepted op is a new version of the restrictions dataset
         with the matching reason (restriction_activated,

@@ -1,12 +1,15 @@
 package restriction
 
 import (
+	"bytes"
 	"encoding/json"
 	"sort"
 	"time"
 
 	"github.com/rootxkit/uspace-core/core"
 	"github.com/rootxkit/uspace-core/ed318"
+
+	"github.com/rootxkit/uspace-cisp/internal/publication"
 )
 
 // MemberName is the extendedProperties member the CISP adds to each
@@ -88,4 +91,46 @@ func CurrentSet(stored []ed318.Feature, h Head, published *ed318.Feature) (*ed31
 		return features[i].Properties.Identifier < features[j].Properties.Identifier
 	})
 	return &ed318.FeatureCollection{Type: "FeatureCollection", Features: features}, nil
+}
+
+// ConflictError is a refused op whose request conflicts with what the
+// CISP holds (409), beyond state and ansp_version: an extend whose
+// feature differs from the published one.
+type ConflictError struct{ *core.FieldError }
+
+// Unwrap is the field error.
+func (e *ConflictError) Unwrap() error { return e.FieldError }
+
+// SameExceptEnd reports whether published is stored (the current feature
+// of a restriction, as served) but for its one period's endDateTime: the
+// only thing an extend may change. The stored cis_restriction member is
+// the CISP's and is left out of the comparison; both are compared in
+// their canonical form.
+func SameExceptEnd(stored, published ed318.Feature) (bool, error) {
+	s := stored
+	ext := make(map[string]json.RawMessage, len(s.Properties.ExtendedProperties))
+	for k, v := range s.Properties.ExtendedProperties {
+		if k != MemberName {
+			ext[k] = v
+		}
+	}
+	if len(ext) == 0 {
+		ext = nil
+	}
+	s.Properties.ExtendedProperties = ext
+	p := published
+	if len(p.Properties.LimitedApplicability) == 1 && len(s.Properties.LimitedApplicability) == 1 {
+		la := []ed318.TimePeriod{p.Properties.LimitedApplicability[0]}
+		la[0].EndDateTime = s.Properties.LimitedApplicability[0].EndDateTime
+		p.Properties.LimitedApplicability = la
+	}
+	a, err := publication.CanonicalFeature(&s, "feature")
+	if err != nil {
+		return false, err
+	}
+	b, err := publication.CanonicalFeature(&p, "feature")
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(a, b), nil
 }

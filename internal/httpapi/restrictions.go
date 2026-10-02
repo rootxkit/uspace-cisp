@@ -30,6 +30,7 @@ const (
 	SlugRestrictionRefused = "restriction_refused"
 	SlugAnspVersion        = "ansp_version"
 	SlugState              = "state"
+	SlugFeatureChanged     = "feature_changed"
 )
 
 // The route patterns of the restrictions tag.
@@ -421,7 +422,11 @@ func (rs *Restrictions) refuseField(ctx context.Context, w write, fe *core.Field
 // as it is, and 500 otherwise.
 func (rs *Restrictions) failure(ctx context.Context, w *write, err error) (problemResponse, error) {
 	var fe *core.FieldError
+	var ce *restriction.ConflictError
 	switch {
+	case w != nil && errors.As(err, &ce):
+		probs := &ed269.Problems{List: []ed269.Problem{{Field: ce.Field, Reason: ce.Reason}}}
+		return rs.refuse(ctx, *w, http.StatusConflict, SlugFeatureChanged, "Conflict", probs), nil
 	case w != nil && errors.As(err, &fe):
 		return rs.refuseField(ctx, *w, fe), nil
 	case w != nil && store.IsIdentifierConflict(err):
@@ -601,6 +606,11 @@ func decision(next restriction.Head, op restriction.Op, reason publication.Reaso
 		}
 		stored = fc.Features
 	}
+	if op == restriction.OpExtend && published != nil {
+		if err := extendsOnlyEnd(stored, next.FeatureID, *published); err != nil {
+			return store.RestrictionDecision{}, err
+		}
+	}
 	fc, err := restriction.CurrentSet(stored, next, published)
 	if err != nil {
 		var fe *core.FieldError
@@ -612,6 +622,27 @@ func decision(next restriction.Head, op restriction.Op, reason publication.Reaso
 		return store.RestrictionDecision{}, err
 	}
 	return store.RestrictionDecision{Head: next, Op: op, Reason: reason, Collection: fc}, nil
+}
+
+// extendsOnlyEnd refuses (409) an extend whose feature differs from the
+// published one in anything but its period's endDateTime: an extend
+// moves ends_at, it does not republish another restriction.
+func extendsOnlyEnd(stored []ed318.Feature, id string, published ed318.Feature) error {
+	for i := range stored {
+		if stored[i].Properties.Identifier != id {
+			continue
+		}
+		same, err := restriction.SameExceptEnd(stored[i], published)
+		if err != nil {
+			return err
+		}
+		if !same {
+			return &restriction.ConflictError{FieldError: core.Fieldf("feature",
+				"differs from the published restriction %s beyond its period's endDateTime; an extend changes only ends_at", id)}
+		}
+		return nil
+	}
+	return errors.New("restriction current set holds no feature " + id + " to extend")
 }
 
 // result is the answer body of an accepted or replayed op: the head as
@@ -678,8 +709,9 @@ func (rs *Restrictions) patch(ctx context.Context, ref string, byAnspRef bool, s
 			return rs.refuse(ctx, w, http.StatusBadRequest, SlugRestrictionRefused, "Restriction refused", probs), nil
 		}
 		if a.Row.ID != head.FeatureID {
-			return rs.refuseField(ctx, w, core.Fieldf("feature.properties.identifier",
-				"%q is not this restriction's identifier %q; an extend republishes the same feature", a.Row.ID, head.FeatureID)), nil
+			fe := core.Fieldf("feature.properties.identifier",
+				"%q is not this restriction's identifier %q; an extend republishes the same feature", a.Row.ID, head.FeatureID)
+			return rs.failure(ctx, &w, &restriction.ConflictError{FieldError: fe})
 		}
 		if resp, refused, err := rs.place(ctx, w, a, head.AnspRef, head.UspaceAirspaceID); refused || err != nil {
 			return resp, err

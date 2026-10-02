@@ -351,7 +351,6 @@ func TestRestrictionExtendFeature(t *testing.T) {
 		field string
 	}{
 		"no feature":           {doc{"op": "extend", "ansp_version": 2, "ends_at": newEnd.Format(time.RFC3339)}, "feature"},
-		"another identifier":   {doc{"op": "extend", "ansp_version": 2, "ends_at": newEnd.Format(time.RFC3339), "feature": darDoc("DARE002", starts, newEnd)}, "feature.properties.identifier"},
 		"the old period":       {doc{"op": "extend", "ansp_version": 2, "ends_at": newEnd.Format(time.RFC3339), "feature": darDoc("DARE001", starts, ends)}, "feature.properties.limitedApplicability[0].endDateTime"},
 		"an earlier ends_at":   {doc{"op": "extend", "ansp_version": 2, "ends_at": ends.Add(-time.Minute).Format(time.RFC3339), "feature": darDoc("DARE001", starts, ends.Add(-time.Minute))}, "ends_at"},
 		"a window over 24 h":   {doc{"op": "extend", "ansp_version": 2, "ends_at": starts.Add(25 * time.Hour).Format(time.RFC3339), "feature": darDoc("DARE001", starts, starts.Add(25*time.Hour))}, "ends_at"},
@@ -361,6 +360,31 @@ func TestRestrictionExtendFeature(t *testing.T) {
 		if rec.Code != http.StatusBadRequest || !hasProblemPrefix(decodeProblem(t, rec), c.field) {
 			t.Errorf("%s = %d %s", name, rec.Code, rec.Body.String())
 		}
+	}
+	// A valid feature that differs in anything but the period's end is a
+	// conflict (409), beside the accepted extend that changes only it.
+	edited := func(edit func(f doc)) doc {
+		f := darDoc("DARE001", starts, newEnd)
+		edit(f)
+		return f
+	}
+	version := h.restrictionsVersion()
+	for name, f := range map[string]doc{
+		"another identifier": darDoc("DARE002", starts, newEnd),
+		"another name":       edited(func(f doc) { f["properties"].(doc)["name"] = []any{doc{"lang": "en-GB", "text": "Renamed"}} }),
+		"another type":       edited(func(f doc) { f["properties"].(doc)["type"] = "CONDITIONAL" }),
+		"another outline": edited(func(f doc) {
+			f["geometry"].(doc)["coordinates"] = []any{[]any{[]any{44.80, 41.70}, []any{44.83, 41.70}, []any{44.83, 41.72}, []any{44.80, 41.72}, []any{44.80, 41.70}}}
+		}),
+		"another upper limit": edited(func(f doc) { f["geometry"].(doc)["layer"].(doc)["upper"] = 150 }),
+	} {
+		rec := h.patchRestriction(id, doc{"op": "extend", "ansp_version": 2, "ends_at": newEnd.Format(time.RFC3339), "feature": f})
+		if rec.Code != http.StatusConflict || !strings.HasSuffix(decodeProblem(t, rec).Type, "/"+SlugFeatureChanged) {
+			t.Errorf("%s = %d %s", name, rec.Code, rec.Body.String())
+		}
+	}
+	if h.restrictionsVersion() != version {
+		t.Error("a conflicting extend wrote")
 	}
 	rec := h.patchRestriction(id, doc{"op": "extend", "ansp_version": 2, "ends_at": newEnd.Format(time.RFC3339), "feature": darDoc("DARE001", starts, newEnd)})
 	if rec.Code != http.StatusOK || !decodeRestriction(t, rec).Restriction.EndsAt.Equal(newEnd) {

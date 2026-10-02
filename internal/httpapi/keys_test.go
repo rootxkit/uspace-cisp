@@ -121,7 +121,7 @@ func TestRouteMiddlewareGuardsStatus(t *testing.T) {
 	}{
 		{"no token", "", 401, auth.SlugUnauthenticated},
 		{"no cis.read", tok("cis.publish:zones"), 403, auth.SlugForbidden},
-		{"cis.read", tok(auth.ScopeRead), 501, SlugNotImplemented},
+		{"cis.read", tok(auth.ScopeRead), 200, ""},
 	}
 	for _, c := range cases {
 		req := httptest.NewRequest(http.MethodGet, "/v1/status", http.NoBody)
@@ -129,7 +129,11 @@ func TestRouteMiddlewareGuardsStatus(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer "+c.token)
 		}
 		rec := f.do(req)
-		if p := decodeProblem(t, rec); rec.Code != c.code || p.Type != ProblemTypeBase+c.slug {
+		if c.slug == "" {
+			if rec.Code != c.code {
+				t.Errorf("%s: %d %s", c.name, rec.Code, rec.Body.String())
+			}
+		} else if p := decodeProblem(t, rec); rec.Code != c.code || p.Type != ProblemTypeBase+c.slug {
 			t.Errorf("%s: %d %s", c.name, rec.Code, rec.Body.String())
 		}
 		if c.code == 401 && (!strings.Contains(rec.Body.String(), `"field":"authorization"`) || rec.Header().Get(HeaderRequestID) == "") {

@@ -112,6 +112,10 @@ type Publications struct {
 	Logger *slog.Logger
 	// Now is the clock; nil is time.Now.
 	Now func() time.Time
+	// OnPublished, when set, is called after each new version commits
+	// (the api pokes its snapshot cache, so this instance's reads see the
+	// version at once instead of at the next refresh).
+	OnPublished func()
 }
 
 func (p *Publications) now() time.Time {
@@ -505,6 +509,9 @@ func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObj
 	}
 
 	p.count(string(ds), CounterPublicationsAccepted)
+	if p.OnPublished != nil {
+		p.OnPublished()
+	}
 	attempt.Outcome, attempt.PublicationID = store.OutcomeAccepted, &res.PublicationID
 	p.record(ctx, attempt)
 	return gen.PutPublication201JSONResponse{
@@ -673,13 +680,24 @@ func (p *Publications) list(ctx context.Context, req gen.ListPublicationsRequest
 	if err != nil {
 		return p.storeFailure(ctx, ds, err)
 	}
+	out, err := versionList(ds, versions, limit)
+	if err != nil {
+		return nil, err
+	}
+	return gen.ListPublications200JSONResponse(out), nil
+}
+
+// versionList is the history body of versions (newest first, one page
+// of at most limit): GET /v1/publications/{dataset} and (WP-4)
+// GET /v1/{dataset}/versions answer the same.
+func versionList(ds publication.Dataset, versions []store.Version, limit int) (gen.PublicationVersionList, error) {
 	out := gen.PublicationVersionList{Dataset: string(ds), Versions: make([]gen.PublicationVersion, 0, len(versions))}
 	for i := range versions {
 		v := &versions[i]
 		var ws []gen.Warning
 		if len(v.Warnings) > 0 {
 			if err := json.Unmarshal(v.Warnings, &ws); err != nil {
-				return nil, err
+				return gen.PublicationVersionList{}, err
 			}
 		}
 		if ws == nil {
@@ -697,7 +715,7 @@ func (p *Publications) list(ctx context.Context, req gen.ListPublicationsRequest
 		next := versions[n-1].Version
 		out.NextBefore = &next
 	}
-	return gen.ListPublications200JSONResponse(out), nil
+	return out, nil
 }
 
 // --- GET /v1/publications/{dataset}/attempts ----------------------------

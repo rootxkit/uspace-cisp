@@ -23,6 +23,11 @@ type Snapshot struct {
 	BodyGz        []byte
 	CISPSignature string
 	BuiltAt       time.Time
+	// ReceivedAt is the version's received_at (metadata.issued and
+	// Last-Modified) and Publisher its publisher's client id; the Store
+	// fills both.
+	ReceivedAt time.Time
+	Publisher  string
 }
 
 func (s *Snapshot) size() int64 { return int64(len(s.BodyGz) + len(s.CISPSignature) + len(s.ETag)) }
@@ -49,13 +54,17 @@ func (s *Store) CurrentVersions(ctx context.Context) (map[publication.Dataset]in
 	return out, nil
 }
 
-// Snapshot reads one stored snapshot.
+// Snapshot reads one stored snapshot with its version's received_at and
+// publisher.
 func (s *Store) Snapshot(ctx context.Context, ds publication.Dataset, version int64) (Snapshot, error) {
-	r, err := relational.New(s.pool).GetSnapshot(ctx, relational.GetSnapshotParams{Dataset: string(ds), Version: version})
+	r, err := relational.New(s.pool).GetSnapshotForRead(ctx, relational.GetSnapshotForReadParams{Dataset: string(ds), Version: version})
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("snapshot %s:%d: %w", ds, version, err)
 	}
-	return Snapshot{Dataset: ds, Version: r.Version, ETag: r.Etag, BodyGz: r.BodyGz, CISPSignature: r.CispSignature, BuiltAt: r.BuiltAt}, nil
+	return Snapshot{
+		Dataset: ds, Version: r.Version, ETag: r.Etag, BodyGz: r.BodyGz, CISPSignature: r.CispSignature, BuiltAt: r.BuiltAt,
+		ReceivedAt: r.ReceivedAt, Publisher: r.PublisherClientID,
+	}, nil
 }
 
 // Cache defaults (docs/PLAN.md section 9).
@@ -99,8 +108,11 @@ type SnapshotCache struct {
 	bytes      int64
 	tick       uint64
 	current    map[publication.Dataset]int64
+	updated    map[publication.Dataset]time.Time
 	loaded     bool
 	staleSince time.Time
+	// refreshed is when the current versions were last read.
+	refreshed time.Time
 }
 
 // NewSnapshotCache is an empty cache over src.
@@ -120,16 +132,65 @@ func NewSnapshotCache(src SnapshotSource, cfg CacheConfig) *SnapshotCache {
 	if cfg.Counters == nil {
 		cfg.Counters = &core.Counters{}
 	}
-	return &SnapshotCache{src: src, cfg: cfg, entries: map[cacheKey]*cacheEntry{}, current: map[publication.Dataset]int64{}}
+	return &SnapshotCache{
+		src: src, cfg: cfg, entries: map[cacheKey]*cacheEntry{},
+		current: map[publication.Dataset]int64{}, updated: map[publication.Dataset]time.Time{},
+	}
 }
 
 // Counters are the cache's counters.
 func (c *SnapshotCache) Counters() *core.Counters { return c.cfg.Counters }
 
+// DatasetState is a dataset's current version and when it was set.
+type DatasetState struct {
+	Version   int64
+	UpdatedAt time.Time
+}
+
+// StateSource is a SnapshotSource that also reports when each current
+// version was set (the Store); the cache then serves both.
+type StateSource interface {
+	CurrentStates(ctx context.Context) (map[publication.Dataset]DatasetState, error)
+}
+
+// CurrentStates is datasets.current_version and updated_at of every
+// dataset.
+func (s *Store) CurrentStates(ctx context.Context) (map[publication.Dataset]DatasetState, error) {
+	rows, err := relational.New(s.pool).ListDatasets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("datasets: %w", err)
+	}
+	out := make(map[publication.Dataset]DatasetState, len(rows))
+	for _, r := range rows {
+		out[publication.Dataset(r.Name)] = DatasetState{Version: r.CurrentVersion, UpdatedAt: r.UpdatedAt}
+	}
+	return out, nil
+}
+
+func (c *SnapshotCache) read(ctx context.Context) (map[publication.Dataset]int64, map[publication.Dataset]time.Time, error) {
+	if st, ok := c.src.(StateSource); ok {
+		states, err := st.CurrentStates(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		cur := make(map[publication.Dataset]int64, len(states))
+		upd := make(map[publication.Dataset]time.Time, len(states))
+		for ds, s := range states {
+			cur[ds] = s.Version
+			if !s.UpdatedAt.IsZero() {
+				upd[ds] = s.UpdatedAt
+			}
+		}
+		return cur, upd, nil
+	}
+	cur, err := c.src.CurrentVersions(ctx)
+	return cur, map[publication.Dataset]time.Time{}, err
+}
+
 // Refresh re-reads the current version of every dataset. On failure the
 // map it holds stays and the cache is stale from the first failure.
 func (c *SnapshotCache) Refresh(ctx context.Context) error {
-	cur, err := c.src.CurrentVersions(ctx)
+	cur, upd, err := c.read(ctx)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err != nil {
@@ -138,9 +199,35 @@ func (c *SnapshotCache) Refresh(ctx context.Context) error {
 		return err
 	}
 	c.current = cur
+	c.updated = upd
 	c.loaded = true
 	c.staleSince = time.Time{}
+	c.refreshed = c.cfg.Now()
 	return nil
+}
+
+// Refreshed is when the current versions were last read from the
+// source; zero before the first read.
+func (c *SnapshotCache) Refreshed() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.refreshed
+}
+
+// Versions is the current version and update time of every dataset as
+// last refreshed (nothing before the first refresh).
+func (c *SnapshotCache) Versions() (map[publication.Dataset]int64, map[publication.Dataset]time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	v := make(map[publication.Dataset]int64, len(c.current))
+	u := make(map[publication.Dataset]time.Time, len(c.updated))
+	for k, x := range c.current {
+		v[k] = x
+	}
+	for k, x := range c.updated {
+		u[k] = x
+	}
+	return v, u
 }
 
 func (c *SnapshotCache) markStale() {

@@ -254,3 +254,33 @@ func TestTracerProviderWithEndpoint(t *testing.T) {
 	defer cancel()
 	_ = shutdown(ctx) // nothing listens; only that it returns matters
 }
+
+// A degraded component keeps the instant it went degraded while it stays
+// degraded, whatever the reason becomes; healthy clears it (E-01: the
+// healthy component beside the degraded one).
+func TestDegradationsKeepTheirSince(t *testing.T) {
+	s := NewStatus("api", nil, time.Now())
+	s.Component("nats").SetHealthy()
+	db := s.Component("database")
+	before := time.Now().UTC()
+	db.SetDegraded("unreachable: dial")
+	reason, since := db.DegradedSince()
+	if reason != "unreachable: dial" || since.Before(before.Add(-time.Second)) || since.After(time.Now().UTC()) {
+		t.Fatalf("since %v reason %q", since, reason)
+	}
+	db.SetDegraded("unreachable: timeout")
+	if _, again := db.DegradedSince(); !again.Equal(since) {
+		t.Errorf("since moved from %v to %v", since, again)
+	}
+	got := s.Degradations()
+	if len(got) != 1 || got[0].Component != "database" || got[0].Reason != "unreachable: timeout" || !got[0].Since.Equal(since) {
+		t.Errorf("degradations %+v", got)
+	}
+	db.SetHealthy()
+	if reason, since := db.DegradedSince(); reason != "" || !since.IsZero() {
+		t.Errorf("healthy: %q %v", reason, since)
+	}
+	if got := s.Degradations(); len(got) != 0 {
+		t.Errorf("healthy: %+v", got)
+	}
+}

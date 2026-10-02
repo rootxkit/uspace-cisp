@@ -421,3 +421,15 @@ func TestOpenPoolRefusesABadURLWithoutEchoingIt(t *testing.T) {
 		t.Errorf("defaults %d %v", d.Config().MaxConns, d.Config().ConnConfig.RuntimeParams)
 	}
 }
+
+// A stored feature that is not JSON cannot become a row: an error naming
+// it, never an empty row.
+func TestStoredFeatureRowRefusesWhatIsNotJSON(t *testing.T) {
+	if _, err := (StoredFeature{ID: "X1", Feature: []byte("{not json")}).Row(); err == nil || !strings.Contains(err.Error(), "X1") {
+		t.Errorf("err = %v", err)
+	}
+	r, err := StoredFeature{ID: "X2", Feature: []byte(`{"b": 1, "a": 2}`), SHA256: make([]byte, 32)}.Row()
+	if err != nil || string(r.Canonical) != `{"a":2,"b":1}` {
+		t.Errorf("row %s %v", r.Canonical, err)
+	}
+}

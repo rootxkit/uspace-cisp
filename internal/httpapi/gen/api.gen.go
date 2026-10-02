@@ -18,6 +18,156 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for ChangeDataset.
+const (
+	ChangeDatasetRestrictions   ChangeDataset = "restrictions"
+	ChangeDatasetUspaceAirspace ChangeDataset = "uspace_airspace"
+	ChangeDatasetUsspList       ChangeDataset = "ussp_list"
+	ChangeDatasetZones          ChangeDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the ChangeDataset enum.
+func (e ChangeDataset) Valid() bool {
+	switch e {
+	case ChangeDatasetRestrictions:
+		return true
+	case ChangeDatasetUspaceAirspace:
+		return true
+	case ChangeDatasetUsspList:
+		return true
+	case ChangeDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeProducer.
+const (
+	UspaceCisp ChangeProducer = "uspace-cisp"
+)
+
+// Valid indicates whether the value is a known member of the ChangeProducer enum.
+func (e ChangeProducer) Valid() bool {
+	switch e {
+	case UspaceCisp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeReason.
+const (
+	ChangeReasonPublication          ChangeReason = "publication"
+	ChangeReasonRepublished          ChangeReason = "republished"
+	ChangeReasonRestrictionActivated ChangeReason = "restriction_activated"
+	ChangeReasonRestrictionCancelled ChangeReason = "restriction_cancelled"
+	ChangeReasonRestrictionCreated   ChangeReason = "restriction_created"
+	ChangeReasonRestrictionEnded     ChangeReason = "restriction_ended"
+	ChangeReasonRestrictionExpired   ChangeReason = "restriction_expired"
+	ChangeReasonRestrictionExtended  ChangeReason = "restriction_extended"
+	ChangeReasonSubscriptionTest     ChangeReason = "subscription_test"
+)
+
+// Valid indicates whether the value is a known member of the ChangeReason enum.
+func (e ChangeReason) Valid() bool {
+	switch e {
+	case ChangeReasonPublication:
+		return true
+	case ChangeReasonRepublished:
+		return true
+	case ChangeReasonRestrictionActivated:
+		return true
+	case ChangeReasonRestrictionCancelled:
+		return true
+	case ChangeReasonRestrictionCreated:
+		return true
+	case ChangeReasonRestrictionEnded:
+		return true
+	case ChangeReasonRestrictionExpired:
+		return true
+	case ChangeReasonRestrictionExtended:
+		return true
+	case ChangeReasonSubscriptionTest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeSchema.
+const (
+	Cischangev1 ChangeSchema = "cis/change/v1"
+)
+
+// Valid indicates whether the value is a known member of the ChangeSchema enum.
+func (e ChangeSchema) Valid() bool {
+	switch e {
+	case Cischangev1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatasetCollectionCisDataset.
+const (
+	DatasetCollectionCisDatasetRestrictions   DatasetCollectionCisDataset = "restrictions"
+	DatasetCollectionCisDatasetUspaceAirspace DatasetCollectionCisDataset = "uspace_airspace"
+	DatasetCollectionCisDatasetZones          DatasetCollectionCisDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the DatasetCollectionCisDataset enum.
+func (e DatasetCollectionCisDataset) Valid() bool {
+	switch e {
+	case DatasetCollectionCisDatasetRestrictions:
+		return true
+	case DatasetCollectionCisDatasetUspaceAirspace:
+		return true
+	case DatasetCollectionCisDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatasetCollectionType.
+const (
+	DatasetCollectionTypeFeatureCollection DatasetCollectionType = "FeatureCollection"
+)
+
+// Valid indicates whether the value is a known member of the DatasetCollectionType enum.
+func (e DatasetCollectionType) Valid() bool {
+	switch e {
+	case DatasetCollectionTypeFeatureCollection:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatasetDeltaDataset.
+const (
+	DatasetDeltaDatasetRestrictions   DatasetDeltaDataset = "restrictions"
+	DatasetDeltaDatasetUspaceAirspace DatasetDeltaDataset = "uspace_airspace"
+	DatasetDeltaDatasetZones          DatasetDeltaDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the DatasetDeltaDataset enum.
+func (e DatasetDeltaDataset) Valid() bool {
+	switch e {
+	case DatasetDeltaDatasetRestrictions:
+		return true
+	case DatasetDeltaDatasetUspaceAirspace:
+		return true
+	case DatasetDeltaDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok HealthStatus = "ok"
@@ -78,6 +228,87 @@ func (e JWKUse) Valid() bool {
 	}
 }
 
+// Defines values for PublicUsspServices.
+const (
+	PublicUsspServicesConformanceMonitoring PublicUsspServices = "conformance_monitoring"
+	PublicUsspServicesFlightAuthorisation   PublicUsspServices = "flight_authorisation"
+	PublicUsspServicesGeoAwareness          PublicUsspServices = "geo_awareness"
+	PublicUsspServicesNetworkIdentification PublicUsspServices = "network_identification"
+	PublicUsspServicesTrafficInformation    PublicUsspServices = "traffic_information"
+	PublicUsspServicesWeather               PublicUsspServices = "weather"
+)
+
+// Valid indicates whether the value is a known member of the PublicUsspServices enum.
+func (e PublicUsspServices) Valid() bool {
+	switch e {
+	case PublicUsspServicesConformanceMonitoring:
+		return true
+	case PublicUsspServicesFlightAuthorisation:
+		return true
+	case PublicUsspServicesGeoAwareness:
+		return true
+	case PublicUsspServicesNetworkIdentification:
+		return true
+	case PublicUsspServicesTrafficInformation:
+		return true
+	case PublicUsspServicesWeather:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PublicUsspStatus.
+const (
+	PublicUsspStatusLimited   PublicUsspStatus = "limited"
+	PublicUsspStatusOperating PublicUsspStatus = "operating"
+	PublicUsspStatusSuspended PublicUsspStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the PublicUsspStatus enum.
+func (e PublicUsspStatus) Valid() bool {
+	switch e {
+	case PublicUsspStatusLimited:
+		return true
+	case PublicUsspStatusOperating:
+		return true
+	case PublicUsspStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PublicUsspListCisDataset.
+const (
+	PublicUsspListCisDatasetUsspList PublicUsspListCisDataset = "ussp_list"
+)
+
+// Valid indicates whether the value is a known member of the PublicUsspListCisDataset enum.
+func (e PublicUsspListCisDataset) Valid() bool {
+	switch e {
+	case PublicUsspListCisDatasetUsspList:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PublicUsspListSchema.
+const (
+	PublicUsspListSchemaCisusspListv1 PublicUsspListSchema = "cis/ussp_list/v1"
+)
+
+// Valid indicates whether the value is a known member of the PublicUsspListSchema enum.
+func (e PublicUsspListSchema) Valid() bool {
+	switch e {
+	case PublicUsspListSchemaCisusspListv1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PublicationAttemptOutcome.
 const (
 	Accepted PublicationAttemptOutcome = "accepted"
@@ -119,34 +350,34 @@ func (e PublicationResultDataset) Valid() bool {
 
 // Defines values for PublicationVersionReason.
 const (
-	Publication          PublicationVersionReason = "publication"
-	Republished          PublicationVersionReason = "republished"
-	RestrictionActivated PublicationVersionReason = "restriction_activated"
-	RestrictionCancelled PublicationVersionReason = "restriction_cancelled"
-	RestrictionCreated   PublicationVersionReason = "restriction_created"
-	RestrictionEnded     PublicationVersionReason = "restriction_ended"
-	RestrictionExpired   PublicationVersionReason = "restriction_expired"
-	RestrictionExtended  PublicationVersionReason = "restriction_extended"
+	PublicationVersionReasonPublication          PublicationVersionReason = "publication"
+	PublicationVersionReasonRepublished          PublicationVersionReason = "republished"
+	PublicationVersionReasonRestrictionActivated PublicationVersionReason = "restriction_activated"
+	PublicationVersionReasonRestrictionCancelled PublicationVersionReason = "restriction_cancelled"
+	PublicationVersionReasonRestrictionCreated   PublicationVersionReason = "restriction_created"
+	PublicationVersionReasonRestrictionEnded     PublicationVersionReason = "restriction_ended"
+	PublicationVersionReasonRestrictionExpired   PublicationVersionReason = "restriction_expired"
+	PublicationVersionReasonRestrictionExtended  PublicationVersionReason = "restriction_extended"
 )
 
 // Valid indicates whether the value is a known member of the PublicationVersionReason enum.
 func (e PublicationVersionReason) Valid() bool {
 	switch e {
-	case Publication:
+	case PublicationVersionReasonPublication:
 		return true
-	case Republished:
+	case PublicationVersionReasonRepublished:
 		return true
-	case RestrictionActivated:
+	case PublicationVersionReasonRestrictionActivated:
 		return true
-	case RestrictionCancelled:
+	case PublicationVersionReasonRestrictionCancelled:
 		return true
-	case RestrictionCreated:
+	case PublicationVersionReasonRestrictionCreated:
 		return true
-	case RestrictionEnded:
+	case PublicationVersionReasonRestrictionEnded:
 		return true
-	case RestrictionExpired:
+	case PublicationVersionReasonRestrictionExpired:
 		return true
-	case RestrictionExtended:
+	case PublicationVersionReasonRestrictionExtended:
 		return true
 	default:
 		return false
@@ -192,6 +423,42 @@ func (e StatusDegradedComponent) Valid() bool {
 	}
 }
 
+// Defines values for StatusMtlsMode.
+const (
+	Off      StatusMtlsMode = "off"
+	Required StatusMtlsMode = "required"
+)
+
+// Valid indicates whether the value is a known member of the StatusMtlsMode enum.
+func (e StatusMtlsMode) Valid() bool {
+	switch e {
+	case Off:
+		return true
+	case Required:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StatusPublishersKind.
+const (
+	Ansp      StatusPublishersKind = "ansp"
+	Authority StatusPublishersKind = "authority"
+)
+
+// Valid indicates whether the value is a known member of the StatusPublishersKind enum.
+func (e StatusPublishersKind) Valid() bool {
+	switch e {
+	case Ansp:
+		return true
+	case Authority:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UspaceRequirementsServicesRequired.
 const (
 	CM  UspaceRequirementsServicesRequired = "CM"
@@ -224,28 +491,28 @@ func (e UspaceRequirementsServicesRequired) Valid() bool {
 
 // Defines values for UsspServices.
 const (
-	ConformanceMonitoring UsspServices = "conformance_monitoring"
-	FlightAuthorisation   UsspServices = "flight_authorisation"
-	GeoAwareness          UsspServices = "geo_awareness"
-	NetworkIdentification UsspServices = "network_identification"
-	TrafficInformation    UsspServices = "traffic_information"
-	Weather               UsspServices = "weather"
+	UsspServicesConformanceMonitoring UsspServices = "conformance_monitoring"
+	UsspServicesFlightAuthorisation   UsspServices = "flight_authorisation"
+	UsspServicesGeoAwareness          UsspServices = "geo_awareness"
+	UsspServicesNetworkIdentification UsspServices = "network_identification"
+	UsspServicesTrafficInformation    UsspServices = "traffic_information"
+	UsspServicesWeather               UsspServices = "weather"
 )
 
 // Valid indicates whether the value is a known member of the UsspServices enum.
 func (e UsspServices) Valid() bool {
 	switch e {
-	case ConformanceMonitoring:
+	case UsspServicesConformanceMonitoring:
 		return true
-	case FlightAuthorisation:
+	case UsspServicesFlightAuthorisation:
 		return true
-	case GeoAwareness:
+	case UsspServicesGeoAwareness:
 		return true
-	case NetworkIdentification:
+	case UsspServicesNetworkIdentification:
 		return true
-	case TrafficInformation:
+	case UsspServicesTrafficInformation:
 		return true
-	case Weather:
+	case UsspServicesWeather:
 		return true
 	default:
 		return false
@@ -254,19 +521,19 @@ func (e UsspServices) Valid() bool {
 
 // Defines values for UsspStatus.
 const (
-	Limited   UsspStatus = "limited"
-	Operating UsspStatus = "operating"
-	Suspended UsspStatus = "suspended"
+	UsspStatusLimited   UsspStatus = "limited"
+	UsspStatusOperating UsspStatus = "operating"
+	UsspStatusSuspended UsspStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the UsspStatus enum.
 func (e UsspStatus) Valid() bool {
 	switch e {
-	case Limited:
+	case UsspStatusLimited:
 		return true
-	case Operating:
+	case UsspStatusOperating:
 		return true
-	case Suspended:
+	case UsspStatusSuspended:
 		return true
 	default:
 		return false
@@ -290,13 +557,160 @@ func (e UsspListCisDataset) Valid() bool {
 
 // Defines values for UsspListSchema.
 const (
-	CisusspListv1 UsspListSchema = "cis/ussp_list/v1"
+	UsspListSchemaCisusspListv1 UsspListSchema = "cis/ussp_list/v1"
 )
 
 // Valid indicates whether the value is a known member of the UsspListSchema enum.
 func (e UsspListSchema) Valid() bool {
 	switch e {
-	case CisusspListv1:
+	case UsspListSchemaCisusspListv1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ZoneFeaturePropertiesExtendedPropertiesCisApplicability.
+const (
+	Applies       ZoneFeaturePropertiesExtendedPropertiesCisApplicability = "applies"
+	NotApplicable ZoneFeaturePropertiesExtendedPropertiesCisApplicability = "not_applicable"
+	Unknown       ZoneFeaturePropertiesExtendedPropertiesCisApplicability = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the ZoneFeaturePropertiesExtendedPropertiesCisApplicability enum.
+func (e ZoneFeaturePropertiesExtendedPropertiesCisApplicability) Valid() bool {
+	switch e {
+	case Applies:
+		return true
+	case NotApplicable:
+		return true
+	case Unknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ZoneFeatureType.
+const (
+	Feature ZoneFeatureType = "Feature"
+)
+
+// Valid indicates whether the value is a known member of the ZoneFeatureType enum.
+func (e ZoneFeatureType) Valid() bool {
+	switch e {
+	case Feature:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ZoneFeatureCollectionType.
+const (
+	ZoneFeatureCollectionTypeFeatureCollection ZoneFeatureCollectionType = "FeatureCollection"
+)
+
+// Valid indicates whether the value is a known member of the ZoneFeatureCollectionType enum.
+func (e ZoneFeatureCollectionType) Valid() bool {
+	switch e {
+	case ZoneFeatureCollectionTypeFeatureCollection:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatasetPath.
+const (
+	DatasetPathRestrictions   DatasetPath = "restrictions"
+	DatasetPathUspaceAirspace DatasetPath = "uspace_airspace"
+	DatasetPathUsspList       DatasetPath = "ussp_list"
+	DatasetPathZones          DatasetPath = "zones"
+)
+
+// Valid indicates whether the value is a known member of the DatasetPath enum.
+func (e DatasetPath) Valid() bool {
+	switch e {
+	case DatasetPathRestrictions:
+		return true
+	case DatasetPathUspaceAirspace:
+		return true
+	case DatasetPathUsspList:
+		return true
+	case DatasetPathZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPublicDatasetParamsDataset.
+const (
+	GetPublicDatasetParamsDatasetRestrictions   GetPublicDatasetParamsDataset = "restrictions"
+	GetPublicDatasetParamsDatasetUspaceAirspace GetPublicDatasetParamsDataset = "uspace_airspace"
+	GetPublicDatasetParamsDatasetUsspList       GetPublicDatasetParamsDataset = "ussp_list"
+	GetPublicDatasetParamsDatasetZones          GetPublicDatasetParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the GetPublicDatasetParamsDataset enum.
+func (e GetPublicDatasetParamsDataset) Valid() bool {
+	switch e {
+	case GetPublicDatasetParamsDatasetRestrictions:
+		return true
+	case GetPublicDatasetParamsDatasetUspaceAirspace:
+		return true
+	case GetPublicDatasetParamsDatasetUsspList:
+		return true
+	case GetPublicDatasetParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HeadPublicDatasetParamsDataset.
+const (
+	HeadPublicDatasetParamsDatasetRestrictions   HeadPublicDatasetParamsDataset = "restrictions"
+	HeadPublicDatasetParamsDatasetUspaceAirspace HeadPublicDatasetParamsDataset = "uspace_airspace"
+	HeadPublicDatasetParamsDatasetUsspList       HeadPublicDatasetParamsDataset = "ussp_list"
+	HeadPublicDatasetParamsDatasetZones          HeadPublicDatasetParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the HeadPublicDatasetParamsDataset enum.
+func (e HeadPublicDatasetParamsDataset) Valid() bool {
+	switch e {
+	case HeadPublicDatasetParamsDatasetRestrictions:
+		return true
+	case HeadPublicDatasetParamsDatasetUspaceAirspace:
+		return true
+	case HeadPublicDatasetParamsDatasetUsspList:
+		return true
+	case HeadPublicDatasetParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListChangesParamsDataset.
+const (
+	ListChangesParamsDatasetRestrictions   ListChangesParamsDataset = "restrictions"
+	ListChangesParamsDatasetUspaceAirspace ListChangesParamsDataset = "uspace_airspace"
+	ListChangesParamsDatasetUsspList       ListChangesParamsDataset = "ussp_list"
+	ListChangesParamsDatasetZones          ListChangesParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the ListChangesParamsDataset enum.
+func (e ListChangesParamsDataset) Valid() bool {
+	switch e {
+	case ListChangesParamsDatasetRestrictions:
+		return true
+	case ListChangesParamsDatasetUspaceAirspace:
+		return true
+	case ListChangesParamsDatasetUsspList:
+		return true
+	case ListChangesParamsDatasetZones:
 		return true
 	default:
 		return false
@@ -372,9 +786,195 @@ func (e ListPublicationAttemptsParamsDataset) Valid() bool {
 	}
 }
 
+// Defines values for GetDatasetParamsDataset.
+const (
+	GetDatasetParamsDatasetRestrictions   GetDatasetParamsDataset = "restrictions"
+	GetDatasetParamsDatasetUspaceAirspace GetDatasetParamsDataset = "uspace_airspace"
+	GetDatasetParamsDatasetUsspList       GetDatasetParamsDataset = "ussp_list"
+	GetDatasetParamsDatasetZones          GetDatasetParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the GetDatasetParamsDataset enum.
+func (e GetDatasetParamsDataset) Valid() bool {
+	switch e {
+	case GetDatasetParamsDatasetRestrictions:
+		return true
+	case GetDatasetParamsDatasetUspaceAirspace:
+		return true
+	case GetDatasetParamsDatasetUsspList:
+		return true
+	case GetDatasetParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HeadDatasetParamsDataset.
+const (
+	HeadDatasetParamsDatasetRestrictions   HeadDatasetParamsDataset = "restrictions"
+	HeadDatasetParamsDatasetUspaceAirspace HeadDatasetParamsDataset = "uspace_airspace"
+	HeadDatasetParamsDatasetUsspList       HeadDatasetParamsDataset = "ussp_list"
+	HeadDatasetParamsDatasetZones          HeadDatasetParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the HeadDatasetParamsDataset enum.
+func (e HeadDatasetParamsDataset) Valid() bool {
+	switch e {
+	case HeadDatasetParamsDatasetRestrictions:
+		return true
+	case HeadDatasetParamsDatasetUspaceAirspace:
+		return true
+	case HeadDatasetParamsDatasetUsspList:
+		return true
+	case HeadDatasetParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListDatasetVersionsParamsDataset.
+const (
+	ListDatasetVersionsParamsDatasetRestrictions   ListDatasetVersionsParamsDataset = "restrictions"
+	ListDatasetVersionsParamsDatasetUspaceAirspace ListDatasetVersionsParamsDataset = "uspace_airspace"
+	ListDatasetVersionsParamsDatasetUsspList       ListDatasetVersionsParamsDataset = "ussp_list"
+	ListDatasetVersionsParamsDatasetZones          ListDatasetVersionsParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the ListDatasetVersionsParamsDataset enum.
+func (e ListDatasetVersionsParamsDataset) Valid() bool {
+	switch e {
+	case ListDatasetVersionsParamsDatasetRestrictions:
+		return true
+	case ListDatasetVersionsParamsDatasetUspaceAirspace:
+		return true
+	case ListDatasetVersionsParamsDatasetUsspList:
+		return true
+	case ListDatasetVersionsParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetDatasetVersionParamsDataset.
+const (
+	GetDatasetVersionParamsDatasetRestrictions   GetDatasetVersionParamsDataset = "restrictions"
+	GetDatasetVersionParamsDatasetUspaceAirspace GetDatasetVersionParamsDataset = "uspace_airspace"
+	GetDatasetVersionParamsDatasetUsspList       GetDatasetVersionParamsDataset = "ussp_list"
+	GetDatasetVersionParamsDatasetZones          GetDatasetVersionParamsDataset = "zones"
+)
+
+// Valid indicates whether the value is a known member of the GetDatasetVersionParamsDataset enum.
+func (e GetDatasetVersionParamsDataset) Valid() bool {
+	switch e {
+	case GetDatasetVersionParamsDatasetRestrictions:
+		return true
+	case GetDatasetVersionParamsDatasetUspaceAirspace:
+		return true
+	case GetDatasetVersionParamsDatasetUsspList:
+		return true
+	case GetDatasetVersionParamsDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
 // AirspaceConstraints Art. 3(4)(d) airspace constraints; max_height_agl_m is optional, others pass.
 type AirspaceConstraints struct {
 	MaxHeightAglM *float64 `json:"max_height_agl_m,omitempty"`
+}
+
+// Change cis/change/v1: one change record, the body of the change feed,
+// of the webhook payload (inside the JWS claims) and of the
+// stream's change frames (docs/PLAN.md section 6.7, section 15
+// Q28). msg_id is the change cursor in decimal; pull_url asks for
+// the delta from the previous version on CISP_PUBLIC_BASE_URL;
+// bbox is [min lng, min lat, max lng, max lat] of what changed,
+// absent for the whole dataset. Written by WP-4 from the plan's
+// member list; WP-6 adopts it for the webhook.
+type Change struct {
+	At      time.Time     `json:"at"`
+	Bbox    *[]float64    `json:"bbox,omitempty"`
+	Dataset ChangeDataset `json:"dataset"`
+
+	// Etag Examples: "zones:5"
+	Etag string `json:"etag"`
+
+	// FeatureIds Every identifier added, changed or removed, sorted.
+	FeatureIds []string       `json:"feature_ids"`
+	MsgId      string         `json:"msg_id"`
+	Producer   ChangeProducer `json:"producer"`
+	PullUrl    string         `json:"pull_url"`
+	Reason     ChangeReason   `json:"reason"`
+	RemovedIds []string       `json:"removed_ids"`
+	Schema     ChangeSchema   `json:"schema"`
+	Version    int64          `json:"version"`
+}
+
+// ChangeDataset defines model for Change.Dataset.
+type ChangeDataset string
+
+// ChangeProducer defines model for Change.Producer.
+type ChangeProducer string
+
+// ChangeReason defines model for Change.Reason.
+type ChangeReason string
+
+// ChangeSchema defines model for Change.Schema.
+type ChangeSchema string
+
+// ChangeList defines model for ChangeList.
+type ChangeList struct {
+	Changes []Change `json:"changes"`
+
+	// Next The cursor to pass as since next time.
+	Next int64 `json:"next"`
+}
+
+// DatasetCollection An ED-318 FeatureCollection as the CISP serves it: the features
+// as published (canonical JSON), metadata.issued the version's
+// received_at, and the top-level cis_dataset, cis_version and
+// cis_updated_at (docs/PLAN.md section 15 Q1).
+type DatasetCollection struct {
+	CisDataset   DatasetCollectionCisDataset `json:"cis_dataset"`
+	CisUpdatedAt time.Time                   `json:"cis_updated_at"`
+	CisVersion   int64                       `json:"cis_version"`
+	Features     []ZoneFeature               `json:"features"`
+	Metadata     *map[string]interface{}     `json:"metadata,omitempty"`
+	Type         DatasetCollectionType       `json:"type"`
+}
+
+// DatasetCollectionCisDataset defines model for DatasetCollection.CisDataset.
+type DatasetCollectionCisDataset string
+
+// DatasetCollectionType defines model for DatasetCollection.Type.
+type DatasetCollectionType string
+
+// DatasetDelta What changed from from_version to to_version: the features added
+// and changed (as published at to_version) and the identifiers
+// removed. Apply removed, then changed and added, to the
+// from_version set.
+type DatasetDelta struct {
+	// Added A plain FeatureCollection of features as published (the parts of a delta).
+	Added ZoneFeatureCollection `json:"added"`
+
+	// Changed A plain FeatureCollection of features as published (the parts of a delta).
+	Changed     ZoneFeatureCollection `json:"changed"`
+	Dataset     DatasetDeltaDataset   `json:"dataset"`
+	FromVersion int64                 `json:"from_version"`
+	Removed     []string              `json:"removed"`
+	ToVersion   int64                 `json:"to_version"`
+}
+
+// DatasetDeltaDataset defines model for DatasetDelta.Dataset.
+type DatasetDeltaDataset string
+
+// DatasetDocument The application/json read of a dataset, the USSP list or a delta.
+type DatasetDocument struct {
+	union json.RawMessage
 }
 
 // FieldProblem defines model for FieldProblem.
@@ -439,6 +1039,43 @@ type Problem struct {
 	// Examples: https://schemas.uspace.ge/problems/not_implemented
 	Type string `json:"type"`
 }
+
+// PublicUssp One certified USSP without base_url and certificate_id.
+type PublicUssp struct {
+	CertificationLimitations []string             `json:"certification_limitations"`
+	Contact                  UsspContact          `json:"contact"`
+	Name                     string               `json:"name"`
+	Services                 []PublicUsspServices `json:"services"`
+	Status                   PublicUsspStatus     `json:"status"`
+	TermsUrl                 string               `json:"terms_url"`
+	UsspId                   string               `json:"ussp_id"`
+	ValidFrom                time.Time            `json:"valid_from"`
+	ValidUntil               time.Time            `json:"valid_until"`
+}
+
+// PublicUsspServices defines model for PublicUssp.Services.
+type PublicUsspServices string
+
+// PublicUsspStatus defines model for PublicUssp.Status.
+type PublicUsspStatus string
+
+// PublicUsspList The USSP list on the public read: cis/ussp_list/v1 without each
+// USSP's base_url and certificate_id (docs/PLAN.md section 15
+// Q10, the demo default until GCAA decides).
+type PublicUsspList struct {
+	CisDataset   PublicUsspListCisDataset `json:"cis_dataset"`
+	CisUpdatedAt time.Time                `json:"cis_updated_at"`
+	CisVersion   int64                    `json:"cis_version"`
+	Issued       time.Time                `json:"issued"`
+	Schema       PublicUsspListSchema     `json:"schema"`
+	Ussps        []PublicUssp             `json:"ussps"`
+}
+
+// PublicUsspListCisDataset defines model for PublicUsspList.CisDataset.
+type PublicUsspListCisDataset string
+
+// PublicUsspListSchema defines model for PublicUsspList.Schema.
+type PublicUsspListSchema string
 
 // PublicationAttempt defines model for PublicationAttempt.
 type PublicationAttempt struct {
@@ -575,27 +1212,44 @@ type ServicePerformance struct {
 	TiUpdateHz  float64 `json:"ti_update_hz"`
 }
 
-// Status Stub of the status document (docs/PLAN.md section 6.3).
+// Status The status document (docs/PLAN.md section 6.3).
 type Status struct {
 	Datasets []struct {
 		CurrentVersion int64      `json:"current_version"`
 		Dataset        string     `json:"dataset"`
+		Etag           *string    `json:"etag,omitempty"`
 		UpdatedAt      *time.Time `json:"updated_at,omitempty"`
 	} `json:"datasets"`
 	Degraded []struct {
 		Component StatusDegradedComponent `json:"component"`
+		Reason    *string                 `json:"reason,omitempty"`
 		Since     time.Time               `json:"since"`
 	} `json:"degraded"`
-	Now        time.Time `json:"now"`
+
+	// MtlsMode CISP_MTLS_MODE; off is also a degraded line of the status (hard rule 4).
+	MtlsMode   *StatusMtlsMode `json:"mtls_mode,omitempty"`
+	Now        time.Time       `json:"now"`
 	Publishers []struct {
-		ClientId        string     `json:"client_id"`
-		LastHeartbeatAt *time.Time `json:"last_heartbeat_at,omitempty"`
-		Stale           bool       `json:"stale"`
+		ClientId          string                `json:"client_id"`
+		Kind              *StatusPublishersKind `json:"kind,omitempty"`
+		LastHeartbeatAt   *time.Time            `json:"last_heartbeat_at,omitempty"`
+		LastPublicationAt *time.Time            `json:"last_publication_at,omitempty"`
+		Stale             bool                  `json:"stale"`
+		StaleAfterS       *int                  `json:"stale_after_s,omitempty"`
+
+		// StaleSince When the publisher became stale (its last heartbeat plus stale_after_s).
+		StaleSince *time.Time `json:"stale_since,omitempty"`
 	} `json:"publishers"`
 }
 
 // StatusDegradedComponent defines model for Status.Degraded.Component.
 type StatusDegradedComponent string
+
+// StatusMtlsMode CISP_MTLS_MODE; off is also a degraded line of the status (hard rule 4).
+type StatusMtlsMode string
+
+// StatusPublishersKind defines model for Status.Publishers.Kind.
+type StatusPublishersKind string
 
 // UspaceRequirements cis/uspace_requirements/v1: the 2021/664 Art. 3(4) requirements
 // of a U-space airspace (spec 02 F1, 03 section 1
@@ -702,14 +1356,127 @@ type Warning struct {
 	Reason string `json:"reason"`
 }
 
+// ZoneFeature One ED-318 UASZone feature as published. The CISP adds only
+// extendedProperties.cis_applicability (at and applies_at reads)
+// to its copy, never to the stored feature.
+type ZoneFeature struct {
+	Geometry   map[string]interface{} `json:"geometry"`
+	Properties struct {
+		ExtendedProperties *struct {
+			CisApplicability *ZoneFeaturePropertiesExtendedPropertiesCisApplicability `json:"cis_applicability,omitempty"`
+		} `json:"extendedProperties,omitempty"`
+		Identifier string `json:"identifier"`
+	} `json:"properties"`
+	Type ZoneFeatureType `json:"type"`
+}
+
+// ZoneFeaturePropertiesExtendedPropertiesCisApplicability defines model for ZoneFeature.Properties.ExtendedProperties.CisApplicability.
+type ZoneFeaturePropertiesExtendedPropertiesCisApplicability string
+
+// ZoneFeatureType defines model for ZoneFeature.Type.
+type ZoneFeatureType string
+
+// ZoneFeatureCollection A plain FeatureCollection of features as published (the parts of a delta).
+type ZoneFeatureCollection struct {
+	Features []ZoneFeature             `json:"features"`
+	Type     ZoneFeatureCollectionType `json:"type"`
+}
+
+// ZoneFeatureCollectionType defines model for ZoneFeatureCollection.Type.
+type ZoneFeatureCollectionType string
+
+// AcceptEncoding defines model for AcceptEncoding.
+type AcceptEncoding = string
+
+// AppliesAt Examples: 2026-10-02T12:00:00Z
+type AppliesAt = string
+
+// At Examples: 2026-10-02T12:00:00Z
+type At = string
+
+// BBox Examples: 44.70,41.65,44.90,41.80
+type BBox = string
+
+// DatasetPath defines model for DatasetPath.
+type DatasetPath string
+
+// IfNoneMatch Examples: "zones:4"
+type IfNoneMatch = string
+
+// DatasetApplicationGeoPlusJSON An ED-318 FeatureCollection as the CISP serves it: the features
+// as published (canonical JSON), metadata.issued the version's
+// received_at, and the top-level cis_dataset, cis_version and
+// cis_updated_at (docs/PLAN.md section 15 Q1).
+type DatasetApplicationGeoPlusJSON = DatasetCollection
+
+// DatasetApplicationJSON The application/json read of a dataset, the USSP list or a delta.
+type DatasetApplicationJSON = DatasetDocument
+
 // PreconditionFailed The ecosystem-wide error body (RFC 9457), the same shape as
 // uspace-lab schemas/common/problem/v1.
 type PreconditionFailed = Problem
+
+// PublicDatasetApplicationGeoPlusJSON An ED-318 FeatureCollection as the CISP serves it: the features
+// as published (canonical JSON), metadata.issued the version's
+// received_at, and the top-level cis_dataset, cis_version and
+// cis_updated_at (docs/PLAN.md section 15 Q1).
+type PublicDatasetApplicationGeoPlusJSON = DatasetCollection
+
+// PublicDatasetApplicationJSON The USSP list on the public read: cis/ussp_list/v1 without each
+// USSP's base_url and certificate_id (docs/PLAN.md section 15
+// Q10, the demo default until GCAA decides).
+type PublicDatasetApplicationJSON = PublicUsspList
+
+// RateLimited The ecosystem-wide error body (RFC 9457), the same shape as
+// uspace-lab schemas/common/problem/v1.
+type RateLimited = Problem
+
+// Unavailable The ecosystem-wide error body (RFC 9457), the same shape as
+// uspace-lab schemas/common/problem/v1.
+type Unavailable = Problem
 
 // GetJWKSParams defines parameters for GetJWKS.
 type GetJWKSParams struct {
 	IfNoneMatch *string `json:"If-None-Match,omitempty"`
 }
+
+// GetPublicDatasetParams defines parameters for GetPublicDataset.
+type GetPublicDatasetParams struct {
+	// Bbox minlng,minlat,maxlng,maxlat in WGS84 degrees; a prefilter on the
+	// stored shapes' bounding boxes. Not across the antimeridian.
+	Bbox *BBox `form:"bbox,omitempty" json:"bbox,omitempty"`
+
+	// At RFC 3339 instant with an offset; keeps what applies then and what cannot be evaluated.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+
+	// AppliesAt RFC 3339 instant with an offset; annotates cis_applicability on every feature, filters nothing.
+	AppliesAt   *AppliesAt   `form:"applies_at,omitempty" json:"applies_at,omitempty"`
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+
+	// AcceptEncoding gzip serves the stored snapshot compressed, as it is held.
+	AcceptEncoding *AcceptEncoding `json:"Accept-Encoding,omitempty"`
+}
+
+// GetPublicDatasetParamsDataset defines parameters for GetPublicDataset.
+type GetPublicDatasetParamsDataset string
+
+// HeadPublicDatasetParams defines parameters for HeadPublicDataset.
+type HeadPublicDatasetParams struct {
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// HeadPublicDatasetParamsDataset defines parameters for HeadPublicDataset.
+type HeadPublicDatasetParamsDataset string
+
+// ListChangesParams defines parameters for ListChanges.
+type ListChangesParams struct {
+	Since   *int64                    `form:"since,omitempty" json:"since,omitempty"`
+	Dataset *ListChangesParamsDataset `form:"dataset,omitempty" json:"dataset,omitempty"`
+	Limit   *int                      `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListChangesParamsDataset defines parameters for ListChanges.
+type ListChangesParamsDataset string
 
 // ListPublicationsParams defines parameters for ListPublications.
 type ListPublicationsParams struct {
@@ -746,6 +1513,56 @@ type ListPublicationAttemptsParams struct {
 // ListPublicationAttemptsParamsDataset defines parameters for ListPublicationAttempts.
 type ListPublicationAttemptsParamsDataset string
 
+// GetDatasetParams defines parameters for GetDataset.
+type GetDatasetParams struct {
+	// Bbox minlng,minlat,maxlng,maxlat in WGS84 degrees; a prefilter on the
+	// stored shapes' bounding boxes. Not across the antimeridian.
+	Bbox *BBox `form:"bbox,omitempty" json:"bbox,omitempty"`
+
+	// At RFC 3339 instant with an offset; keeps what applies then and what cannot be evaluated.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+
+	// AppliesAt RFC 3339 instant with an offset; annotates cis_applicability on every feature, filters nothing.
+	AppliesAt *AppliesAt `form:"applies_at,omitempty" json:"applies_at,omitempty"`
+
+	// SinceVersion The version the client holds; the answer is the delta from it.
+	SinceVersion *int64       `form:"since_version,omitempty" json:"since_version,omitempty"`
+	IfNoneMatch  *IfNoneMatch `json:"If-None-Match,omitempty"`
+
+	// AcceptEncoding gzip serves the stored snapshot compressed, as it is held.
+	AcceptEncoding *AcceptEncoding `json:"Accept-Encoding,omitempty"`
+}
+
+// GetDatasetParamsDataset defines parameters for GetDataset.
+type GetDatasetParamsDataset string
+
+// HeadDatasetParams defines parameters for HeadDataset.
+type HeadDatasetParams struct {
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// HeadDatasetParamsDataset defines parameters for HeadDataset.
+type HeadDatasetParamsDataset string
+
+// ListDatasetVersionsParams defines parameters for ListDatasetVersions.
+type ListDatasetVersionsParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Before Only versions below this one.
+	Before *int64 `form:"before,omitempty" json:"before,omitempty"`
+}
+
+// ListDatasetVersionsParamsDataset defines parameters for ListDatasetVersions.
+type ListDatasetVersionsParamsDataset string
+
+// GetDatasetVersionParams defines parameters for GetDatasetVersion.
+type GetDatasetVersionParams struct {
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// GetDatasetVersionParamsDataset defines parameters for GetDatasetVersion.
+type GetDatasetVersionParamsDataset string
+
 // PutPublicationApplicationGeoPlusJSONRequestBody defines body for PutPublication for application/geo+json ContentType.
 type PutPublicationApplicationGeoPlusJSONRequestBody = PublicationBody
 
@@ -755,6 +1572,68 @@ type PutPublicationJSONRequestBody = PublicationBody
 // PostPublisherHeartbeatJSONRequestBody defines body for PostPublisherHeartbeat for application/json ContentType.
 type PostPublisherHeartbeatJSONRequestBody = PublisherHeartbeat
 
+// AsUsspList returns the union data inside the DatasetDocument as a UsspList
+func (t DatasetDocument) AsUsspList() (UsspList, error) {
+	var body UsspList
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUsspList overwrites any union data inside the DatasetDocument as the provided UsspList
+func (t *DatasetDocument) FromUsspList(v UsspList) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUsspList performs a merge with any union data inside the DatasetDocument, using the provided UsspList
+func (t *DatasetDocument) MergeUsspList(v UsspList) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsDatasetDelta returns the union data inside the DatasetDocument as a DatasetDelta
+func (t DatasetDocument) AsDatasetDelta() (DatasetDelta, error) {
+	var body DatasetDelta
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDatasetDelta overwrites any union data inside the DatasetDocument as the provided DatasetDelta
+func (t *DatasetDocument) FromDatasetDelta(v DatasetDelta) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeDatasetDelta performs a merge with any union data inside the DatasetDocument, using the provided DatasetDelta
+func (t *DatasetDocument) MergeDatasetDelta(v DatasetDelta) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t DatasetDocument) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *DatasetDocument) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetJWKS The CISP's signing keys (JWKS)
@@ -763,9 +1642,18 @@ type ServerInterface interface {
 	// GetHealthz Liveness
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
+	// GetPublicDataset The public read of a dataset (no token)
+	// (GET /public/v1/{dataset})
+	GetPublicDataset(w http.ResponseWriter, r *http.Request, dataset GetPublicDatasetParamsDataset, params GetPublicDatasetParams)
+	// HeadPublicDataset The public read's headers (no token)
+	// (HEAD /public/v1/{dataset})
+	HeadPublicDataset(w http.ResponseWriter, r *http.Request, dataset HeadPublicDatasetParamsDataset, params HeadPublicDatasetParams)
 	// GetReadyz Readiness
 	// (GET /readyz)
 	GetReadyz(w http.ResponseWriter, r *http.Request)
+	// ListChanges The change cursor feed
+	// (GET /v1/changes)
+	ListChanges(w http.ResponseWriter, r *http.Request, params ListChangesParams)
 	// ListPublications The version history of a dataset
 	// (GET /v1/publications/{dataset})
 	ListPublications(w http.ResponseWriter, r *http.Request, dataset ListPublicationsParamsDataset, params ListPublicationsParams)
@@ -778,9 +1666,21 @@ type ServerInterface interface {
 	// PostPublisherHeartbeat Publisher heartbeat (every 15 s)
 	// (POST /v1/publishers/heartbeat)
 	PostPublisherHeartbeat(w http.ResponseWriter, r *http.Request)
-	// GetStatus Service status (stub)
+	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(w http.ResponseWriter, r *http.Request)
+	// GetDataset Read a dataset (F3 pull)
+	// (GET /v1/{dataset})
+	GetDataset(w http.ResponseWriter, r *http.Request, dataset GetDatasetParamsDataset, params GetDatasetParams)
+	// HeadDataset The current version's headers (the 60 s reconciliation)
+	// (HEAD /v1/{dataset})
+	HeadDataset(w http.ResponseWriter, r *http.Request, dataset HeadDatasetParamsDataset, params HeadDatasetParams)
+	// ListDatasetVersions The versions of a dataset
+	// (GET /v1/{dataset}/versions)
+	ListDatasetVersions(w http.ResponseWriter, r *http.Request, dataset ListDatasetVersionsParamsDataset, params ListDatasetVersionsParams)
+	// GetDatasetVersion One version as published (spec 06 T4)
+	// (GET /v1/{dataset}/versions/{version})
+	GetDatasetVersion(w http.ResponseWriter, r *http.Request, dataset GetDatasetVersionParamsDataset, version int64, params GetDatasetVersionParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -847,11 +1747,228 @@ func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetPublicDataset operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicDataset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset GetPublicDatasetParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetPublicDatasetParams
+
+	// ------------- Optional query parameter "bbox" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "bbox", r.URL.Query(), &params.Bbox, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "bbox"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bbox", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "applies_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "applies_at", r.URL.Query(), &params.AppliesAt, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "applies_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applies_at", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	// ------------- Optional header parameter "Accept-Encoding" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Accept-Encoding")]; found {
+		var AcceptEncoding AcceptEncoding
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Accept-Encoding", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Accept-Encoding", valueList[0], &AcceptEncoding, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Accept-Encoding", Err: err})
+			return
+		}
+
+		params.AcceptEncoding = &AcceptEncoding
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicDataset(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// HeadPublicDataset operation middleware
+func (siw *ServerInterfaceWrapper) HeadPublicDataset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset HeadPublicDatasetParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params HeadPublicDatasetParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HeadPublicDataset(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetReadyz operation middleware
 func (siw *ServerInterfaceWrapper) GetReadyz(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReadyz(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListChanges operation middleware
+func (siw *ServerInterfaceWrapper) ListChanges(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListChangesParams
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "dataset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dataset", r.URL.Query(), &params.Dataset, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dataset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListChanges(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1068,6 +2185,291 @@ func (siw *ServerInterfaceWrapper) GetStatus(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetDataset operation middleware
+func (siw *ServerInterfaceWrapper) GetDataset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset GetDatasetParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDatasetParams
+
+	// ------------- Optional query parameter "bbox" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "bbox", r.URL.Query(), &params.Bbox, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "bbox"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bbox", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "applies_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "applies_at", r.URL.Query(), &params.AppliesAt, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "applies_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applies_at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "since_version" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since_version", r.URL.Query(), &params.SinceVersion, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since_version"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since_version", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	// ------------- Optional header parameter "Accept-Encoding" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Accept-Encoding")]; found {
+		var AcceptEncoding AcceptEncoding
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Accept-Encoding", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Accept-Encoding", valueList[0], &AcceptEncoding, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Accept-Encoding", Err: err})
+			return
+		}
+
+		params.AcceptEncoding = &AcceptEncoding
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDataset(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// HeadDataset operation middleware
+func (siw *ServerInterfaceWrapper) HeadDataset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset HeadDatasetParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params HeadDatasetParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HeadDataset(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDatasetVersions operation middleware
+func (siw *ServerInterfaceWrapper) ListDatasetVersions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset ListDatasetVersionsParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDatasetVersionsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDatasetVersions(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDatasetVersion operation middleware
+func (siw *ServerInterfaceWrapper) GetDatasetVersion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dataset" -------------
+	var dataset GetDatasetVersionParamsDataset
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dataset", r.PathValue("dataset"), &dataset, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dataset", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "version" -------------
+	var version int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "version", r.PathValue("version"), &version, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "version", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDatasetVersionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDatasetVersion(w, r, dataset, version, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1195,9 +2597,62 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/publications/{dataset}", wrapper.PutPublication)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/publications/{dataset}/attempts", wrapper.ListPublicationAttempts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/publishers/heartbeat", wrapper.PostPublisherHeartbeat)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}", wrapper.GetDataset)
+	m.HandleFunc(http.MethodHead+" "+options.BaseURL+"/v1/{dataset}", wrapper.HeadDataset)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions", wrapper.ListDatasetVersions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions/{version}", wrapper.GetDatasetVersion)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/changes", wrapper.ListChanges)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/public/v1/{dataset}", wrapper.GetPublicDataset)
+	m.HandleFunc(http.MethodHead+" "+options.BaseURL+"/public/v1/{dataset}", wrapper.HeadPublicDataset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/.well-known/jwks.json", wrapper.GetJWKS)
 
 	return m
+}
+
+type DatasetResponseHeaders struct {
+	CacheControl    *string
+	ContentEncoding *string
+	ETag            *string
+	LastModified    *string
+	Vary            *string
+	XCISAgeS        *int
+	XCISFiltered    *string
+	XCISSignature   *string
+	XCISStale       *string
+	XCISVersion     *int64
+}
+type DatasetApplicationGeoPlusJSONResponse struct {
+	Body DatasetCollection
+
+	Headers DatasetResponseHeaders
+}
+type DatasetJSONResponse struct {
+	Body DatasetDocument
+
+	Headers DatasetResponseHeaders
+}
+
+type DatasetHeadResponseHeaders struct {
+	CacheControl  *string
+	ETag          *string
+	LastModified  *string
+	XCISAgeS      *int
+	XCISSignature *string
+	XCISStale     *string
+	XCISVersion   *int64
+}
+type DatasetHeadResponse struct {
+	Headers DatasetHeadResponseHeaders
+}
+
+type NotModifiedResponseHeaders struct {
+	CacheControl *string
+	ETag         *string
+	XCISStale    *string
+	XCISVersion  *int64
+}
+type NotModifiedResponse struct {
+	Headers NotModifiedResponseHeaders
 }
 
 type PreconditionFailedResponseHeaders struct {
@@ -1210,6 +2665,47 @@ type PreconditionFailedApplicationProblemPlusJSONResponse struct {
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type PublicDatasetResponseHeaders struct {
+	CacheControl    *string
+	ContentEncoding *string
+	ETag            *string
+	LastModified    *string
+	Vary            *string
+	XCISAgeS        *int
+	XCISFiltered    *string
+	XCISSignature   *string
+	XCISStale       *string
+	XCISVersion     *int64
+}
+type PublicDatasetApplicationGeoPlusJSONResponse struct {
+	Body DatasetCollection
+
+	Headers PublicDatasetResponseHeaders
+}
+type PublicDatasetJSONResponse struct {
+	Body PublicUsspList
+
+	Headers PublicDatasetResponseHeaders
+}
+
+type RateLimitedResponseHeaders struct {
+	RetryAfter *string
+}
+type RateLimitedApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers RateLimitedResponseHeaders
+}
+
+type UnavailableResponseHeaders struct {
+	RetryAfter *string
+}
+type UnavailableApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers UnavailableResponseHeaders
+}
 
 type GetJWKSRequestObject struct {
 	Params GetJWKSParams
@@ -1338,6 +2834,328 @@ func (response GetHealthzdefaultApplicationProblemPlusJSONResponse) VisitGetHeal
 	return err
 }
 
+type GetPublicDatasetRequestObject struct {
+	Dataset GetPublicDatasetParamsDataset `json:"dataset"`
+	Params  GetPublicDatasetParams
+}
+
+type GetPublicDatasetResponseObject interface {
+	VisitGetPublicDatasetResponse(w http.ResponseWriter) error
+}
+
+type GetPublicDataset200ApplicationGeoPlusJSONResponse struct {
+	PublicDatasetApplicationGeoPlusJSONResponse
+}
+
+func (response GetPublicDataset200ApplicationGeoPlusJSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/geo+json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ContentEncoding != nil {
+		w.Header().Set("Content-Encoding", fmt.Sprint(*response.Headers.ContentEncoding))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.Vary != nil {
+		w.Header().Set("Vary", fmt.Sprint(*response.Headers.Vary))
+	}
+	if response.Headers.XCISAgeS != nil {
+		w.Header().Set("X-CIS-Age-S", fmt.Sprint(*response.Headers.XCISAgeS))
+	}
+	if response.Headers.XCISFiltered != nil {
+		w.Header().Set("X-CIS-Filtered", fmt.Sprint(*response.Headers.XCISFiltered))
+	}
+	if response.Headers.XCISSignature != nil {
+		w.Header().Set("X-CIS-Signature", fmt.Sprint(*response.Headers.XCISSignature))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicDataset200JSONResponse struct{ PublicDatasetJSONResponse }
+
+func (response GetPublicDataset200JSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ContentEncoding != nil {
+		w.Header().Set("Content-Encoding", fmt.Sprint(*response.Headers.ContentEncoding))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.Vary != nil {
+		w.Header().Set("Vary", fmt.Sprint(*response.Headers.Vary))
+	}
+	if response.Headers.XCISAgeS != nil {
+		w.Header().Set("X-CIS-Age-S", fmt.Sprint(*response.Headers.XCISAgeS))
+	}
+	if response.Headers.XCISFiltered != nil {
+		w.Header().Set("X-CIS-Filtered", fmt.Sprint(*response.Headers.XCISFiltered))
+	}
+	if response.Headers.XCISSignature != nil {
+		w.Header().Set("X-CIS-Signature", fmt.Sprint(*response.Headers.XCISSignature))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicDataset304Response = NotModifiedResponse
+
+func (response GetPublicDataset304Response) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetPublicDataset400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicDataset400ApplicationProblemPlusJSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicDataset404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetPublicDataset404ApplicationProblemPlusJSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicDataset429ApplicationProblemPlusJSONResponse struct {
+	RateLimitedApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicDataset429ApplicationProblemPlusJSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicDataset500ApplicationProblemPlusJSONResponse Problem
+
+func (response GetPublicDataset500ApplicationProblemPlusJSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicDataset503ApplicationProblemPlusJSONResponse struct {
+	UnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicDataset503ApplicationProblemPlusJSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicDatasetdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetPublicDatasetdefaultApplicationProblemPlusJSONResponse) VisitGetPublicDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type HeadPublicDatasetRequestObject struct {
+	Dataset HeadPublicDatasetParamsDataset `json:"dataset"`
+	Params  HeadPublicDatasetParams
+}
+
+type HeadPublicDatasetResponseObject interface {
+	VisitHeadPublicDatasetResponse(w http.ResponseWriter) error
+}
+
+type HeadPublicDataset200Response = DatasetHeadResponse
+
+func (response HeadPublicDataset200Response) VisitHeadPublicDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.XCISAgeS != nil {
+		w.Header().Set("X-CIS-Age-S", fmt.Sprint(*response.Headers.XCISAgeS))
+	}
+	if response.Headers.XCISSignature != nil {
+		w.Header().Set("X-CIS-Signature", fmt.Sprint(*response.Headers.XCISSignature))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(200)
+	return nil
+}
+
+type HeadPublicDataset304Response = NotModifiedResponse
+
+func (response HeadPublicDataset304Response) VisitHeadPublicDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(304)
+	return nil
+}
+
+type HeadPublicDataset404Response struct {
+}
+
+func (response HeadPublicDataset404Response) VisitHeadPublicDatasetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
+type HeadPublicDataset429ResponseHeaders struct {
+	RetryAfter *string
+}
+
+type HeadPublicDataset429Response struct {
+	Headers HeadPublicDataset429ResponseHeaders
+}
+
+func (response HeadPublicDataset429Response) VisitHeadPublicDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	return nil
+}
+
+type HeadPublicDataset503ResponseHeaders struct {
+	RetryAfter *string
+}
+
+type HeadPublicDataset503Response struct {
+	Headers HeadPublicDataset503ResponseHeaders
+}
+
+func (response HeadPublicDataset503Response) VisitHeadPublicDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	return nil
+}
+
+type HeadPublicDatasetdefaultResponse struct {
+	StatusCode int
+}
+
+func (response HeadPublicDatasetdefaultResponse) VisitHeadPublicDatasetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(response.StatusCode)
+	return nil
+}
+
 type GetReadyzRequestObject struct {
 }
 
@@ -1379,6 +3197,108 @@ type GetReadyzdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetReadyzdefaultApplicationProblemPlusJSONResponse) VisitGetReadyzResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChangesRequestObject struct {
+	Params ListChangesParams
+}
+
+type ListChangesResponseObject interface {
+	VisitListChangesResponse(w http.ResponseWriter) error
+}
+
+type ListChanges200JSONResponse ChangeList
+
+func (response ListChanges200JSONResponse) VisitListChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChanges400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListChanges400ApplicationProblemPlusJSONResponse) VisitListChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChanges401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListChanges401ApplicationProblemPlusJSONResponse) VisitListChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChanges403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListChanges403ApplicationProblemPlusJSONResponse) VisitListChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChanges503ApplicationProblemPlusJSONResponse struct {
+	UnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response ListChanges503ApplicationProblemPlusJSONResponse) VisitListChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChangesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListChangesdefaultApplicationProblemPlusJSONResponse) VisitListChangesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -1935,18 +3855,32 @@ func (response GetStatus200JSONResponse) VisitGetStatusResponse(w http.ResponseW
 	return err
 }
 
-type GetStatus501ApplicationProblemPlusJSONResponse struct {
+type GetStatus401ApplicationProblemPlusJSONResponse struct {
 	ProblemApplicationProblemPlusJSONResponse
 }
 
-func (response GetStatus501ApplicationProblemPlusJSONResponse) VisitGetStatusResponse(w http.ResponseWriter) error {
+func (response GetStatus401ApplicationProblemPlusJSONResponse) VisitGetStatusResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(501)
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStatus403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetStatus403ApplicationProblemPlusJSONResponse) VisitGetStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1968,6 +3902,687 @@ func (response GetStatusdefaultApplicationProblemPlusJSONResponse) VisitGetStatu
 	return err
 }
 
+type GetDatasetRequestObject struct {
+	Dataset GetDatasetParamsDataset `json:"dataset"`
+	Params  GetDatasetParams
+}
+
+type GetDatasetResponseObject interface {
+	VisitGetDatasetResponse(w http.ResponseWriter) error
+}
+
+type GetDataset200ApplicationGeoPlusJSONResponse struct {
+	DatasetApplicationGeoPlusJSONResponse
+}
+
+func (response GetDataset200ApplicationGeoPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/geo+json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ContentEncoding != nil {
+		w.Header().Set("Content-Encoding", fmt.Sprint(*response.Headers.ContentEncoding))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.Vary != nil {
+		w.Header().Set("Vary", fmt.Sprint(*response.Headers.Vary))
+	}
+	if response.Headers.XCISAgeS != nil {
+		w.Header().Set("X-CIS-Age-S", fmt.Sprint(*response.Headers.XCISAgeS))
+	}
+	if response.Headers.XCISFiltered != nil {
+		w.Header().Set("X-CIS-Filtered", fmt.Sprint(*response.Headers.XCISFiltered))
+	}
+	if response.Headers.XCISSignature != nil {
+		w.Header().Set("X-CIS-Signature", fmt.Sprint(*response.Headers.XCISSignature))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset200JSONResponse struct{ DatasetJSONResponse }
+
+func (response GetDataset200JSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ContentEncoding != nil {
+		w.Header().Set("Content-Encoding", fmt.Sprint(*response.Headers.ContentEncoding))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.Vary != nil {
+		w.Header().Set("Vary", fmt.Sprint(*response.Headers.Vary))
+	}
+	if response.Headers.XCISAgeS != nil {
+		w.Header().Set("X-CIS-Age-S", fmt.Sprint(*response.Headers.XCISAgeS))
+	}
+	if response.Headers.XCISFiltered != nil {
+		w.Header().Set("X-CIS-Filtered", fmt.Sprint(*response.Headers.XCISFiltered))
+	}
+	if response.Headers.XCISSignature != nil {
+		w.Header().Set("X-CIS-Signature", fmt.Sprint(*response.Headers.XCISSignature))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset304Response = NotModifiedResponse
+
+func (response GetDataset304Response) VisitGetDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetDataset400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetDataset400ApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset401ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDataset401ApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDataset403ApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDataset404ApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset410ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDataset410ApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset500ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDataset500ApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDataset503ApplicationProblemPlusJSONResponse struct {
+	UnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response GetDataset503ApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetDatasetdefaultApplicationProblemPlusJSONResponse) VisitGetDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type HeadDatasetRequestObject struct {
+	Dataset HeadDatasetParamsDataset `json:"dataset"`
+	Params  HeadDatasetParams
+}
+
+type HeadDatasetResponseObject interface {
+	VisitHeadDatasetResponse(w http.ResponseWriter) error
+}
+
+type HeadDataset200Response = DatasetHeadResponse
+
+func (response HeadDataset200Response) VisitHeadDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	if response.Headers.XCISAgeS != nil {
+		w.Header().Set("X-CIS-Age-S", fmt.Sprint(*response.Headers.XCISAgeS))
+	}
+	if response.Headers.XCISSignature != nil {
+		w.Header().Set("X-CIS-Signature", fmt.Sprint(*response.Headers.XCISSignature))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(200)
+	return nil
+}
+
+type HeadDataset304Response = NotModifiedResponse
+
+func (response HeadDataset304Response) VisitHeadDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(304)
+	return nil
+}
+
+type HeadDataset401Response struct {
+}
+
+func (response HeadDataset401Response) VisitHeadDatasetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type HeadDataset403Response struct {
+}
+
+func (response HeadDataset403Response) VisitHeadDatasetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
+type HeadDataset404Response struct {
+}
+
+func (response HeadDataset404Response) VisitHeadDatasetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
+type HeadDataset503ResponseHeaders struct {
+	RetryAfter *string
+}
+
+type HeadDataset503Response struct {
+	Headers HeadDataset503ResponseHeaders
+}
+
+func (response HeadDataset503Response) VisitHeadDatasetResponse(w http.ResponseWriter) error {
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	return nil
+}
+
+type HeadDatasetdefaultResponse struct {
+	StatusCode int
+}
+
+func (response HeadDatasetdefaultResponse) VisitHeadDatasetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(response.StatusCode)
+	return nil
+}
+
+type ListDatasetVersionsRequestObject struct {
+	Dataset ListDatasetVersionsParamsDataset `json:"dataset"`
+	Params  ListDatasetVersionsParams
+}
+
+type ListDatasetVersionsResponseObject interface {
+	VisitListDatasetVersionsResponse(w http.ResponseWriter) error
+}
+
+type ListDatasetVersions200JSONResponse PublicationVersionList
+
+func (response ListDatasetVersions200JSONResponse) VisitListDatasetVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatasetVersions400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListDatasetVersions400ApplicationProblemPlusJSONResponse) VisitListDatasetVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatasetVersions401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListDatasetVersions401ApplicationProblemPlusJSONResponse) VisitListDatasetVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatasetVersions403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListDatasetVersions403ApplicationProblemPlusJSONResponse) VisitListDatasetVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatasetVersions404ApplicationProblemPlusJSONResponse Problem
+
+func (response ListDatasetVersions404ApplicationProblemPlusJSONResponse) VisitListDatasetVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatasetVersions503ApplicationProblemPlusJSONResponse struct {
+	UnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response ListDatasetVersions503ApplicationProblemPlusJSONResponse) VisitListDatasetVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatasetVersionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListDatasetVersionsdefaultApplicationProblemPlusJSONResponse) VisitListDatasetVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersionRequestObject struct {
+	Dataset GetDatasetVersionParamsDataset `json:"dataset"`
+	Version int64                          `json:"version"`
+	Params  GetDatasetVersionParams
+}
+
+type GetDatasetVersionResponseObject interface {
+	VisitGetDatasetVersionResponse(w http.ResponseWriter) error
+}
+
+type GetDatasetVersion200ResponseHeaders struct {
+	CacheControl        *string
+	ETag                *string
+	LastModified        *string
+	XCISSignature       string
+	XCISVersion         *int64
+	XPublisherKid       *string
+	XPublisherSignature *string
+}
+
+type GetDatasetVersion200ApplicationGeoPlusJSONResponse struct {
+	Body    PublicationBody
+	Headers GetDatasetVersion200ResponseHeaders
+}
+
+func (response GetDatasetVersion200ApplicationGeoPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/geo+json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	if response.Headers.XPublisherKid != nil {
+		w.Header().Set("X-Publisher-Kid", fmt.Sprint(*response.Headers.XPublisherKid))
+	}
+	if response.Headers.XPublisherSignature != nil {
+		w.Header().Set("X-Publisher-Signature", fmt.Sprint(*response.Headers.XPublisherSignature))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion200JSONResponse struct {
+	Body    PublicationBody
+	Headers GetDatasetVersion200ResponseHeaders
+}
+
+func (response GetDatasetVersion200JSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.LastModified != nil {
+		w.Header().Set("Last-Modified", fmt.Sprint(*response.Headers.LastModified))
+	}
+	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	if response.Headers.XPublisherKid != nil {
+		w.Header().Set("X-Publisher-Kid", fmt.Sprint(*response.Headers.XPublisherKid))
+	}
+	if response.Headers.XPublisherSignature != nil {
+		w.Header().Set("X-Publisher-Signature", fmt.Sprint(*response.Headers.XPublisherSignature))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion304Response = NotModifiedResponse
+
+func (response GetDatasetVersion304Response) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.XCISStale != nil {
+		w.Header().Set("X-CIS-Stale", fmt.Sprint(*response.Headers.XCISStale))
+	}
+	if response.Headers.XCISVersion != nil {
+		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
+	}
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetDatasetVersion400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetDatasetVersion400ApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion401ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDatasetVersion401ApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDatasetVersion403ApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDatasetVersion404ApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion500ApplicationProblemPlusJSONResponse Problem
+
+func (response GetDatasetVersion500ApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersion503ApplicationProblemPlusJSONResponse struct {
+	UnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response GetDatasetVersion503ApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatasetVersiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetDatasetVersiondefaultApplicationProblemPlusJSONResponse) VisitGetDatasetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// GetJWKS The CISP's signing keys (JWKS)
@@ -1976,9 +4591,18 @@ type StrictServerInterface interface {
 	// GetHealthz Liveness
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
+	// GetPublicDataset The public read of a dataset (no token)
+	// (GET /public/v1/{dataset})
+	GetPublicDataset(ctx context.Context, request GetPublicDatasetRequestObject) (GetPublicDatasetResponseObject, error)
+	// HeadPublicDataset The public read's headers (no token)
+	// (HEAD /public/v1/{dataset})
+	HeadPublicDataset(ctx context.Context, request HeadPublicDatasetRequestObject) (HeadPublicDatasetResponseObject, error)
 	// GetReadyz Readiness
 	// (GET /readyz)
 	GetReadyz(ctx context.Context, request GetReadyzRequestObject) (GetReadyzResponseObject, error)
+	// ListChanges The change cursor feed
+	// (GET /v1/changes)
+	ListChanges(ctx context.Context, request ListChangesRequestObject) (ListChangesResponseObject, error)
 	// ListPublications The version history of a dataset
 	// (GET /v1/publications/{dataset})
 	ListPublications(ctx context.Context, request ListPublicationsRequestObject) (ListPublicationsResponseObject, error)
@@ -1991,9 +4615,21 @@ type StrictServerInterface interface {
 	// PostPublisherHeartbeat Publisher heartbeat (every 15 s)
 	// (POST /v1/publishers/heartbeat)
 	PostPublisherHeartbeat(ctx context.Context, request PostPublisherHeartbeatRequestObject) (PostPublisherHeartbeatResponseObject, error)
-	// GetStatus Service status (stub)
+	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(ctx context.Context, request GetStatusRequestObject) (GetStatusResponseObject, error)
+	// GetDataset Read a dataset (F3 pull)
+	// (GET /v1/{dataset})
+	GetDataset(ctx context.Context, request GetDatasetRequestObject) (GetDatasetResponseObject, error)
+	// HeadDataset The current version's headers (the 60 s reconciliation)
+	// (HEAD /v1/{dataset})
+	HeadDataset(ctx context.Context, request HeadDatasetRequestObject) (HeadDatasetResponseObject, error)
+	// ListDatasetVersions The versions of a dataset
+	// (GET /v1/{dataset}/versions)
+	ListDatasetVersions(ctx context.Context, request ListDatasetVersionsRequestObject) (ListDatasetVersionsResponseObject, error)
+	// GetDatasetVersion One version as published (spec 06 T4)
+	// (GET /v1/{dataset}/versions/{version})
+	GetDatasetVersion(ctx context.Context, request GetDatasetVersionRequestObject) (GetDatasetVersionResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2085,6 +4721,60 @@ func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetPublicDataset operation middleware
+func (sh *strictHandler) GetPublicDataset(w http.ResponseWriter, r *http.Request, dataset GetPublicDatasetParamsDataset, params GetPublicDatasetParams) {
+	var request GetPublicDatasetRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPublicDataset(ctx, request.(GetPublicDatasetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPublicDataset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPublicDatasetResponseObject); ok {
+		if err := validResponse.VisitGetPublicDatasetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// HeadPublicDataset operation middleware
+func (sh *strictHandler) HeadPublicDataset(w http.ResponseWriter, r *http.Request, dataset HeadPublicDatasetParamsDataset, params HeadPublicDatasetParams) {
+	var request HeadPublicDatasetRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.HeadPublicDataset(ctx, request.(HeadPublicDatasetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "HeadPublicDataset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(HeadPublicDatasetResponseObject); ok {
+		if err := validResponse.VisitHeadPublicDatasetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetReadyz operation middleware
 func (sh *strictHandler) GetReadyz(w http.ResponseWriter, r *http.Request) {
 	var request GetReadyzRequestObject
@@ -2102,6 +4792,32 @@ func (sh *strictHandler) GetReadyz(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetReadyzResponseObject); ok {
 		if err := validResponse.VisitGetReadyzResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListChanges operation middleware
+func (sh *strictHandler) ListChanges(w http.ResponseWriter, r *http.Request, params ListChangesParams) {
+	var request ListChangesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListChanges(ctx, request.(ListChangesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListChanges")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListChangesResponseObject); ok {
+		if err := validResponse.VisitListChangesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2258,6 +4974,115 @@ func (sh *strictHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetStatusResponseObject); ok {
 		if err := validResponse.VisitGetStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDataset operation middleware
+func (sh *strictHandler) GetDataset(w http.ResponseWriter, r *http.Request, dataset GetDatasetParamsDataset, params GetDatasetParams) {
+	var request GetDatasetRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDataset(ctx, request.(GetDatasetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDataset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDatasetResponseObject); ok {
+		if err := validResponse.VisitGetDatasetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// HeadDataset operation middleware
+func (sh *strictHandler) HeadDataset(w http.ResponseWriter, r *http.Request, dataset HeadDatasetParamsDataset, params HeadDatasetParams) {
+	var request HeadDatasetRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.HeadDataset(ctx, request.(HeadDatasetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "HeadDataset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(HeadDatasetResponseObject); ok {
+		if err := validResponse.VisitHeadDatasetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDatasetVersions operation middleware
+func (sh *strictHandler) ListDatasetVersions(w http.ResponseWriter, r *http.Request, dataset ListDatasetVersionsParamsDataset, params ListDatasetVersionsParams) {
+	var request ListDatasetVersionsRequestObject
+
+	request.Dataset = dataset
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDatasetVersions(ctx, request.(ListDatasetVersionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDatasetVersions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDatasetVersionsResponseObject); ok {
+		if err := validResponse.VisitListDatasetVersionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDatasetVersion operation middleware
+func (sh *strictHandler) GetDatasetVersion(w http.ResponseWriter, r *http.Request, dataset GetDatasetVersionParamsDataset, version int64, params GetDatasetVersionParams) {
+	var request GetDatasetVersionRequestObject
+
+	request.Dataset = dataset
+	request.Version = version
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDatasetVersion(ctx, request.(GetDatasetVersionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDatasetVersion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDatasetVersionResponseObject); ok {
+		if err := validResponse.VisitGetDatasetVersionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

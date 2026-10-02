@@ -110,7 +110,7 @@ func TestRunJWKSHealthy(t *testing.T) {
 		t.Errorf("no token: %d %s", code, body)
 	}
 	t.Logf("GET /v1/status without a token: %d %s", code, strings.TrimSpace(body))
-	if code, body := getWith(t, r.base+"/v1/status", a.token(t, "cis.read")); code != 501 {
+	if code, body := getWith(t, r.base+"/v1/status", a.token(t, "cis.read")); code != 200 || !strings.Contains(body, `"mtls_mode":"required"`) {
 		t.Errorf("cis.read token: %d %s", code, body)
 	}
 	if code, body := getWith(t, r.base+"/v1/status", a.token(t)); code != 403 || !strings.Contains(body, `"field":"scope"`) {
@@ -139,7 +139,7 @@ func TestRunJWKSDownWithCache(t *testing.T) {
 		t.Errorf("status = %v", status)
 	}
 	t.Logf("jwks: %s", reason)
-	if code, body := getWith(t, r.base+"/v1/status", a.token(t, "cis.read")); code != 501 {
+	if code, body := getWith(t, r.base+"/v1/status", a.token(t, "cis.read")); code != 200 || !strings.Contains(body, `"component":"jwks"`) {
 		t.Errorf("a token on the cached JWKS: %d %s", code, body)
 	}
 	if c := r.stop(t); c != 0 {

@@ -20,6 +20,7 @@ import (
 
 	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
+	"github.com/rootxkit/uspace-cisp/internal/publication"
 )
 
 // DefaultMaxBodyBytes is the body cap of a route that does not raise it.
@@ -63,6 +64,12 @@ type Options struct {
 	RouteMiddleware map[string]func(http.Handler) http.Handler
 	// Now is the clock for durations; nil: time.Now.
 	Now func() time.Time
+	// RouteAliases names a registered ServeMux pattern by the operation it
+	// serves: NewRouter registers "GET /v1/{dataset}" as one pattern per
+	// dataset ("GET /v1/zones", ...) and maps each back here, so the
+	// route middleware, the body caps, the logs and the metrics all key
+	// on the operation. Set by NewRouter.
+	RouteAliases map[string]string
 }
 
 // PublicRoutes are the operations served without authentication: the
@@ -80,7 +87,7 @@ var PublicRoutes = map[string]bool{
 // does not start) when an operation outside PublicRoutes has no
 // RouteMiddleware entry, or an entry names no operation.
 func NewRouter(server gen.StrictServerInterface, opts Options) (http.Handler, error) {
-	mux := &recordingMux{ServeMux: http.NewServeMux()}
+	mux := &recordingMux{ServeMux: http.NewServeMux(), aliases: map[string]string{}}
 	strict := gen.NewStrictHandlerWithOptions(server, nil, gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestError,
 		ResponseErrorHandlerFunc: responseError(opts.Logger),
@@ -92,18 +99,48 @@ func NewRouter(server gen.StrictServerInterface, opts Options) (http.Handler, er
 	if err := CheckRouteAuth(mux.patterns, opts.RouteMiddleware); err != nil {
 		return nil, err
 	}
+	opts.RouteAliases = mux.aliases
 	return Wrap(mux.ServeMux, opts), nil
 }
 
-// recordingMux records every pattern the generated code registers.
+// datasetFirst are the operation paths whose first segment after the
+// version is the dataset. net/http's ServeMux refuses them as written:
+// "GET /v1/{dataset}/versions" and "GET /v1/publications/{dataset}" both
+// match /v1/publications/versions and neither is more specific, and
+// "HEAD /v1/{dataset}" conflicts with "GET /v1/status" the same way. They
+// are registered once per dataset instead, which also answers an unknown
+// dataset with the router's 404 before any handler or authentication.
+var datasetFirst = []string{"/v1/{dataset}", "/public/v1/{dataset}"}
+
+// recordingMux records every pattern the generated code registers, and
+// expands the datasetFirst ones.
 type recordingMux struct {
 	*http.ServeMux
 	patterns []string
+	// aliases maps an expanded pattern to the operation's pattern.
+	aliases map[string]string
 }
 
-// HandleFunc registers and records pattern.
+// HandleFunc registers and records pattern; a datasetFirst pattern is
+// registered once per dataset, with the dataset set as the path value
+// the generated code reads.
 func (m *recordingMux) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Request)) {
 	m.patterns = append(m.patterns, pattern)
+	method, path, _ := strings.Cut(pattern, " ")
+	for _, prefix := range datasetFirst {
+		if path != prefix && !strings.HasPrefix(path, prefix+"/") {
+			continue
+		}
+		for _, ds := range publication.Datasets {
+			expanded := method + " " + strings.Replace(path, "{dataset}", string(ds), 1)
+			m.aliases[expanded] = pattern
+			m.ServeMux.HandleFunc(expanded, func(w http.ResponseWriter, r *http.Request) {
+				r.SetPathValue("dataset", string(ds))
+				h(w, r)
+			})
+		}
+		return
+	}
 	m.ServeMux.HandleFunc(pattern, h)
 }
 
@@ -187,8 +224,16 @@ func Wrap(mux *http.ServeMux, opts Options) http.Handler {
 	h = bodyCap(h, opts.MaxBodyBytes, opts.RouteBodyCaps)
 	h = tracing(h, opts.Tracer)
 	h = recoverer(h, opts.Logger, panics)
-	h = access(h, opts.Logger, hist, mux, opts.Now)
+	h = access(h, opts.Logger, hist, mux, opts.RouteAliases, opts.Now)
 	return requestID(h)
+}
+
+// routeName is the operation a matched ServeMux pattern serves.
+func routeName(pattern string, aliases map[string]string) string {
+	if op, ok := aliases[pattern]; ok {
+		return op
+	}
+	return pattern
 }
 
 // routeMiddleware runs the matched route's middleware, if any.

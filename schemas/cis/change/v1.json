@@ -1,0 +1,99 @@
+{
+  "$id": "https://schemas.uspace.ge/cis/change/v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "cis/change/v1: one change record, the body of the change feed,\nof the webhook payload (inside the JWS claims) and of the\nstream's change frames (docs/PLAN.md section 6.7, section 15\nQ28). msg_id is the change cursor in decimal; pull_url asks for\nthe delta from the previous version on CISP_PUBLIC_BASE_URL;\nbbox is [min lng, min lat, max lng, max lat] of what changed,\nabsent for the whole dataset. Written by WP-4 from the plan's\nmember list; WP-6 adopts it for the webhook.\n",
+  "properties": {
+    "at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "bbox": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "type": "array"
+    },
+    "dataset": {
+      "enum": [
+        "zones",
+        "uspace_airspace",
+        "ussp_list",
+        "restrictions"
+      ],
+      "type": "string"
+    },
+    "etag": {
+      "examples": [
+        "\"zones:5\""
+      ],
+      "type": "string"
+    },
+    "feature_ids": {
+      "description": "Every identifier added, changed or removed, sorted.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "msg_id": {
+      "pattern": "^[0-9]+$",
+      "type": "string"
+    },
+    "producer": {
+      "const": "uspace-cisp",
+      "type": "string"
+    },
+    "pull_url": {
+      "format": "uri",
+      "type": "string"
+    },
+    "reason": {
+      "enum": [
+        "publication",
+        "restriction_created",
+        "restriction_activated",
+        "restriction_extended",
+        "restriction_ended",
+        "restriction_cancelled",
+        "restriction_expired",
+        "republished",
+        "subscription_test"
+      ],
+      "type": "string"
+    },
+    "removed_ids": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "schema": {
+      "const": "cis/change/v1",
+      "type": "string"
+    },
+    "version": {
+      "format": "int64",
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema",
+    "msg_id",
+    "producer",
+    "dataset",
+    "version",
+    "etag",
+    "feature_ids",
+    "removed_ids",
+    "reason",
+    "at",
+    "pull_url"
+  ],
+  "title": "cis/change/v1: one change record of the change feed, the webhooks and the stream",
+  "type": "object"
+}

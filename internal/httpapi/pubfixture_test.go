@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -75,6 +76,14 @@ type fakeStore struct {
 	// rowsGiven says whether the last PublishTx was handed its rows.
 	rowsGiven bool
 	attemptFn func(store.Attempt) error
+	// What the reads need (WP-4): the signed snapshot, the rows and the
+	// head of every version, the change feed and the publishers.
+	snaps      map[publication.Dataset]map[int64]store.Snapshot
+	rowsAt     map[publication.Dataset]map[int64][]publication.FeatureRow
+	heads      map[publication.Dataset]map[int64]store.StoredPublication
+	updated    map[publication.Dataset]time.Time
+	changes    []publication.Change
+	publishers []store.Publisher
 }
 
 func newFakeStore() *fakeStore {
@@ -83,6 +92,10 @@ func newFakeStore() *fakeStore {
 		current: map[publication.Dataset][]publication.FeatureRow{},
 		bodies:  map[publication.Dataset]map[int64][]byte{},
 		beats:   map[string]store.Heartbeat{},
+		snaps:   map[publication.Dataset]map[int64]store.Snapshot{},
+		rowsAt:  map[publication.Dataset]map[int64][]publication.FeatureRow{},
+		heads:   map[publication.Dataset]map[int64]store.StoredPublication{},
+		updated: map[publication.Dataset]time.Time{},
 	}
 }
 
@@ -170,11 +183,12 @@ func (f *fakeStore) PublishTx(ctx context.Context, in store.PublishInput, signer
 			}
 		}
 	}
-	if _, err := signer.Sign(ctx, in.Body); err != nil {
+	version := current + 1
+	snap, err := fakeSnapshot(ctx, in, version, signer)
+	if err != nil {
 		return store.PublishResult{}, err
 	}
 	f.signed++
-	version := current + 1
 	f.version[in.Dataset] = version
 	f.current[in.Dataset] = next
 	if f.bodies[in.Dataset] == nil {
@@ -188,6 +202,7 @@ func (f *fakeStore) PublishTx(ctx context.Context, in store.PublishInput, signer
 		SignatureKID: in.SignatureKID, FeatureCount: len(next), Added: len(diff.Added), Changed: len(diff.Changed),
 		Removed: len(diff.Removed), Warnings: in.Warnings, Reason: in.Reason,
 	})
+	f.record(in, version, next, diff, snap, sum[:])
 	return store.PublishResult{PublicationID: fmt.Sprintf("PUB%d", len(f.versions)-1), Version: version, ETag: publication.ETag(in.Dataset, version), Diff: diff}, nil
 }
 
@@ -274,6 +289,12 @@ type pubHarness struct {
 	logs   *bytes.Buffer
 	now    time.Time
 	pubs   *Publications
+	// The reads (WP-4) when the store serves them: the snapshot cache,
+	// the handlers, the key ring that signs, the public rate limiter.
+	reads   *Reads
+	cache   *store.SnapshotCache
+	ring    *jws.KeyRing
+	limiter *RateLimiter
 }
 
 type harnessOption func(*Publications, *Server)
@@ -328,12 +349,22 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 	h.store = st
 	h.logs = &bytes.Buffer{}
 	logger := obs.NewLogger(h.logs, "api", slog.LevelInfo)
+	h.ring = keyRing(t)
 	h.pubs = &Publications{
 		Logger: logger,
-		Store:  st, Signer: KeyRingSigner{Keys: keyRing(t)}, MaxPublicationBytes: maxBytes,
+		Store:  st, Signer: KeyRingSigner{Keys: h.ring}, MaxPublicationBytes: maxBytes,
 		AuthorityClientID: authorityID, ANSPClientID: anspID, Status: status,
 	}
-	server := &Server{Publications: h.pubs}
+	server := &Server{Publications: h.pubs, Status: &StatusReport{
+		Configured: []ConfiguredPublisher{{ClientID: authorityID, Kind: "authority"}, {ClientID: anspID, Kind: "ansp"}},
+		Registry:   status, MTLSMode: config.MTLSRequired,
+	}}
+	h.withReads(st, server, status, logger)
+	read := g.RequireScopes(auth.ScopeRead)
+	for _, op := range []string{"GET /v1/{dataset}", "HEAD /v1/{dataset}", "GET /v1/{dataset}/versions", "GET /v1/{dataset}/versions/{version}", "GET /v1/changes"} {
+		routes[op] = read
+	}
+	maps.Copy(routes, PublicReadAuth(h.limiter))
 	for _, o := range opts {
 		o(h.pubs, server)
 	}

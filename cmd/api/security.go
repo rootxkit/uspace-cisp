@@ -129,10 +129,21 @@ func (s *security) retry(ctx context.Context, tick <-chan time.Time) {
 // publish scope, the authority binding, the media type and the
 // authority's detached signature on PUT; the ANSP's client certificate
 // on its heartbeat).
-func (s *security) routes(cfg *config.API, status *obs.Status) map[string]func(http.Handler) http.Handler {
+//
+// The reads (WP-4) take cis.read; the public reads take no token and go
+// through the per-client rate limiter (httpapi.PublicReadAuth), an
+// explicit entry like every other.
+func (s *security) routes(cfg *config.API, status *obs.Status, limiter *httpapi.RateLimiter) map[string]func(http.Handler) http.Handler {
+	read := s.guard.RequireScopes(auth.ScopeRead)
 	out := map[string]func(http.Handler) http.Handler{
-		"GET /v1/status": s.guard.RequireScopes(auth.ScopeRead),
+		"GET /v1/status":                       read,
+		"GET /v1/{dataset}":                    read,
+		"HEAD /v1/{dataset}":                   read,
+		"GET /v1/{dataset}/versions":           read,
+		"GET /v1/{dataset}/versions/{version}": read,
+		"GET /v1/changes":                      read,
 	}
+	maps.Copy(out, httpapi.PublicReadAuth(limiter))
 	pub := httpapi.PublicationAuth{
 		Guard: s.guard,
 		AuthoritySignature: jws.SignatureGuard{

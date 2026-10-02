@@ -30,6 +30,7 @@ var exports = []struct {
 }{
 	{"UsspList", "ussp_list", "cis/ussp_list/v1: the national list of certified USSPs"},
 	{"UspaceRequirements", "uspace_requirements", "cis/uspace_requirements/v1: the Art. 3(4) requirements of a U-space airspace"},
+	{"Change", "change", "cis/change/v1: one change record of the change feed, the webhooks and the stream"},
 }
 
 const (

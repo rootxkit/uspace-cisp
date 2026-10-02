@@ -166,7 +166,7 @@ func TestListPublications(t *testing.T) {
 		t.Fatalf("page 1 %+v", list)
 	}
 	v := list.Versions[0]
-	if v.Etag != `"zones:3"` || v.Publisher != authorityID || v.Changed != 1 || v.Reason != gen.Publication || len(v.BodySha256) != 64 || v.SignatureKid == nil {
+	if v.Etag != `"zones:3"` || v.Publisher != authorityID || v.Changed != 1 || v.Reason != gen.PublicationVersionReasonPublication || len(v.BodySha256) != 64 || v.SignatureKid == nil {
 		t.Errorf("version %+v", v)
 	}
 	rec = h.get("/v1/publications/zones?limit=2&before=2", h.token(usspID, auth.ScopeRead))

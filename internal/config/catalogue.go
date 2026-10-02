@@ -59,6 +59,7 @@ const (
 	EnvIssuerURL                 = "CISP_ISSUER_URL"
 	EnvReadMaxAgeS               = "CISP_READ_MAX_AGE_S"
 	EnvPublicRPM                 = "CISP_PUBLIC_RPM"
+	EnvTrustedProxyCIDR          = "CISP_TRUSTED_PROXY_CIDR"
 	EnvMaxPublicationBytes       = "CISP_MAX_PUBLICATION_BYTES"
 	EnvMaxSubscriptionsPerClient = "CISP_MAX_SUBSCRIPTIONS_PER_CLIENT"
 	EnvDeliveryLogRetentionDays  = "CISP_DELIVERY_LOG_RETENTION_DAYS"
@@ -111,6 +112,7 @@ var Catalogue = []Var{
 	{Name: EnvIssuerURL, Default: ""},
 	{Name: EnvReadMaxAgeS, Default: "60"},
 	{Name: EnvPublicRPM, Default: "60"},
+	{Name: EnvTrustedProxyCIDR, Default: ""},
 	{Name: EnvMaxPublicationBytes, Default: "33554432"},
 	{Name: EnvMaxSubscriptionsPerClient, Default: "20"},
 	{Name: EnvBrandingFile, Default: ""},

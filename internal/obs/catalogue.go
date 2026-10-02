@@ -99,6 +99,7 @@ func buildCatalogue() []Metric {
 	add(counters("Dataset reads.", "applicability_unknown", "stale_publisher_served", "stale_refused", "stale_served")...)
 	add(counter("integrity_failed", "Stored versions whose body hash did not match when served.", "any increase"))
 	add(counter("signature_cache_evicted", "Version signatures evicted from the bounded cache.", ""))
+	add(counter("outline_failed", "Circles served without cis_display_geometry because no outline could be drawn.", "any increase"))
 	add(counters("Public reads limited per client.", "rate_limited", "rate_limit_clients_evicted", "rate_limit_forwarded_for_unreadable")...)
 
 	// Restrictions.

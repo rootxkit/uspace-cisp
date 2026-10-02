@@ -16,6 +16,8 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${ORIGIN_PORT}`,
     trace: "retain-on-failure",
+    // The time control's chosen instant is local time; the tests choose UTC.
+    timezoneId: "UTC",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
@@ -23,7 +25,15 @@ export default defineConfig({
       command: `pnpm exec next start --port ${WEB_PORT} --hostname 127.0.0.1`,
       url: `http://127.0.0.1:${WEB_PORT}/healthz`,
       reuseExistingServer: !CI,
-      env: { NEXT_TELEMETRY_DISABLED: "1", CISP_API_INTERNAL_URL: `http://127.0.0.1:${ORIGIN_PORT}` },
+      env: {
+        NEXT_TELEMETRY_DISABLED: "1",
+        CISP_API_INTERNAL_URL: `http://127.0.0.1:${ORIGIN_PORT}`,
+        // The fixture collection's area; test configuration, not a default.
+        NEXT_PUBLIC_MAP_CENTER: "44.82,41.72",
+        NEXT_PUBLIC_MAP_ZOOM: "10",
+        // A short poll, so the HEAD fallback is seen within a test.
+        CISP_WEB_POLL_INTERVAL_S: "2",
+      },
     },
     {
       command: "node test/mock-api.mjs",

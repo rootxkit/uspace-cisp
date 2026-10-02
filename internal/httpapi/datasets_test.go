@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,10 +17,13 @@ import (
 	"time"
 
 	coreauth "github.com/rootxkit/uspace-core/auth"
+	"github.com/rootxkit/uspace-core/core"
+	"github.com/rootxkit/uspace-core/geodesy"
 
 	"github.com/rootxkit/uspace-cisp/internal/auth"
 	"github.com/rootxkit/uspace-cisp/internal/authtest"
 	"github.com/rootxkit/uspace-cisp/internal/jws"
+	"github.com/rootxkit/uspace-cisp/internal/outline"
 	"github.com/rootxkit/uspace-cisp/internal/publication"
 	"github.com/rootxkit/uspace-cisp/internal/store"
 )
@@ -648,5 +652,109 @@ func TestAcceptsGzip(t *testing.T) {
 	}
 	if acceptsGzip(nil) {
 		t.Error("absent header takes gzip")
+	}
+}
+
+// displayRing is the outer ring of a feature's cis_display_geometry, or
+// nil when the copy carries none.
+func displayRing(t testing.TB, f doc) []core.LatLon {
+	t.Helper()
+	ext, _ := f["properties"].(doc)["extendedProperties"].(doc)
+	g, _ := ext[outline.Member].(doc)
+	if g == nil {
+		return nil
+	}
+	if g["type"] != "Polygon" {
+		t.Fatalf("cis_display_geometry type %v", g["type"])
+	}
+	rings := g["coordinates"].([]any)
+	var out []core.LatLon
+	for _, p := range rings[0].([]any) {
+		pos := p.([]any)
+		out = append(out, core.LatLon{LatDeg: pos[1].(float64), LonDeg: pos[0].(float64)})
+	}
+	return out
+}
+
+// A filtered read draws each circle as its geodesic outline: 64
+// vertices, closed, each at the published radius within 5 mm by
+// uspace-core's Vincenty inverse. Polygons get no member, the stored row
+// and the unfiltered (published, signed) bytes never carry it.
+func TestReadDrawsCircles(t *testing.T) {
+	h := newPubHarness(t, nil)
+	if rec := h.put("zones", jsonBytes(t, zonesDoc(t))); rec.Code != 201 {
+		t.Fatalf("publish = %d %s", rec.Code, rec.Body.String())
+	}
+	circles := map[string]struct {
+		centre  core.LatLon
+		radiusM float64
+	}{
+		"TSD001": {core.LatLon{LatDeg: 41.7151, LonDeg: 44.8271}, 1500},
+		"TSN001": {core.LatLon{LatDeg: 41.75, LonDeg: 44.9}, 250.5},
+	}
+	for _, target := range []string{
+		"/v1/zones?applies_at=" + url.QueryEscape(winterMonday),
+		"/v1/zones?bbox=44.6,41.6,45.0,41.9",
+		"/v1/zones?at=" + url.QueryEscape(winterMonday),
+		"/public/v1/zones?applies_at=" + url.QueryEscape(winterMonday),
+	} {
+		rec := h.read(http.MethodGet, target)
+		_, byID := collection(t, rec)
+		if rec.Code != 200 {
+			t.Fatalf("%s = %d", target, rec.Code)
+		}
+		for id, f := range byID {
+			ring := displayRing(t, f)
+			c, isCircle := circles[id]
+			if !isCircle {
+				if ring != nil {
+					t.Errorf("%s: polygon %s carries %s", target, id, outline.Member)
+				}
+				continue
+			}
+			if len(ring) != outline.Vertices+1 || ring[0] != ring[outline.Vertices] {
+				t.Fatalf("%s: %s ring of %d positions, closed %v", target, id, len(ring), ring[0] == ring[len(ring)-1])
+			}
+			for i, p := range ring {
+				d, err := geodesy.DistanceM(c.centre, p)
+				if err != nil || math.Abs(d-c.radiusM) > 0.005 {
+					t.Errorf("%s: %s vertex %d at %.4f m, want %v m (%v)", target, id, i, d, c.radiusM, err)
+				}
+			}
+		}
+	}
+	_, all := collection(t, h.read(http.MethodGet, "/v1/zones"))
+	for id, f := range all {
+		if displayRing(t, f) != nil {
+			t.Errorf("unfiltered read: %s carries %s", id, outline.Member)
+		}
+	}
+	for _, row := range h.fake.current[publication.DatasetZones] {
+		if bytes.Contains(row.Canonical, []byte(outline.Member)) {
+			t.Error("the stored row carries the outline")
+		}
+	}
+}
+
+// A circle the CISP cannot draw (its centre within a degree of the pole)
+// is served whole without the member and counted, beside one it draws.
+func TestReadCountsACircleItCannotDraw(t *testing.T) {
+	h := newPubHarness(t, nil)
+	d := zonesDoc(t)
+	g := feats(d)[3].(doc)["geometry"].(doc) // TSN001
+	g["coordinates"] = []any{15.0, 89.5}
+	if rec := h.put("zones", jsonBytes(t, d)); rec.Code != 201 {
+		t.Fatalf("publish = %d %s", rec.Code, rec.Body.String())
+	}
+	before := h.counter(readsComponent, CounterOutlineFailed)
+	_, byID := collection(t, h.read(http.MethodGet, "/v1/zones?applies_at="+url.QueryEscape(winterMonday)))
+	if _, ok := byID["TSN001"]; !ok || displayRing(t, byID["TSN001"]) != nil {
+		t.Errorf("polar circle: present %v, outline %v", ok, displayRing(t, byID["TSN001"]))
+	}
+	if displayRing(t, byID["TSD001"]) == nil {
+		t.Error("the drawable circle beside it has no outline")
+	}
+	if got := h.counter(readsComponent, CounterOutlineFailed) - before; got != 1 {
+		t.Errorf("outline_failed counted %d, want 1", got)
 	}
 }

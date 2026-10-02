@@ -3210,8 +3210,10 @@ components:
       description: |
         One ED-318 UASZone feature as published. The CISP adds only
         extendedProperties.cis_applicability (at and applies_at reads)
-        to its copy, never to the stored feature, and to a restriction
-        extendedProperties.cis_restriction (CisRestriction).
+        and extendedProperties.cis_display_geometry (filtered reads, a
+        feature with a circle) to its copy, never to the stored feature,
+        and to a restriction extendedProperties.cis_restriction
+        (CisRestriction).
       required: [type, geometry, properties]
       properties:
         type:
@@ -3233,6 +3235,43 @@ components:
                   enum: [applies, not_applicable, unknown]
                 cis_restriction:
                   $ref: "#/components/schemas/CisRestriction"
+                cis_display_geometry:
+                  $ref: "#/components/schemas/DisplayGeometry"
+    DisplayGeometry:
+      type: object
+      description: |
+        The drawable outline of a feature that holds an ED-318 circle (a
+        Point with extent.radius), written into its copy on filtered
+        reads (bbox, at, applies_at; docs/PLAN.md section 15 Q43). A
+        circle becomes a GeoJSON Polygon of 64 vertices on the geodesic
+        circle (WGS84, uspace-core geodesy; each vertex at the radius
+        within 5 mm), counterclockwise from due north and closed; in a
+        GeometryCollection the other parts are copied as published.
+        Positions are [longitude, latitude]; there is no layer. It is a
+        drawing for maps, never a judgement: a consumer judges the
+        circle as published. Absent for a feature without a circle, and
+        on unfiltered reads, which serve the published bytes.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [Polygon, GeometryCollection]
+        coordinates:
+          type: array
+          description: Polygon only. Rings of [longitude, latitude] positions, exterior first.
+          items:
+            type: array
+            items:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: number
+        geometries:
+          type: array
+          description: GeometryCollection only. One Polygon per published part.
+          items:
+            $ref: "#/components/schemas/DisplayGeometry"
     ZoneFeatureCollection:
       type: object
       description: A plain FeatureCollection of features as published (the parts of a delta).

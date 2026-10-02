@@ -1,6 +1,6 @@
-import { PendingNotice } from "@/src/components/PendingNotice";
+import { PublicMap } from "@/src/public/PublicMap";
 
-// The public map (WP-10 fills this page).
+// The public zone map (WP-10): /public/v1/* and WS /v1/stream only.
 export default function PublicHome() {
-  return <PendingNotice messageKey="cisp.shell.map_pending" />;
+  return <PublicMap />;
 }

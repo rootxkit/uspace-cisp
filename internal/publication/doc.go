@@ -28,9 +28,10 @@
 // Rows refuses more than MaxFeaturesPerPublication features.
 //
 // Geom carries the parts as published (rings, or a circle's centre and
-// radius). The CISP computes no shape in Go: the store turns a circle
-// into its drawing and prefilter buffer in SQL and computes Centroid
-// there (LESSONS Z-11); Rows leaves Centroid zero. LowerM and UpperM come
+// radius). The store turns a circle into its prefilter buffer in SQL and
+// computes Centroid there (LESSONS Z-11); Rows leaves Centroid zero. The
+// one circle outline drawn in Go is a read's cis_display_geometry
+// (internal/outline), a drawing for maps on uspace-core geodesy. LowerM and UpperM come
 // from ed318.Layer.LowerM and UpperM (feet converted by core); for a
 // GeometryCollection they are the lowest lower and the highest upper of
 // the layers when the layers share a reference, and nil (the surface,

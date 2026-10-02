@@ -26,6 +26,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
         <nav aria-label={t("cisp.nav.label")} className="flex gap-4 text-sm">
           <Link href={`/${lang}`}>{t("cisp.nav.map")}</Link>
+          <Link href={`/${lang}/ussps`}>{t("cisp.nav.ussps")}</Link>
           <Link href={`/${lang}/console`}>{t("cisp.nav.console")}</Link>
         </nav>
         <LocaleSwitch />

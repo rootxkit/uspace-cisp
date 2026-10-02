@@ -42,16 +42,21 @@ Against the real API (`make dev-deps`, then the `api` process on
 `:8080`, see the repository README):
 
 ```
-CISP_DEV_API_URL=http://127.0.0.1:8080 CISP_API_INTERNAL_URL=http://127.0.0.1:8080 pnpm dev
+CISP_DEV_API_URL=http://127.0.0.1:8080 CISP_API_INTERNAL_URL=http://127.0.0.1:8080 \
+  NEXT_PUBLIC_MAP_CENTER=44.82,41.72 NEXT_PUBLIC_MAP_ZOOM=10 pnpm dev
 ```
 
 `CISP_DEV_API_URL` rewrites `/public/*`, `/v1/*` and `/.well-known/*` to
 the api in `pnpm dev` only, as Caddy does in a deployment; a build never
-has rewrites. Without an API, the fixture server serves `/public/v1/*` in
+has rewrites. A rewrite does not carry the WebSocket, so under `pnpm dev`
+the map shows "polling" and follows changes by `HEAD`. Without an API, the fixture server serves `/public/v1/*` in
 front of a built app: `pnpm build`, then
 `pnpm exec next start --port 3100` and
 `MOCK_UPSTREAM=http://127.0.0.1:3100 node test/mock-api.mjs`, and open
-`http://127.0.0.1:3000/ka`.
+`http://127.0.0.1:3000/ka` (set `NEXT_PUBLIC_MAP_CENTER=44.82,41.72` and
+`NEXT_PUBLIC_MAP_ZOOM=10` on `next start` for the fixture collection).
+The fixture server also serves `WS /v1/stream`; `POST
+/__mock/state {"stream": false}` turns it off to see the map poll.
 
 ## Configuration
 
@@ -66,6 +71,8 @@ once in CI):
 | `CISP_WEB_SESSION_MAX_AGE_S` | ceiling of the session cookie's `Max-Age` (43200); the API's `expires_at` shortens it |
 | `CISP_WEB_UPSTREAM_TIMEOUT_MS` | timeout of each BFF call to the API (10000) |
 | `CISP_WEB_TRUSTED_PROXY_HOPS` | reverse proxies in front of Next.js that append to `X-Forwarded-For` (1 behind Caddy) |
+| `NEXT_PUBLIC_MAP_CENTER`, `NEXT_PUBLIC_MAP_ZOOM` | the public map's first view, `"lng,lat"` and a zoom; unset, the page names the variable instead of choosing a place |
+| `CISP_WEB_POLL_INTERVAL_S` | the public map's `HEAD` poll period while the stream is not live (60) |
 
 `deploy/compose.yml` sets them from `WEB_*` names in `deploy/.env`
 (`deploy/.env.example`): the Go processes refuse unknown `CISP_*` names.

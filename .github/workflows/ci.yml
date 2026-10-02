@@ -71,6 +71,7 @@ jobs:
               - 'go.mod'
               - 'go.sum'
               - 'deploy/postgres/**'
+              - 'test/e2e/**'
               - 'Makefile'
               - '.github/workflows/ci.yml'
 
@@ -204,6 +205,30 @@ jobs:
           name: integration-log
           path: integration.log
 
+  # The compose-driven end to end tests (WP-6): the webhook latency over
+  # 20 publications, the subscriber killed and reconciling, the NATS
+  # outage delivered by the scan, and the healthy status line. Each
+  # writes its measurements to the step summary.
+  e2e:
+    name: end to end (compose)
+    needs: changes
+    if: needs.changes.outputs.integration == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: make e2e (fails when zero tests ran)
+        run: make e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-log
+          path: e2e.log
+
   vectors:
     name: knowledge vectors
     needs: changes
@@ -265,7 +290,7 @@ jobs:
   image:
     name: images
     if: github.event_name == 'push'
-    needs: [build-vet-lint, generate-check, test-race, integration, vectors, govulncheck, gitleaks]
+    needs: [build-vet-lint, generate-check, test-race, integration, e2e, vectors, govulncheck, gitleaks]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

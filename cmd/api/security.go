@@ -135,7 +135,9 @@ func (s *security) retry(ctx context.Context, tick <-chan time.Time) {
 // explicit entry like every other. The restrictions (WP-5) are
 // httpapi.RestrictionAuth's: the ANSP's publish scope, its client id and
 // client certificate, and its detached signature verified with the
-// ANSP's own JWKS on POST and PATCH; cis.read on the heads.
+// ANSP's own JWKS on POST and PATCH; cis.read on the heads. The
+// subscriptions (WP-6) take cis.read, and application/json on POST and
+// PATCH (httpapi.SubscriptionAuth): any consumer of F3 is a subscriber.
 func (s *security) routes(cfg *config.API, status *obs.Status, limiter *httpapi.RateLimiter) map[string]func(http.Handler) http.Handler {
 	read := s.guard.RequireScopes(auth.ScopeRead)
 	out := map[string]func(http.Handler) http.Handler{
@@ -168,6 +170,7 @@ func (s *security) routes(cfg *config.API, status *obs.Status, limiter *httpapi.
 		},
 	}
 	maps.Copy(out, restrictions.Routes())
+	maps.Copy(out, httpapi.SubscriptionAuth{Guard: s.guard}.Routes())
 	return out
 }
 

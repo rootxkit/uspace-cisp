@@ -89,6 +89,8 @@ type fakeStore struct {
 	publishers []store.Publisher
 	// What the restrictions need (WP-5).
 	restr *fakeRestrictions
+	// What the subscriptions need (WP-6).
+	subs *fakeSubscriptions
 }
 
 func newFakeStore() *fakeStore {
@@ -304,6 +306,8 @@ type pubHarness struct {
 	// signing key.
 	rs         *Restrictions
 	anspSigner *rsa.PrivateKey
+	// The subscriptions (WP-6) when the store serves them.
+	subs *Subscriptions
 }
 
 type harnessOption func(*Publications, *Server)
@@ -380,6 +384,8 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 	}}
 	h.withReads(st, server, status, logger)
 	h.withRestrictions(st, server, status, logger)
+	h.withSubscriptions(st, server, status, logger)
+	maps.Copy(routes, SubscriptionAuth{Guard: g}.Routes())
 	read := g.RequireScopes(auth.ScopeRead)
 	for _, op := range []string{"GET /v1/{dataset}", "HEAD /v1/{dataset}", "GET /v1/{dataset}/versions", "GET /v1/{dataset}/versions/{version}", "GET /v1/changes"} {
 		routes[op] = read
@@ -391,6 +397,9 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 	caps := map[string]int64{PublicationRoute: maxBytes}
 	for _, r := range RestrictionWriteRoutes {
 		caps[r] = restrictionMaxBytes
+	}
+	for _, r := range SubscriptionWriteRoutes {
+		caps[r] = MaxSubscriptionBodyBytes
 	}
 	router, err := NewRouter(server, Options{
 		Logger: logger, Status: status, RouteMiddleware: routes,

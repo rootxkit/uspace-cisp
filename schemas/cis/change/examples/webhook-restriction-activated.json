@@ -1,0 +1,14 @@
+{
+  "schema": "cis/change/v1",
+  "msg_id": "57",
+  "producer": "cisp/deliver-deliver-1",
+  "dataset": "restrictions",
+  "version": 9,
+  "etag": "\"restrictions:9\"",
+  "feature_ids": ["DAR0A1Z"],
+  "removed_ids": [],
+  "reason": "restriction_activated",
+  "at": "2026-10-02T09:20:00Z",
+  "pull_url": "https://uspace-cisp.chikox.net/v1/restrictions?since_version=8",
+  "bbox": [44.8, 41.7, 44.82, 41.72]
+}

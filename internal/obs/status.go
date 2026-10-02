@@ -219,6 +219,9 @@ type Component struct {
 	// warning is a condition worth a warning-level status line that is
 	// not a fault of this process (a silent publisher, say).
 	warning string
+	// summary is a one-line reading of the component for people
+	// ("0 queued, 0 due"); it changes no level.
+	summary string
 }
 
 // Counter returns the named counter of this component, creating and
@@ -302,6 +305,16 @@ func (c *Component) SetWarning(reason string) {
 	c.warning = reason
 }
 
+// SetSummary sets the component's one-line reading, printed as summary
+// in every status line ("0 queued, 0 due, 0 in flight"); "" removes it.
+// It changes no level: the branch that says nothing is wrong prints it
+// too (E-02).
+func (c *Component) SetSummary(s string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.summary = s
+}
+
 // Warning is the component's warning, or "".
 func (c *Component) Warning() string {
 	c.mu.Lock()
@@ -338,6 +351,9 @@ func (c *Component) attrs() ([]slog.Attr, string, string) {
 		if g, ok := c.gauges[n]; ok {
 			attrs = append(attrs, slog.Float64(n, g.Value()))
 		}
+	}
+	if c.summary != "" {
+		attrs = append(attrs, slog.String("summary", c.summary))
 	}
 	if c.warning != "" {
 		attrs = append(attrs, slog.String("warning", c.warning))

@@ -2,7 +2,7 @@
   "$id": "https://schemas.uspace.ge/cis/change/v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "cis/change/v1: one change record, the body of the change feed,\nof the webhook payload (inside the JWS claims) and of the\nstream's change frames (docs/PLAN.md section 6.7, section 15\nQ28). msg_id is the change cursor in decimal; pull_url asks for\nthe delta from the previous version on CISP_PUBLIC_BASE_URL;\nbbox is [min lng, min lat, max lng, max lat] of what changed,\nabsent for the whole dataset. Written by WP-4 from the plan's\nmember list; WP-6 adopts it for the webhook.\n",
+  "description": "cis/change/v1: one change record, the body of the change feed,\nof the webhook payload (inside the JWS claims) and of the\nstream's change frames (docs/PLAN.md section 6.7, section 15\nQ28, Q38). msg_id is the change cursor in decimal; pull_url asks\nfor the delta from the previous version on CISP_PUBLIC_BASE_URL;\nbbox is [min lng, min lat, max lng, max lat] of what changed,\nabsent for the whole dataset. producer is uspace-cisp on the bus,\nthe change feed and the stream, and cisp/deliver-<instance> in a\nwebhook (the deliver instance that sent it).\n\nreason is an open enumeration (spec 04 section 4: values are\nadded within v1). A receiver pulls pull_url only for publication\nand the restriction_* reasons, and only when pull_url's host is\nthe CISP's; it acknowledges subscription_test (the verification\nping of a new or changed subscription), republished (the current\nversion announced again, content unchanged) and any reason it\ndoes not know with 204, without pulling. A subscription_test\nrecord names no change: msg_id is the delivery id (a ULID),\ndataset the first of the subscription's datasets, version and\netag its current version (0 before the first), feature_ids and\nremoved_ids empty, at when the ping was queued.\n",
   "properties": {
     "at": {
       "format": "date-time",
@@ -40,11 +40,12 @@
       "type": "array"
     },
     "msg_id": {
-      "pattern": "^[0-9]+$",
+      "description": "The change cursor in decimal; the delivery id (a ULID) for subscription_test.",
+      "pattern": "^([0-9]+|[0-9A-HJKMNP-TV-Z]{26})$",
       "type": "string"
     },
     "producer": {
-      "const": "uspace-cisp",
+      "pattern": "^(uspace-cisp|cisp/deliver-[A-Za-z0-9._-]{1,64})$",
       "type": "string"
     },
     "pull_url": {
@@ -76,8 +77,9 @@
       "type": "string"
     },
     "version": {
+      "description": "The version the change made (at least 1); a subscription_test names the current version, 0 before the first.",
       "format": "int64",
-      "minimum": 1,
+      "minimum": 0,
       "type": "integer"
     }
   },

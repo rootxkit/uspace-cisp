@@ -5,6 +5,7 @@
 *.out
 coverage.*
 integration.log
+e2e.log
 vectors.log
 
 # Local data that must never be committed (spec 06 section 4): keys,

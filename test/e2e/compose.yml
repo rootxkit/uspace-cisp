@@ -1,0 +1,53 @@
+# The e2e stack (test/e2e, build tag e2e): PostgreSQL + TimescaleDB,
+# NATS JetStream and the reference subscriber container. The api,
+# deliver and cispctl run as processes the test builds from this
+# checkout and starts with their CISP_* environment, so it reads their
+# output (the status line) and stops them as SIGTERM would; the
+# subscriber reaches the api through host.docker.internal and deliver
+# reaches the subscriber on its published localhost port. The test
+# writes every value below into an --env-file; nothing is a default.
+name: uspace-cisp-e2e
+
+services:
+  postgres:
+    image: timescale/timescaledb-ha:pg16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set by the e2e test}
+      PG_CISP_API_PASSWORD: ${PG_CISP_API_PASSWORD:?set by the e2e test}
+      PG_CISP_DELIVER_PASSWORD: ${PG_CISP_DELIVER_PASSWORD:?set by the e2e test}
+    ports:
+      - "127.0.0.1:${E2E_PG_PORT:?}:5432"
+    volumes:
+      - ../../deploy/postgres/init.sql:/docker-entrypoint-initdb.d/10-cisp.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  nats:
+    image: nats:2-alpine
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "127.0.0.1:${E2E_NATS_PORT:?}:4222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  subscriber:
+    build:
+      context: ../..
+      dockerfile: test/e2e/subscriber/Dockerfile
+    image: uspace-cisp-e2e-subscriber:local
+    environment:
+      CISP_JWKS_URL: ${E2E_CISP_JWKS_URL:?}
+      CISP_ISSUER_URL: ${E2E_CISP_ISSUER_URL:?}
+      CISP_PUBLIC_BASE_URL: ${E2E_CISP_PUBLIC_BASE_URL:?}
+      SUBSCRIBER_AUDIENCE: localhost
+      SUBSCRIBER_TOKEN: ${E2E_SUBSCRIBER_TOKEN:?}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${E2E_SUBSCRIBER_PORT:?}:8080"

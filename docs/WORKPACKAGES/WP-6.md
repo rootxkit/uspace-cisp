@@ -79,12 +79,16 @@ attempt's error.
   `feature_ids`, `removed_ids`, `reason`, `at`, `pull_url` =
   `CISP_PUBLIC_BASE_URL + /v1/{dataset}?since_version=<prev>` — always
   on the CISP's configured base host, because receivers honour a
-  `pull_url` only when its host is the issuer's, M5), `bbox?`) plus
-  `iss` (`CISP_ISSUER_URL`), **`aud` = the host of the subscription's
-  `callback_url`** (M19; the audience rule of `docs/PLAN.md §8.2`
-  applied to webhooks, never the client id), `sub` (subscription id),
-  `iat`, `jti` (delivery id), `exp` (`iat` + 5 min), signed
-  `SignCompact`; `POST` with `Content-Type:
+  `pull_url` only when its host is the issuer's, M5), `bbox?`), signed
+  `SignCompact` as core writes a compact delivery: the payload is
+  `{iss, aud, sub, iat, jti, body}` with the record in `body`, `iss`
+  (`CISP_ISSUER_URL`), **`aud` = the host of the subscription's
+  `callback_url`** without its port (M19; the audience rule of
+  `docs/PLAN.md §8.2` applied to webhooks, never the client id), `sub`
+  (subscription id), `iat`, `jti` (delivery id). There is no `exp`: a
+  delivery is single use, core's `CompactVerifier` refuses an `iat`
+  more than 5 min old, and the receiver's store keyed on `jti` is the
+  replay guard (`docs/PLAN.md §15 Q38`); `POST` with `Content-Type:
   application/jose`, `User-Agent: uspace-cisp/<version>`,
   `X-CIS-Delivery-Id`, `X-CIS-Attempt`; the client: 2 s total timeout,
   no redirects (a 3xx is a failure), response body read to 1 KiB then
@@ -144,7 +148,8 @@ e2e compose. The lab may reuse it.
   (counted `ssrf_refused`), a 1 MiB response body (only 1 KiB read).
   JWS verified by the test with the key ring's JWKS: `iss`, `aud` (=
   the callback host, asserted against a `callback_url` with a port and
-  one without), `sub`, `jti`, `exp` present; a signature by another key
+  one without), `sub`, `jti`, `iat` present and no `exp` (an `iat` more
+  than 5 min old refused by `CompactVerifier`); a signature by another key
   is refused by the subscriber helper (T4 pair); the helper does not
   pull on `subscription_test` and `republished` and does pull on
   `publication` (E-01 pair), and refuses a `pull_url` on another host.

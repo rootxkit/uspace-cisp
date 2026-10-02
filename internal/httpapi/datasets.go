@@ -1050,7 +1050,7 @@ func (r *Reads) changes(ctx context.Context, req gen.ListChangesRequestObject) (
 		c := &rows[i]
 		m := bus.MessageOf(*c, r.PublicBaseURL)
 		item := gen.Change{
-			Schema: gen.ChangeSchema(m.Schema), MsgId: m.MsgID, Producer: gen.ChangeProducer(m.Producer), Dataset: gen.ChangeDataset(m.Dataset),
+			Schema: gen.ChangeSchema(m.Schema), MsgId: m.MsgID, Producer: m.Producer, Dataset: gen.ChangeDataset(m.Dataset),
 			Version: m.Version, Etag: m.ETag, FeatureIds: m.FeatureIDs, RemovedIds: m.RemovedIDs,
 			Reason: gen.ChangeReason(m.Reason), At: m.At, PullUrl: m.PullURL,
 		}

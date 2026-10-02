@@ -1,0 +1,13 @@
+{
+  "schema": "cis/change/v1",
+  "msg_id": "01J9ZK3Q7M2X8B4C6D5E7F8G9H",
+  "producer": "cisp/deliver-deliver-1",
+  "dataset": "zones",
+  "version": 0,
+  "etag": "\"zones:0\"",
+  "feature_ids": [],
+  "removed_ids": [],
+  "reason": "subscription_test",
+  "at": "2026-10-02T09:14:58Z",
+  "pull_url": "https://uspace-cisp.chikox.net/v1/zones?since_version=0"
+}

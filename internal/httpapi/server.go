@@ -48,6 +48,9 @@ type Server struct {
 	// Restrictions serves the restrictions tag (WP-5); nil (no database
 	// configured) answers its operations with 503.
 	Restrictions *Restrictions
+	// Subscriptions serves the subscriptions tag (WP-6); nil (no database
+	// configured) answers its operations with 503.
+	Subscriptions *Subscriptions
 }
 
 var _ gen.StrictServerInterface = (*Server)(nil)

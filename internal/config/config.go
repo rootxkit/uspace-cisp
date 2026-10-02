@@ -81,7 +81,12 @@ type API struct {
 	TrustedProxyCIDR          []string
 	MaxPublicationBytes       int64
 	MaxSubscriptionsPerClient int64
-	BrandingFile              string
+	// AllowPrivateCallbacks and AllowInsecureCallbacks are the callback
+	// URL policy a registration is judged by (deliver judges every dial
+	// by the same two variables).
+	AllowPrivateCallbacks  bool
+	AllowInsecureCallbacks bool
+	BrandingFile           string
 	// MaxRestrictionBytes caps a restriction body (POST and PATCH
 	// /v1/restrictions; 256 KiB).
 	MaxRestrictionBytes int64
@@ -108,6 +113,9 @@ type Deliver struct {
 	SigningKeyFile string
 	SigningKID     string
 	IssuerURL      string
+	// PublicBaseURL prefixes every pull_url (M5: receivers honour a
+	// pull_url only on the CISP's own host).
+	PublicBaseURL string
 
 	DeliveryLogRetentionDays int64
 	AllowPrivateCallbacks    bool
@@ -189,6 +197,8 @@ func LoadAPI(environ []string) (*API, error) {
 		TrustedProxyCIDR:          e.list(EnvTrustedProxyCIDR),
 		MaxPublicationBytes:       e.integer(EnvMaxPublicationBytes),
 		MaxSubscriptionsPerClient: e.integer(EnvMaxSubscriptionsPerClient),
+		AllowPrivateCallbacks:     e.boolean(EnvAllowPrivateCallbacks),
+		AllowInsecureCallbacks:    e.boolean(EnvAllowInsecureCallbacks),
 		BrandingFile:              e.str(EnvBrandingFile),
 		MaxRestrictionBytes:       e.integer(EnvMaxRestrictionBytes),
 		ExpiryInterval:            e.seconds(EnvExpiryIntervalS),
@@ -215,6 +225,7 @@ func LoadDeliver(environ []string) (*Deliver, error) {
 		SigningKeyFile: e.str(EnvSigningKeyFile),
 		SigningKID:     e.str(EnvSigningKID),
 		IssuerURL:      e.str(EnvIssuerURL),
+		PublicBaseURL:  e.str(EnvPublicBaseURL),
 
 		DeliveryLogRetentionDays: e.integer(EnvDeliveryLogRetentionDays),
 		AllowPrivateCallbacks:    e.boolean(EnvAllowPrivateCallbacks),
@@ -442,6 +453,15 @@ func (c *Deliver) Validate() error {
 		p = append(p, core.Fieldf(EnvSigningKID, "%q must be 1-64 of A-Z a-z 0-9 . _ -", c.SigningKID))
 	}
 	p = urlOK(p, EnvIssuerURL, c.IssuerURL, "http", "https")
+	p = urlOK(p, EnvPublicBaseURL, c.PublicBaseURL, "http", "https")
+	if c.DatabaseURL != "" {
+		// With a database deliver signs and sends: everything a webhook
+		// carries must be configured (no default names this CISP).
+		p = required(p, EnvSigningKeyFile, c.SigningKeyFile)
+		p = required(p, EnvSigningKID, c.SigningKID)
+		p = required(p, EnvIssuerURL, c.IssuerURL)
+		p = required(p, EnvPublicBaseURL, c.PublicBaseURL)
+	}
 	p = intIn(p, EnvDeliveryLogRetentionDays, c.DeliveryLogRetentionDays, 1, 3650)
 	return orNil(p)
 }

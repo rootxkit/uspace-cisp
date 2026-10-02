@@ -42,21 +42,6 @@ func (e ChangeDataset) Valid() bool {
 	}
 }
 
-// Defines values for ChangeProducer.
-const (
-	UspaceCisp ChangeProducer = "uspace-cisp"
-)
-
-// Valid indicates whether the value is a known member of the ChangeProducer enum.
-func (e ChangeProducer) Valid() bool {
-	switch e {
-	case UspaceCisp:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ChangeReason.
 const (
 	ChangeReasonPublication          ChangeReason = "publication"
@@ -207,6 +192,93 @@ func (e DatasetDeltaDataset) Valid() bool {
 	case DatasetDeltaDatasetUspaceAirspace:
 		return true
 	case DatasetDeltaDatasetZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeliveryReason.
+const (
+	DeliveryReasonPublication          DeliveryReason = "publication"
+	DeliveryReasonRepublished          DeliveryReason = "republished"
+	DeliveryReasonRestrictionActivated DeliveryReason = "restriction_activated"
+	DeliveryReasonRestrictionCancelled DeliveryReason = "restriction_cancelled"
+	DeliveryReasonRestrictionCreated   DeliveryReason = "restriction_created"
+	DeliveryReasonRestrictionEnded     DeliveryReason = "restriction_ended"
+	DeliveryReasonRestrictionExpired   DeliveryReason = "restriction_expired"
+	DeliveryReasonRestrictionExtended  DeliveryReason = "restriction_extended"
+	DeliveryReasonSubscriptionTest     DeliveryReason = "subscription_test"
+)
+
+// Valid indicates whether the value is a known member of the DeliveryReason enum.
+func (e DeliveryReason) Valid() bool {
+	switch e {
+	case DeliveryReasonPublication:
+		return true
+	case DeliveryReasonRepublished:
+		return true
+	case DeliveryReasonRestrictionActivated:
+		return true
+	case DeliveryReasonRestrictionCancelled:
+		return true
+	case DeliveryReasonRestrictionCreated:
+		return true
+	case DeliveryReasonRestrictionEnded:
+		return true
+	case DeliveryReasonRestrictionExpired:
+		return true
+	case DeliveryReasonRestrictionExtended:
+		return true
+	case DeliveryReasonSubscriptionTest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeliveryState.
+const (
+	Delivered  DeliveryState = "delivered"
+	Delivering DeliveryState = "delivering"
+	Expired    DeliveryState = "expired"
+	Failed     DeliveryState = "failed"
+	Queued     DeliveryState = "queued"
+)
+
+// Valid indicates whether the value is a known member of the DeliveryState enum.
+func (e DeliveryState) Valid() bool {
+	switch e {
+	case Delivered:
+		return true
+	case Delivering:
+		return true
+	case Expired:
+		return true
+	case Failed:
+		return true
+	case Queued:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeliveryListLog.
+const (
+	DeliveryListLogComplete      DeliveryListLog = "complete"
+	DeliveryListLogNotConfigured DeliveryListLog = "not_configured"
+	DeliveryListLogUnavailable   DeliveryListLog = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the DeliveryListLog enum.
+func (e DeliveryListLog) Valid() bool {
+	switch e {
+	case DeliveryListLogComplete:
+		return true
+	case DeliveryListLogNotConfigured:
+		return true
+	case DeliveryListLogUnavailable:
 		return true
 	default:
 		return false
@@ -654,6 +726,102 @@ func (e StatusPublishersKind) Valid() bool {
 	case StatusPublishersKindAnsp:
 		return true
 	case StatusPublishersKindAuthority:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubscriptionDatasets.
+const (
+	SubscriptionDatasetsRestrictions   SubscriptionDatasets = "restrictions"
+	SubscriptionDatasetsUspaceAirspace SubscriptionDatasets = "uspace_airspace"
+	SubscriptionDatasetsUsspList       SubscriptionDatasets = "ussp_list"
+	SubscriptionDatasetsZones          SubscriptionDatasets = "zones"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionDatasets enum.
+func (e SubscriptionDatasets) Valid() bool {
+	switch e {
+	case SubscriptionDatasetsRestrictions:
+		return true
+	case SubscriptionDatasetsUspaceAirspace:
+		return true
+	case SubscriptionDatasetsUsspList:
+		return true
+	case SubscriptionDatasetsZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubscriptionStatus.
+const (
+	SubscriptionStatusActive              SubscriptionStatus = "active"
+	SubscriptionStatusDeleted             SubscriptionStatus = "deleted"
+	SubscriptionStatusPendingVerification SubscriptionStatus = "pending_verification"
+	SubscriptionStatusSuspended           SubscriptionStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionStatus enum.
+func (e SubscriptionStatus) Valid() bool {
+	switch e {
+	case SubscriptionStatusActive:
+		return true
+	case SubscriptionStatusDeleted:
+		return true
+	case SubscriptionStatusPendingVerification:
+		return true
+	case SubscriptionStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubscriptionCreateDatasets.
+const (
+	SubscriptionCreateDatasetsRestrictions   SubscriptionCreateDatasets = "restrictions"
+	SubscriptionCreateDatasetsUspaceAirspace SubscriptionCreateDatasets = "uspace_airspace"
+	SubscriptionCreateDatasetsUsspList       SubscriptionCreateDatasets = "ussp_list"
+	SubscriptionCreateDatasetsZones          SubscriptionCreateDatasets = "zones"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionCreateDatasets enum.
+func (e SubscriptionCreateDatasets) Valid() bool {
+	switch e {
+	case SubscriptionCreateDatasetsRestrictions:
+		return true
+	case SubscriptionCreateDatasetsUspaceAirspace:
+		return true
+	case SubscriptionCreateDatasetsUsspList:
+		return true
+	case SubscriptionCreateDatasetsZones:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubscriptionPatchDatasets.
+const (
+	SubscriptionPatchDatasetsRestrictions   SubscriptionPatchDatasets = "restrictions"
+	SubscriptionPatchDatasetsUspaceAirspace SubscriptionPatchDatasets = "uspace_airspace"
+	SubscriptionPatchDatasetsUsspList       SubscriptionPatchDatasets = "ussp_list"
+	SubscriptionPatchDatasetsZones          SubscriptionPatchDatasets = "zones"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionPatchDatasets enum.
+func (e SubscriptionPatchDatasets) Valid() bool {
+	switch e {
+	case SubscriptionPatchDatasetsRestrictions:
+		return true
+	case SubscriptionPatchDatasetsUspaceAirspace:
+		return true
+	case SubscriptionPatchDatasetsUsspList:
+		return true
+	case SubscriptionPatchDatasetsZones:
 		return true
 	default:
 		return false
@@ -1169,11 +1337,24 @@ type AirspaceConstraints struct {
 // Change cis/change/v1: one change record, the body of the change feed,
 // of the webhook payload (inside the JWS claims) and of the
 // stream's change frames (docs/PLAN.md section 6.7, section 15
-// Q28). msg_id is the change cursor in decimal; pull_url asks for
-// the delta from the previous version on CISP_PUBLIC_BASE_URL;
+// Q28, Q38). msg_id is the change cursor in decimal; pull_url asks
+// for the delta from the previous version on CISP_PUBLIC_BASE_URL;
 // bbox is [min lng, min lat, max lng, max lat] of what changed,
-// absent for the whole dataset. Written by WP-4 from the plan's
-// member list; WP-6 adopts it for the webhook.
+// absent for the whole dataset. producer is uspace-cisp on the bus,
+// the change feed and the stream, and cisp/deliver-<instance> in a
+// webhook (the deliver instance that sent it).
+//
+// reason is an open enumeration (spec 04 section 4: values are
+// added within v1). A receiver pulls pull_url only for publication
+// and the restriction_* reasons, and only when pull_url's host is
+// the CISP's; it acknowledges subscription_test (the verification
+// ping of a new or changed subscription), republished (the current
+// version announced again, content unchanged) and any reason it
+// does not know with 204, without pulling. A subscription_test
+// record names no change: msg_id is the delivery id (a ULID),
+// dataset the first of the subscription's datasets, version and
+// etag its current version (0 before the first), feature_ids and
+// removed_ids empty, at when the ping was queued.
 type Change struct {
 	At      time.Time     `json:"at"`
 	Bbox    *[]float64    `json:"bbox,omitempty"`
@@ -1183,21 +1364,22 @@ type Change struct {
 	Etag string `json:"etag"`
 
 	// FeatureIds Every identifier added, changed or removed, sorted.
-	FeatureIds []string       `json:"feature_ids"`
-	MsgId      string         `json:"msg_id"`
-	Producer   ChangeProducer `json:"producer"`
-	PullUrl    string         `json:"pull_url"`
-	Reason     ChangeReason   `json:"reason"`
-	RemovedIds []string       `json:"removed_ids"`
-	Schema     ChangeSchema   `json:"schema"`
-	Version    int64          `json:"version"`
+	FeatureIds []string `json:"feature_ids"`
+
+	// MsgId The change cursor in decimal; the delivery id (a ULID) for subscription_test.
+	MsgId      string       `json:"msg_id"`
+	Producer   string       `json:"producer"`
+	PullUrl    string       `json:"pull_url"`
+	Reason     ChangeReason `json:"reason"`
+	RemovedIds []string     `json:"removed_ids"`
+	Schema     ChangeSchema `json:"schema"`
+
+	// Version The version the change made (at least 1); a subscription_test names the current version, 0 before the first.
+	Version int64 `json:"version"`
 }
 
 // ChangeDataset defines model for Change.Dataset.
 type ChangeDataset string
-
-// ChangeProducer defines model for Change.Producer.
-type ChangeProducer string
 
 // ChangeReason defines model for Change.Reason.
 type ChangeReason string
@@ -1285,6 +1467,55 @@ type DatasetDeltaDataset string
 type DatasetDocument struct {
 	union json.RawMessage
 }
+
+// Delivery One delivery of a change (or of the verification ping: change_id
+// absent, reason subscription_test) to a subscription.
+type Delivery struct {
+	Attempts       int        `json:"attempts"`
+	ChangeId       *int64     `json:"change_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	DeliveredAt    *time.Time `json:"delivered_at,omitempty"`
+	FirstAttemptAt *time.Time `json:"first_attempt_at,omitempty"`
+	Id             string     `json:"id"`
+	LastAttemptAt  *time.Time `json:"last_attempt_at,omitempty"`
+	LastError      *string    `json:"last_error,omitempty"`
+	LastStatusCode *int       `json:"last_status_code,omitempty"`
+
+	// Log Every attempt from the delivery log, oldest first (deliveries list only).
+	Log            *[]DeliveryAttempt `json:"log,omitempty"`
+	NextRetryAt    *time.Time         `json:"next_retry_at,omitempty"`
+	Reason         DeliveryReason     `json:"reason"`
+	State          DeliveryState      `json:"state"`
+	SubscriptionId string             `json:"subscription_id"`
+}
+
+// DeliveryReason defines model for Delivery.Reason.
+type DeliveryReason string
+
+// DeliveryState defines model for Delivery.State.
+type DeliveryState string
+
+// DeliveryAttempt defines model for DeliveryAttempt.
+type DeliveryAttempt struct {
+	At              time.Time `json:"at"`
+	Attempt         int       `json:"attempt"`
+	DeliverInstance string    `json:"deliver_instance"`
+	Error           *string   `json:"error,omitempty"`
+	LatencyMs       int       `json:"latency_ms"`
+	PayloadBytes    int       `json:"payload_bytes"`
+	StatusCode      *int      `json:"status_code,omitempty"`
+}
+
+// DeliveryList defines model for DeliveryList.
+type DeliveryList struct {
+	Deliveries []Delivery `json:"deliveries"`
+
+	// Log Whether the attempts of the delivery log were read.
+	Log DeliveryListLog `json:"log"`
+}
+
+// DeliveryListLog Whether the attempts of the delivery log were read.
+type DeliveryListLog string
 
 // FieldProblem defines model for FieldProblem.
 type FieldProblem struct {
@@ -1733,6 +1964,67 @@ type StatusMtlsMode string
 // StatusPublishersKind defines model for Status.Publishers.Kind.
 type StatusPublishersKind string
 
+// Subscription defines model for Subscription.
+type Subscription struct {
+	Bbox                *[]float64             `json:"bbox,omitempty"`
+	CallbackUrl         string                 `json:"callback_url"`
+	ClientId            string                 `json:"client_id"`
+	ConsecutiveFailures int                    `json:"consecutive_failures"`
+	CreatedAt           time.Time              `json:"created_at"`
+	Datasets            []SubscriptionDatasets `json:"datasets"`
+
+	// FailingSince The first failure of the current run of consecutive failures.
+	FailingSince  *time.Time         `json:"failing_since,omitempty"`
+	Id            string             `json:"id"`
+	LastSuccessAt *time.Time         `json:"last_success_at,omitempty"`
+	Status        SubscriptionStatus `json:"status"`
+
+	// SuspendedReason Why and since when it is suspended; present while suspended.
+	SuspendedReason *string `json:"suspended_reason,omitempty"`
+
+	// Verification One delivery of a change (or of the verification ping: change_id
+	// absent, reason subscription_test) to a subscription.
+	Verification *Delivery  `json:"verification,omitempty"`
+	VerifiedAt   *time.Time `json:"verified_at,omitempty"`
+}
+
+// SubscriptionDatasets defines model for Subscription.Datasets.
+type SubscriptionDatasets string
+
+// SubscriptionStatus defines model for Subscription.Status.
+type SubscriptionStatus string
+
+// SubscriptionCreate The body of POST /v1/subscriptions; unknown members are ignored.
+type SubscriptionCreate struct {
+	// Bbox [min lng, min lat, max lng, max lat] in WGS84 degrees (GeoJSON
+	// order), not across the antimeridian; only changes whose box
+	// intersects it (touching counts) or that have no box are sent.
+	Bbox *[]float64 `json:"bbox,omitempty"`
+
+	// CallbackUrl Examples: https://ussp.example.ge/v1/cis/notifications
+	CallbackUrl string                       `json:"callback_url"`
+	Datasets    []SubscriptionCreateDatasets `json:"datasets"`
+}
+
+// SubscriptionCreateDatasets defines model for SubscriptionCreate.Datasets.
+type SubscriptionCreateDatasets string
+
+// SubscriptionList defines model for SubscriptionList.
+type SubscriptionList struct {
+	Subscriptions []Subscription `json:"subscriptions"`
+}
+
+// SubscriptionPatch The body of PATCH /v1/subscriptions/{id}; the members given replace the stored ones.
+type SubscriptionPatch struct {
+	// Bbox Four numbers as in SubscriptionCreate, or [] to remove the box.
+	Bbox        *[]float64                   `json:"bbox,omitempty"`
+	CallbackUrl *string                      `json:"callback_url,omitempty"`
+	Datasets    *[]SubscriptionPatchDatasets `json:"datasets,omitempty"`
+}
+
+// SubscriptionPatchDatasets defines model for SubscriptionPatch.Datasets.
+type SubscriptionPatchDatasets string
+
 // UspaceRequirements cis/uspace_requirements/v1: the 2021/664 Art. 3(4) requirements
 // of a U-space airspace (spec 02 F1, 03 section 1
 // uspace_airspaces; docs/PLAN.md section 15 Q6). It travels in the
@@ -1905,6 +2197,9 @@ type RestrictionBy string
 // RestrictionID defines model for RestrictionID.
 type RestrictionID = string
 
+// SubscriptionID defines model for SubscriptionID.
+type SubscriptionID = string
+
 // DatasetApplicationGeoPlusJSON An ED-318 FeatureCollection as the CISP serves it: the features
 // as published (canonical JSON), metadata.issued the version's
 // received_at, and the top-level cis_dataset, cis_version and
@@ -2076,6 +2371,13 @@ type PatchRestrictionParams struct {
 // PatchRestrictionParamsBy defines parameters for PatchRestriction.
 type PatchRestrictionParamsBy string
 
+// ListDeliveriesParams defines parameters for ListDeliveries.
+type ListDeliveriesParams struct {
+	// Since RFC 3339 instant with an offset.
+	Since *string `form:"since,omitempty" json:"since,omitempty"`
+	Limit *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // GetDatasetParams defines parameters for GetDataset.
 type GetDatasetParams struct {
 	// Bbox minlng,minlat,maxlng,maxlat in WGS84 degrees; a prefilter on the
@@ -2140,6 +2442,12 @@ type CreateRestrictionJSONRequestBody = RestrictionCreate
 
 // PatchRestrictionJSONRequestBody defines body for PatchRestriction for application/json ContentType.
 type PatchRestrictionJSONRequestBody = RestrictionPatch
+
+// CreateSubscriptionJSONRequestBody defines body for CreateSubscription for application/json ContentType.
+type CreateSubscriptionJSONRequestBody = SubscriptionCreate
+
+// PatchSubscriptionJSONRequestBody defines body for PatchSubscription for application/json ContentType.
+type PatchSubscriptionJSONRequestBody = SubscriptionPatch
 
 // AsUsspList returns the union data inside the DatasetDocument as a UsspList
 func (t DatasetDocument) AsUsspList() (UsspList, error) {
@@ -2250,6 +2558,27 @@ type ServerInterface interface {
 	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(w http.ResponseWriter, r *http.Request)
+	// ListSubscriptions The caller's subscriptions
+	// (GET /v1/subscriptions)
+	ListSubscriptions(w http.ResponseWriter, r *http.Request)
+	// CreateSubscription Register a webhook for changes (F3 push)
+	// (POST /v1/subscriptions)
+	CreateSubscription(w http.ResponseWriter, r *http.Request)
+	// DeleteSubscription Delete a subscription
+	// (DELETE /v1/subscriptions/{id})
+	DeleteSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID)
+	// GetSubscription One of the caller's subscriptions
+	// (GET /v1/subscriptions/{id})
+	GetSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID)
+	// PatchSubscription Change a subscription's callback, datasets or box
+	// (PATCH /v1/subscriptions/{id})
+	PatchSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID)
+	// ListDeliveries A subscription's deliveries with their attempts
+	// (GET /v1/subscriptions/{id}/deliveries)
+	ListDeliveries(w http.ResponseWriter, r *http.Request, id SubscriptionID, params ListDeliveriesParams)
+	// RetryDelivery Re-queue a delivery now
+	// (POST /v1/subscriptions/{id}/deliveries/{delivery_id}/retry)
+	RetryDelivery(w http.ResponseWriter, r *http.Request, id SubscriptionID, deliveryId string)
 	// GetDataset Read a dataset (F3 pull)
 	// (GET /v1/{dataset})
 	GetDataset(w http.ResponseWriter, r *http.Request, dataset GetDatasetParamsDataset, params GetDatasetParams)
@@ -3022,6 +3351,202 @@ func (siw *ServerInterfaceWrapper) GetStatus(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ListSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSubscriptions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSubscription operation middleware
+func (siw *ServerInterfaceWrapper) CreateSubscription(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSubscription(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSubscription operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSubscription(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSubscription operation middleware
+func (siw *ServerInterfaceWrapper) GetSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSubscription(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchSubscription operation middleware
+func (siw *ServerInterfaceWrapper) PatchSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchSubscription(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeliveries operation middleware
+func (siw *ServerInterfaceWrapper) ListDeliveries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDeliveriesParams
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeliveries(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RetryDelivery operation middleware
+func (siw *ServerInterfaceWrapper) RetryDelivery(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SubscriptionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "delivery_id" -------------
+	var deliveryId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "delivery_id", r.PathValue("delivery_id"), &deliveryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "delivery_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RetryDelivery(w, r, id, deliveryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetDataset operation middleware
 func (siw *ServerInterfaceWrapper) GetDataset(w http.ResponseWriter, r *http.Request) {
 
@@ -3438,6 +3963,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/restrictions/heads", wrapper.ListRestrictions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/restrictions/{id}", wrapper.GetRestriction)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/restrictions/{id}", wrapper.PatchRestriction)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions", wrapper.ListSubscriptions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/subscriptions", wrapper.CreateSubscription)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/subscriptions/{id}", wrapper.DeleteSubscription)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions/{id}", wrapper.GetSubscription)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/subscriptions/{id}", wrapper.PatchSubscription)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions/{id}/deliveries", wrapper.ListDeliveries)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/subscriptions/{id}/deliveries/{delivery_id}/retry", wrapper.RetryDelivery)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}", wrapper.GetDataset)
 	m.HandleFunc(http.MethodHead+" "+options.BaseURL+"/v1/{dataset}", wrapper.HeadDataset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions", wrapper.ListDatasetVersions)
@@ -5279,6 +5811,795 @@ func (response GetStatusdefaultApplicationProblemPlusJSONResponse) VisitGetStatu
 	return err
 }
 
+type ListSubscriptionsRequestObject struct {
+}
+
+type ListSubscriptionsResponseObject interface {
+	VisitListSubscriptionsResponse(w http.ResponseWriter) error
+}
+
+type ListSubscriptions200JSONResponse SubscriptionList
+
+func (response ListSubscriptions200JSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptions401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListSubscriptions401ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptions403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListSubscriptions403ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptions503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListSubscriptions503ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListSubscriptionsdefaultApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscriptionRequestObject struct {
+	Body *CreateSubscriptionJSONRequestBody
+}
+
+type CreateSubscriptionResponseObject interface {
+	VisitCreateSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type CreateSubscription201ResponseHeaders struct {
+	Location *string
+}
+
+type CreateSubscription201JSONResponse struct {
+	Body    Subscription
+	Headers CreateSubscription201ResponseHeaders
+}
+
+func (response CreateSubscription201JSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscription400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSubscription400ApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscription401ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSubscription401ApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscription403ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSubscription403ApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscription409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSubscription409ApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscription413ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSubscription413ApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscription415ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSubscription415ApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscription503ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSubscription503ApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitCreateSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubscriptionRequestObject struct {
+	Id SubscriptionID `json:"id"`
+}
+
+type DeleteSubscriptionResponseObject interface {
+	VisitDeleteSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type DeleteSubscription200JSONResponse Subscription
+
+func (response DeleteSubscription200JSONResponse) VisitDeleteSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubscription401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSubscription401ApplicationProblemPlusJSONResponse) VisitDeleteSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubscription403ApplicationProblemPlusJSONResponse Problem
+
+func (response DeleteSubscription403ApplicationProblemPlusJSONResponse) VisitDeleteSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubscription404ApplicationProblemPlusJSONResponse Problem
+
+func (response DeleteSubscription404ApplicationProblemPlusJSONResponse) VisitDeleteSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubscription503ApplicationProblemPlusJSONResponse Problem
+
+func (response DeleteSubscription503ApplicationProblemPlusJSONResponse) VisitDeleteSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitDeleteSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSubscriptionRequestObject struct {
+	Id SubscriptionID `json:"id"`
+}
+
+type GetSubscriptionResponseObject interface {
+	VisitGetSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type GetSubscription200JSONResponse Subscription
+
+func (response GetSubscription200JSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSubscription401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetSubscription401ApplicationProblemPlusJSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSubscription403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetSubscription403ApplicationProblemPlusJSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSubscription404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetSubscription404ApplicationProblemPlusJSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSubscription503ApplicationProblemPlusJSONResponse Problem
+
+func (response GetSubscription503ApplicationProblemPlusJSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscriptionRequestObject struct {
+	Id   SubscriptionID `json:"id"`
+	Body *PatchSubscriptionJSONRequestBody
+}
+
+type PatchSubscriptionResponseObject interface {
+	VisitPatchSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type PatchSubscription200JSONResponse Subscription
+
+func (response PatchSubscription200JSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscription400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response PatchSubscription400ApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscription401ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchSubscription401ApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscription403ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchSubscription403ApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscription404ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchSubscription404ApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscription413ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchSubscription413ApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscription415ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchSubscription415ApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscription503ApplicationProblemPlusJSONResponse Problem
+
+func (response PatchSubscription503ApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PatchSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitPatchSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeliveriesRequestObject struct {
+	Id     SubscriptionID `json:"id"`
+	Params ListDeliveriesParams
+}
+
+type ListDeliveriesResponseObject interface {
+	VisitListDeliveriesResponse(w http.ResponseWriter) error
+}
+
+type ListDeliveries200JSONResponse DeliveryList
+
+func (response ListDeliveries200JSONResponse) VisitListDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeliveries400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListDeliveries400ApplicationProblemPlusJSONResponse) VisitListDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeliveries401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListDeliveries401ApplicationProblemPlusJSONResponse) VisitListDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeliveries403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListDeliveries403ApplicationProblemPlusJSONResponse) VisitListDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeliveries404ApplicationProblemPlusJSONResponse Problem
+
+func (response ListDeliveries404ApplicationProblemPlusJSONResponse) VisitListDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeliveries503ApplicationProblemPlusJSONResponse Problem
+
+func (response ListDeliveries503ApplicationProblemPlusJSONResponse) VisitListDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeliveriesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListDeliveriesdefaultApplicationProblemPlusJSONResponse) VisitListDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryDeliveryRequestObject struct {
+	Id         SubscriptionID `json:"id"`
+	DeliveryId string         `json:"delivery_id"`
+}
+
+type RetryDeliveryResponseObject interface {
+	VisitRetryDeliveryResponse(w http.ResponseWriter) error
+}
+
+type RetryDelivery202JSONResponse Delivery
+
+func (response RetryDelivery202JSONResponse) VisitRetryDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryDelivery401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response RetryDelivery401ApplicationProblemPlusJSONResponse) VisitRetryDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryDelivery403ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryDelivery403ApplicationProblemPlusJSONResponse) VisitRetryDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryDelivery404ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryDelivery404ApplicationProblemPlusJSONResponse) VisitRetryDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryDelivery409ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryDelivery409ApplicationProblemPlusJSONResponse) VisitRetryDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryDelivery503ApplicationProblemPlusJSONResponse Problem
+
+func (response RetryDelivery503ApplicationProblemPlusJSONResponse) VisitRetryDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RetryDeliverydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RetryDeliverydefaultApplicationProblemPlusJSONResponse) VisitRetryDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetDatasetRequestObject struct {
 	Dataset GetDatasetParamsDataset `json:"dataset"`
 	Params  GetDatasetParams
@@ -6007,6 +7328,27 @@ type StrictServerInterface interface {
 	// GetStatus Service status
 	// (GET /v1/status)
 	GetStatus(ctx context.Context, request GetStatusRequestObject) (GetStatusResponseObject, error)
+	// ListSubscriptions The caller's subscriptions
+	// (GET /v1/subscriptions)
+	ListSubscriptions(ctx context.Context, request ListSubscriptionsRequestObject) (ListSubscriptionsResponseObject, error)
+	// CreateSubscription Register a webhook for changes (F3 push)
+	// (POST /v1/subscriptions)
+	CreateSubscription(ctx context.Context, request CreateSubscriptionRequestObject) (CreateSubscriptionResponseObject, error)
+	// DeleteSubscription Delete a subscription
+	// (DELETE /v1/subscriptions/{id})
+	DeleteSubscription(ctx context.Context, request DeleteSubscriptionRequestObject) (DeleteSubscriptionResponseObject, error)
+	// GetSubscription One of the caller's subscriptions
+	// (GET /v1/subscriptions/{id})
+	GetSubscription(ctx context.Context, request GetSubscriptionRequestObject) (GetSubscriptionResponseObject, error)
+	// PatchSubscription Change a subscription's callback, datasets or box
+	// (PATCH /v1/subscriptions/{id})
+	PatchSubscription(ctx context.Context, request PatchSubscriptionRequestObject) (PatchSubscriptionResponseObject, error)
+	// ListDeliveries A subscription's deliveries with their attempts
+	// (GET /v1/subscriptions/{id}/deliveries)
+	ListDeliveries(ctx context.Context, request ListDeliveriesRequestObject) (ListDeliveriesResponseObject, error)
+	// RetryDelivery Re-queue a delivery now
+	// (POST /v1/subscriptions/{id}/deliveries/{delivery_id}/retry)
+	RetryDelivery(ctx context.Context, request RetryDeliveryRequestObject) (RetryDeliveryResponseObject, error)
 	// GetDataset Read a dataset (F3 pull)
 	// (GET /v1/{dataset})
 	GetDataset(ctx context.Context, request GetDatasetRequestObject) (GetDatasetResponseObject, error)
@@ -6483,6 +7825,200 @@ func (sh *strictHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetStatusResponseObject); ok {
 		if err := validResponse.VisitGetStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSubscriptions operation middleware
+func (sh *strictHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+	var request ListSubscriptionsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSubscriptions(ctx, request.(ListSubscriptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSubscriptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSubscriptionsResponseObject); ok {
+		if err := validResponse.VisitListSubscriptionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSubscription operation middleware
+func (sh *strictHandler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
+	var request CreateSubscriptionRequestObject
+
+	var body CreateSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSubscription(ctx, request.(CreateSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSubscriptionResponseObject); ok {
+		if err := validResponse.VisitCreateSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSubscription operation middleware
+func (sh *strictHandler) DeleteSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID) {
+	var request DeleteSubscriptionRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSubscription(ctx, request.(DeleteSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSubscriptionResponseObject); ok {
+		if err := validResponse.VisitDeleteSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSubscription operation middleware
+func (sh *strictHandler) GetSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID) {
+	var request GetSubscriptionRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSubscription(ctx, request.(GetSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSubscriptionResponseObject); ok {
+		if err := validResponse.VisitGetSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchSubscription operation middleware
+func (sh *strictHandler) PatchSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID) {
+	var request PatchSubscriptionRequestObject
+
+	request.Id = id
+
+	var body PatchSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchSubscription(ctx, request.(PatchSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchSubscriptionResponseObject); ok {
+		if err := validResponse.VisitPatchSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeliveries operation middleware
+func (sh *strictHandler) ListDeliveries(w http.ResponseWriter, r *http.Request, id SubscriptionID, params ListDeliveriesParams) {
+	var request ListDeliveriesRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeliveries(ctx, request.(ListDeliveriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeliveries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeliveriesResponseObject); ok {
+		if err := validResponse.VisitListDeliveriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RetryDelivery operation middleware
+func (sh *strictHandler) RetryDelivery(w http.ResponseWriter, r *http.Request, id SubscriptionID, deliveryId string) {
+	var request RetryDeliveryRequestObject
+
+	request.Id = id
+	request.DeliveryId = deliveryId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RetryDelivery(ctx, request.(RetryDeliveryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RetryDelivery")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RetryDeliveryResponseObject); ok {
+		if err := validResponse.VisitRetryDeliveryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

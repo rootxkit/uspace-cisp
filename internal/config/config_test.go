@@ -336,7 +336,8 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvDeliveryLogRetentionDays, "0", "3650", loadDeliverErr},
 		{EnvAllowPrivateCallbacks, "yes", "true", loadDeliverErr},
 		{EnvAllowInsecureCallbacks, "2", "0", loadDeliverErr},
-		{EnvDatabaseURL, "redis://db", "postgres://db/cisp", loadDeliverErr},
+		{EnvDatabaseURL, "redis://db", "postgres://db/cisp", loadDeliverSendingErr},
+		{EnvPublicBaseURL, "cisp", "https://cisp.lab.test", loadDeliverErr},
 		{EnvTimeseriesURL, "redis://db", "postgres://db/cisp_ts", loadDeliverErr},
 		{EnvNATSURL, "redis://nats", "nats://nats", loadDeliverErr},
 		{EnvSigningKID, "kid 1", "kid-1", loadDeliverErr},
@@ -367,7 +368,42 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 
 func loadAPIErr(env []string) error     { _, err := LoadAPI(withBase(env...)); return err }
 func loadDeliverErr(env []string) error { _, err := LoadDeliver(env); return err }
-func loadCtlErr(env []string) error     { _, err := LoadCtl(env); return err }
+
+// loadDeliverSendingErr loads deliver with what it needs to send.
+func loadDeliverSendingErr(env []string) error {
+	_, err := LoadDeliver(append([]string{
+		EnvSigningKeyFile + "=/run/keys/cisp.pem", EnvSigningKID + "=cisp-1",
+		EnvIssuerURL + "=https://cisp.lab.test", EnvPublicBaseURL + "=https://cisp.lab.test",
+	}, env...))
+	return err
+}
+
+// With a database deliver sends webhooks: the signing key, its kid, the
+// issuer and the public base URL are required, each named; without one
+// it runs idle and needs none of them (E-01).
+func TestDeliverSendingNeedsSigning(t *testing.T) {
+	probs := problemsOf(t, loadDeliverErr([]string{EnvDatabaseURL + "=postgres://db/cisp"}))
+	for _, name := range []string{EnvSigningKeyFile, EnvSigningKID, EnvIssuerURL, EnvPublicBaseURL} {
+		if _, ok := probs[name]; !ok {
+			t.Errorf("%s not named: %v", name, probs)
+		}
+	}
+	if len(probs) != 4 {
+		t.Errorf("problems %v", probs)
+	}
+	if err := loadDeliverSendingErr([]string{EnvDatabaseURL + "=postgres://db/cisp"}); err != nil {
+		t.Errorf("complete: %v", err)
+	}
+	d, err := LoadDeliver([]string{EnvPublicBaseURL + "=https://cisp.lab.test/"})
+	if err != nil || d.PublicBaseURL != "https://cisp.lab.test/" {
+		t.Errorf("public base URL %q %v", d.PublicBaseURL, err)
+	}
+	a, err := LoadAPI(withBase(EnvAllowPrivateCallbacks+"=true", EnvAllowInsecureCallbacks+"=true"))
+	if err != nil || !a.AllowPrivateCallbacks || !a.AllowInsecureCallbacks {
+		t.Errorf("api callback policy %v %v %v", a.AllowPrivateCallbacks, a.AllowInsecureCallbacks, err)
+	}
+}
+func loadCtlErr(env []string) error { _, err := LoadCtl(env); return err }
 
 // Every problem is reported at once, not only the first.
 func TestEveryProblemAtOnce(t *testing.T) {

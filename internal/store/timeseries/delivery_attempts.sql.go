@@ -48,6 +48,52 @@ func (q *Queries) InsertDeliveryAttempt(ctx context.Context, arg InsertDeliveryA
 	return err
 }
 
+const listAttemptsOfDeliveries = `-- name: ListAttemptsOfDeliveries :many
+SELECT at, delivery_id, subscription_id, change_id, attempt, status_code, error,
+       latency_ms, payload_bytes, deliver_instance
+FROM delivery_attempts
+WHERE subscription_id = $1 AND delivery_id = ANY($2::text[])
+ORDER BY at, attempt
+`
+
+type ListAttemptsOfDeliveriesParams struct {
+	SubscriptionID string
+	DeliveryIds    []string
+}
+
+// WP-6: every attempt of some deliveries of one subscription (the
+// deliveries list joins them to the relational rows), oldest first.
+func (q *Queries) ListAttemptsOfDeliveries(ctx context.Context, arg ListAttemptsOfDeliveriesParams) ([]DeliveryAttempt, error) {
+	rows, err := q.db.Query(ctx, listAttemptsOfDeliveries, arg.SubscriptionID, arg.DeliveryIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DeliveryAttempt
+	for rows.Next() {
+		var i DeliveryAttempt
+		if err := rows.Scan(
+			&i.At,
+			&i.DeliveryID,
+			&i.SubscriptionID,
+			&i.ChangeID,
+			&i.Attempt,
+			&i.StatusCode,
+			&i.Error,
+			&i.LatencyMs,
+			&i.PayloadBytes,
+			&i.DeliverInstance,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDeliveryAttempts = `-- name: ListDeliveryAttempts :many
 SELECT at, delivery_id, subscription_id, change_id, attempt, status_code, error,
        latency_ms, payload_bytes, deliver_instance

@@ -33,6 +33,11 @@ func TestConfigCheckOK(t *testing.T) {
 		"CISP_TOKEN_JWKS_URL=https://authority.example.test/.well-known/jwks.json",
 		"CISP_AUDIENCES=uspace-cisp.example.test",
 		"CISP_ANSP_MTLS_SUBJECT=CN=ansp-01",
+		// With a database deliver signs and sends (WP-6).
+		"CISP_SIGNING_KEY_FILE=/run/keys/cisp.pem",
+		"CISP_SIGNING_KID=cisp-1",
+		"CISP_ISSUER_URL=https://uspace-cisp.example.test",
+		"CISP_PUBLIC_BASE_URL=https://uspace-cisp.example.test",
 	})
 	if code != exitOK || !strings.Contains(out, "config check: ok") {
 		t.Fatalf("config check = %d %q %q", code, out, errOut)

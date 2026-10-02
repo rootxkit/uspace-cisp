@@ -14,7 +14,8 @@ info:
     WP-2: the signing JWKS. WP-4: the reads (datasets, versions, the
     change feed, status) and the public subset. WP-5: the dynamic
     restrictions of the ANSP (F2), their expiry and the publisher
-    staleness.
+    staleness. WP-6: subscriptions and the signed webhook delivery
+    (F3 push).
 servers:
   - url: /
 tags:
@@ -633,6 +634,291 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /v1/subscriptions:
+    post:
+      operationId: createSubscription
+      tags: [subscriptions]
+      summary: Register a webhook for changes (F3 push)
+      description: |
+        Any client with cis.read registers a callback for some datasets,
+        optionally within a box. callback_url must be https (plain http
+        only to localhost, and only with CISP_ALLOW_INSECURE_CALLBACKS),
+        an absolute URL without userinfo or fragment, its host at most
+        253 characters, and neither a literal IP address nor a
+        localhost, .local, .internal or .localhost name, nor a name that
+        resolves to a loopback, private, link-local, CGNAT, multicast or
+        unspecified address, unless CISP_ALLOW_PRIVATE_CALLBACKS (the
+        lab). deliver applies the address rule again at every dial, to
+        the address it connects to, and never follows a redirect. A
+        client holds at most CISP_MAX_SUBSCRIPTIONS_PER_CLIENT (20)
+        subscriptions that are not deleted; one more is 409 limit.
+
+        The subscription is created pending_verification and deliver
+        POSTs it a cis/change/v1 with reason subscription_test at once;
+        the first 2xx makes it active. Until then GET says
+        pending_verification and, in verification, the last attempt's
+        status and error. Pending subscriptions are sent changes too.
+
+        Every notification is POSTed to the registered callback_url
+        (receivers in the ecosystem expose POST /v1/cis/notifications,
+        but the CISP never assumes a path) as application/jose: a compact
+        JWS (RS256, a kid of /.well-known/jwks.json) whose payload is
+        {iss, aud, sub, iat, jti, body}: iss is CISP_ISSUER_URL, aud the
+        host of callback_url without its port, sub the subscription id,
+        jti the delivery id, and body the cis/change/v1 record (the
+        Change schema). Receivers answer 2xx within 2 s; anything else,
+        a redirect or a timeout is retried 1, 2, 4 ... s doubling to
+        300 s (with 10 % jitter) until 24 h after the change, then the
+        delivery expires. 50 consecutive failures over at least an hour
+        suspend an active subscription (its suspended_reason says since
+        when and why). Receivers acknowledge reason subscription_test
+        and republished, and any reason they do not know, with 204
+        without pulling; only the publication and restriction reasons
+        trigger a pull of pull_url, and only when its host is this
+        CISP's. A notification is a hint: the subscriber still runs its
+        own 60 s HEAD reconciliation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionCreate"
+      responses:
+        "201":
+          description: Registered, pending verification.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "415":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+    get:
+      operationId: listSubscriptions
+      tags: [subscriptions]
+      summary: The caller's subscriptions
+      description: |
+        The caller's subscriptions that are not deleted, oldest first.
+        Token scope cis.read; a client sees its own only (the console
+        sees every client's, WP-8).
+      responses:
+        "200":
+          description: The subscriptions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/subscriptions/{id}:
+    get:
+      operationId: getSubscription
+      tags: [subscriptions]
+      summary: One of the caller's subscriptions
+      description: |
+        The subscription with its counters (consecutive_failures,
+        last_success_at) and, while it is pending_verification, its
+        verification ping with the last attempt's status and error.
+        Another client's subscription is 404.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionID"
+      responses:
+        "200":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: patchSubscription
+      tags: [subscriptions]
+      summary: Change a subscription's callback, datasets or box
+      description: |
+        The members given replace the stored ones; bbox [] removes the
+        box. A changed callback_url is held to the rules of POST and
+        verified again: the subscription returns to pending_verification
+        and is pinged (subscription_test). A suspended subscription is
+        re-activated by any PATCH the same way: it is pinged and becomes
+        active on the first 2xx. A deleted subscription is 404.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionPatch"
+      responses:
+        "200":
+          description: The subscription as it is now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "415":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteSubscription
+      tags: [subscriptions]
+      summary: Delete a subscription
+      description: |
+        A soft delete: the status becomes deleted, nothing more is sent,
+        and the open deliveries expire (a state, never a deletion; the
+        delivery log keeps every attempt). Audited. A deleted
+        subscription is 404 afterwards.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionID"
+      responses:
+        "200":
+          description: The subscription, deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/subscriptions/{id}/deliveries:
+    get:
+      operationId: listDeliveries
+      tags: [subscriptions]
+      summary: A subscription's deliveries with their attempts
+      description: |
+        The deliveries queued at or after since (default 24 h ago),
+        newest first, each with its attempts from the delivery log (the
+        timeseries database, read through the api's read-only role).
+        log says whether the attempts could be read: complete, unavailable
+        (the timeseries database did not answer; the deliveries are
+        still listed) or not_configured.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionID"
+        - name: since
+          in: query
+          required: false
+          description: RFC 3339 instant with an offset.
+          schema:
+            type: string
+            examples: ["2026-10-02T12:00:00Z"]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: The deliveries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryList"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/subscriptions/{id}/deliveries/{delivery_id}/retry:
+    post:
+      operationId: retryDelivery
+      tags: [subscriptions]
+      summary: Re-queue a delivery now
+      description: |
+        The delivery becomes queued and due now, whatever its state
+        (delivered and expired ones included: a notification is a hint
+        and sending it again is harmless); 409 delivering while an
+        attempt is in flight. It is sent while the subscription is
+        active or pending. Audited.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionID"
+        - name: delivery_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+      responses:
+        "202":
+          description: Re-queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /v1/{dataset}:
     get:
       operationId: getDataset
@@ -1131,6 +1417,14 @@ components:
         type: string
         enum: [id, ansp_ref]
         default: id
+    SubscriptionID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
   responses:
     Problem:
       description: An error, as RFC 9457 problem details.
@@ -2239,11 +2533,24 @@ components:
         cis/change/v1: one change record, the body of the change feed,
         of the webhook payload (inside the JWS claims) and of the
         stream's change frames (docs/PLAN.md section 6.7, section 15
-        Q28). msg_id is the change cursor in decimal; pull_url asks for
-        the delta from the previous version on CISP_PUBLIC_BASE_URL;
+        Q28, Q38). msg_id is the change cursor in decimal; pull_url asks
+        for the delta from the previous version on CISP_PUBLIC_BASE_URL;
         bbox is [min lng, min lat, max lng, max lat] of what changed,
-        absent for the whole dataset. Written by WP-4 from the plan's
-        member list; WP-6 adopts it for the webhook.
+        absent for the whole dataset. producer is uspace-cisp on the bus,
+        the change feed and the stream, and cisp/deliver-<instance> in a
+        webhook (the deliver instance that sent it).
+
+        reason is an open enumeration (spec 04 section 4: values are
+        added within v1). A receiver pulls pull_url only for publication
+        and the restriction_* reasons, and only when pull_url's host is
+        the CISP's; it acknowledges subscription_test (the verification
+        ping of a new or changed subscription), republished (the current
+        version announced again, content unchanged) and any reason it
+        does not know with 204, without pulling. A subscription_test
+        record names no change: msg_id is the delivery id (a ULID),
+        dataset the first of the subscription's datasets, version and
+        etag its current version (0 before the first), feature_ids and
+        removed_ids empty, at when the ping was queued.
       additionalProperties: false
       required: [schema, msg_id, producer, dataset, version, etag, feature_ids, removed_ids, reason, at, pull_url]
       properties:
@@ -2252,17 +2559,19 @@ components:
           const: cis/change/v1
         msg_id:
           type: string
-          pattern: "^[0-9]+$"
+          description: The change cursor in decimal; the delivery id (a ULID) for subscription_test.
+          pattern: "^([0-9]+|[0-9A-HJKMNP-TV-Z]{26})$"
         producer:
           type: string
-          const: uspace-cisp
+          pattern: "^(uspace-cisp|cisp/deliver-[A-Za-z0-9._-]{1,64})$"
         dataset:
           type: string
           enum: [zones, uspace_airspace, ussp_list, restrictions]
         version:
           type: integer
           format: int64
-          minimum: 1
+          minimum: 0
+          description: The version the change made (at least 1); a subscription_test names the current version, 0 before the first.
         etag:
           type: string
           examples: ['"zones:5"']
@@ -2291,6 +2600,196 @@ components:
           items:
             type: number
             format: double
+    SubscriptionCreate:
+      type: object
+      description: The body of POST /v1/subscriptions; unknown members are ignored.
+      required: [callback_url, datasets]
+      properties:
+        callback_url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          examples: ["https://ussp.example.ge/v1/cis/notifications"]
+        datasets:
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            enum: [zones, uspace_airspace, ussp_list, restrictions]
+        bbox:
+          type: array
+          description: |
+            [min lng, min lat, max lng, max lat] in WGS84 degrees (GeoJSON
+            order), not across the antimeridian; only changes whose box
+            intersects it (touching counts) or that have no box are sent.
+          minItems: 4
+          maxItems: 4
+          items:
+            type: number
+            format: double
+    SubscriptionPatch:
+      type: object
+      description: The body of PATCH /v1/subscriptions/{id}; the members given replace the stored ones.
+      properties:
+        callback_url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        datasets:
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            enum: [zones, uspace_airspace, ussp_list, restrictions]
+        bbox:
+          type: array
+          description: Four numbers as in SubscriptionCreate, or [] to remove the box.
+          maxItems: 4
+          items:
+            type: number
+            format: double
+    Subscription:
+      type: object
+      required: [id, client_id, callback_url, datasets, status, created_at, consecutive_failures]
+      properties:
+        id:
+          type: string
+        client_id:
+          type: string
+        callback_url:
+          type: string
+        datasets:
+          type: array
+          items:
+            type: string
+            enum: [zones, uspace_airspace, ussp_list, restrictions]
+        bbox:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: number
+            format: double
+        status:
+          type: string
+          enum: [pending_verification, active, suspended, deleted]
+        created_at:
+          type: string
+          format: date-time
+        verified_at:
+          type: string
+          format: date-time
+        suspended_reason:
+          type: string
+          description: Why and since when it is suspended; present while suspended.
+        consecutive_failures:
+          type: integer
+          minimum: 0
+        last_success_at:
+          type: string
+          format: date-time
+        failing_since:
+          type: string
+          format: date-time
+          description: The first failure of the current run of consecutive failures.
+        verification:
+          $ref: "#/components/schemas/Delivery"
+    SubscriptionList:
+      type: object
+      required: [subscriptions]
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscription"
+    Delivery:
+      type: object
+      description: |
+        One delivery of a change (or of the verification ping: change_id
+        absent, reason subscription_test) to a subscription.
+      required: [id, subscription_id, reason, state, attempts, created_at]
+      properties:
+        id:
+          type: string
+        subscription_id:
+          type: string
+        change_id:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          enum: [publication, restriction_created, restriction_activated, restriction_extended, restriction_ended, restriction_cancelled, restriction_expired, republished, subscription_test]
+        state:
+          type: string
+          enum: [queued, delivering, delivered, failed, expired]
+        attempts:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        first_attempt_at:
+          type: string
+          format: date-time
+        last_attempt_at:
+          type: string
+          format: date-time
+        next_retry_at:
+          type: string
+          format: date-time
+        delivered_at:
+          type: string
+          format: date-time
+        last_status_code:
+          type: integer
+        last_error:
+          type: string
+        log:
+          type: array
+          description: Every attempt from the delivery log, oldest first (deliveries list only).
+          items:
+            $ref: "#/components/schemas/DeliveryAttempt"
+    DeliveryAttempt:
+      type: object
+      required: [at, attempt, latency_ms, payload_bytes, deliver_instance]
+      properties:
+        at:
+          type: string
+          format: date-time
+        attempt:
+          type: integer
+          minimum: 1
+        status_code:
+          type: integer
+        error:
+          type: string
+        latency_ms:
+          type: integer
+          minimum: 0
+        payload_bytes:
+          type: integer
+          minimum: 0
+        deliver_instance:
+          type: string
+    DeliveryList:
+      type: object
+      required: [deliveries, log]
+      properties:
+        deliveries:
+          type: array
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/Delivery"
+        log:
+          type: string
+          enum: [complete, unavailable, not_configured]
+          description: Whether the attempts of the delivery log were read.
+
     ChangeList:
       type: object
       required: [changes, next]

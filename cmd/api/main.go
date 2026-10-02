@@ -30,6 +30,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/obs"
 	"github.com/rootxkit/uspace-cisp/internal/restriction"
 	"github.com/rootxkit/uspace-cisp/internal/store"
+	"github.com/rootxkit/uspace-cisp/internal/subscription"
 )
 
 const process = "api"
@@ -186,6 +187,13 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		expiry := time.NewTicker(cfg.ExpiryInterval)
 		defer expiry.Stop()
 		go rs.RunExpiry(ctx, expiry.C)
+		subs, closeLog, err := subscriptions(ctx, cfg, st, status, logger)
+		if err != nil {
+			logger.ErrorContext(ctx, "delivery log refused", "error", err.Error())
+			return 1
+		}
+		defer closeLog()
+		server.Subscriptions = subs
 	}
 	// The public reads' per-client limit; a request the cache will answer
 	// 304 is counted at the cheap rate.
@@ -334,13 +342,41 @@ func reads(cfg *config.API, st *store.Store, cache *store.SnapshotCache, sec *se
 }
 
 // routeBodyCaps raises the cap of PUT /v1/publications/{dataset} to the
-// publication cap and sets the restriction writes' cap.
+// publication cap and sets the restriction and subscription writes' caps.
 func routeBodyCaps(cfg *config.API) map[string]int64 {
 	caps := map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes}
 	for _, route := range httpapi.RestrictionWriteRoutes {
 		caps[route] = cfg.MaxRestrictionBytes
 	}
+	for _, route := range httpapi.SubscriptionWriteRoutes {
+		caps[route] = httpapi.MaxSubscriptionBodyBytes
+	}
 	return caps
+}
+
+// subscriptions are the subscriptions tag (WP-6) on the relational
+// store, with the delivery log read from the timeseries database through
+// the api's read-only role when CISP_TIMESERIES_URL is set (the
+// deliveries list says not_configured otherwise). The returned function
+// closes the timeseries pool.
+func subscriptions(ctx context.Context, cfg *config.API, st *store.Store, status *obs.Status, logger *slog.Logger) (*httpapi.Subscriptions, func(), error) {
+	ss := &httpapi.Subscriptions{
+		Store: st, MaxPerClient: int(cfg.MaxSubscriptionsPerClient),
+		Policy: subscription.URLPolicy{AllowPrivate: cfg.AllowPrivateCallbacks, AllowInsecure: cfg.AllowInsecureCallbacks},
+		Status: status, Logger: logger,
+	}
+	if cfg.TimeseriesURL == "" {
+		status.Component("delivery_log").SetDegraded("not configured (" + config.EnvTimeseriesURL + "): the deliveries list carries no attempts")
+		return ss, func() {}, nil
+	}
+	pool, err := store.OpenPool(ctx, store.PoolConfig{
+		URL: cfg.TimeseriesURL, ApplicationName: "uspace-cisp-" + process, MaxConns: int32(cfg.TimeseriesMaxConns),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	ss.Log = store.NewDeliveryLog(pool)
+	return ss, pool.Close, nil
 }
 
 // restrictions is the restrictions lifecycle on the database (WP-5): the

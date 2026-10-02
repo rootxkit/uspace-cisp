@@ -165,7 +165,7 @@ func TestMigrationTreesUpDownUp(t *testing.T) {
 		tables []string
 		files  int
 	}{
-		{TreeRelational, "CISP_TEST_DATABASE_URL", []string{"datasets", "publications", "publication_attempts", "features", "features_current", "snapshots", "changes", "restrictions", "restriction_events", "publishers", "subscriptions", "deliveries", "accounts", "sessions", "events", "job_runs"}, 8},
+		{TreeRelational, "CISP_TEST_DATABASE_URL", []string{"datasets", "publications", "publication_attempts", "features", "features_current", "snapshots", "changes", "restrictions", "restriction_events", "publishers", "subscriptions", "deliveries", "accounts", "sessions", "events", "job_runs", "deliver_state"}, 9},
 		{TreeTimeseries, "CISP_TEST_TIMESERIES_URL", []string{"delivery_attempts"}, 2},
 	}
 	for _, c := range cases {

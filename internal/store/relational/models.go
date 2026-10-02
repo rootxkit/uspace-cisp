@@ -43,10 +43,18 @@ type Dataset struct {
 	UpdatedAt      time.Time
 }
 
+// deliver's reconciliation watermark (D6): changes up to it have their deliveries.
+type DeliverState struct {
+	Name      string
+	Watermark int64
+	UpdatedAt time.Time
+}
+
 type Delivery struct {
 	ID             string
 	SubscriptionID string
-	ChangeID       int64
+	// The changes.id delivered; null for the subscription_test ping of a new or changed callback.
+	ChangeID       *int64
 	State          string
 	Attempts       int32
 	FirstAttemptAt *time.Time
@@ -55,6 +63,7 @@ type Delivery struct {
 	DeliveredAt    *time.Time
 	LastStatusCode *int32
 	LastError      *string
+	CreatedAt      time.Time
 }
 
 // Append-only audit log with a per-row hash chain (06 T7); partitioned by month; insert-only for cisp_api.
@@ -223,4 +232,5 @@ type Subscription struct {
 	SuspendedReason     *string
 	ConsecutiveFailures int32
 	LastSuccessAt       *time.Time
+	FailingSince        *time.Time
 }

@@ -417,7 +417,7 @@ func publications(cfg *config.API, st *store.Store, sec *security, status *obs.S
 func reads(cfg *config.API, st *store.Store, cache *store.SnapshotCache, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Reads {
 	r := &httpapi.Reads{
 		Store: st, Cache: cache, MaxAge: cfg.ReadMaxAge, PublicBaseURL: cfg.PublicBaseURL,
-		Status: status, Logger: logger,
+		MaxPublicationBytes: cfg.MaxPublicationBytes, Status: status, Logger: logger,
 	}
 	if sec.keys != nil {
 		r.Signer = httpapi.KeyRingSigner{Keys: sec.keys}

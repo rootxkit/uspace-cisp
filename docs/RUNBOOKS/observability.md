@@ -96,6 +96,8 @@ section 9) where it names one.
 | `cisp_delivery_scan_failed_total` | counter | `component` | Reconciliation scans that failed. | any increase for 1 min |
 | `cisp_delivery_scans_total` | counter | `component` | Webhook delivery intake. | — |
 | `cisp_delivery_sign_failed_total` | counter | `component` | Delivery bookkeeping failures. | — |
+| `cisp_ed269_exported_total` | counter | `component` | Versions exported as ED-269 through uspace-core (format=ed269). | — |
+| `cisp_ed269_not_representable_total` | counter | `component` | ED-269 exports refused 406 because the version holds what ED-269 cannot. | — |
 | `cisp_expiry_last_tick_failures` | gauge | `component` | Restrictions the last expiry tick could not expire. | above 0 |
 | `cisp_expiry_ticks_not_leader_total` | counter | `component` | Expiry ticks. | — |
 | `cisp_expiry_ticks_total` | counter | `component` | Expiry ticks. | — |

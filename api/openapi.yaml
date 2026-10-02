@@ -15,7 +15,7 @@ info:
     change feed, status) and the public subset. WP-5: the dynamic
     restrictions of the ANSP (F2), their expiry and the publisher
     staleness. WP-6: subscriptions and the signed webhook delivery
-    (F3 push).
+    (F3 push). WP-7: the WebSocket change stream.
 servers:
   - url: /
 tags:
@@ -1201,6 +1201,76 @@ paths:
           $ref: "#/components/responses/Problem"
         "403":
           $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/stream:
+    get:
+      operationId: getStream
+      tags: [stream]
+      summary: The WebSocket change stream
+      x-websocket: true
+      description: |
+        A WebSocket upgrade (OpenAPI has no WebSocket verb: this GET is
+        the handshake, and 101 is its success). Public: no token, the
+        upgrade rate-limited per client address like the public reads.
+        A browser's upgrade must carry an Origin in the allow-list (the
+        origin of CISP_PUBLIC_BASE_URL and CISP_STREAM_ALLOWED_ORIGINS),
+        else 403 origin; an upgrade without Origin is not a browser's and
+        is served. The uspace_session cookie of a same-origin upgrade is
+        verified by the shared verifier and marks the client as a console
+        (the content is the same); with CISP_STREAM_PUBLIC=false a missing
+        or invalid session is accepted and then closed with code 4401
+        (re-login, M22). There is no ticket route.
+
+        Every frame is a text message holding the common envelope
+        (StreamFrame, uspace-lab schemas/common envelope/v1) around one
+        of two bodies: console/status/v1 (StreamStatus) on connect, every
+        CISP_STREAM_STATUS_INTERVAL_S (2 s) and at once after the bus
+        returns, and cis/change/v1 (Change) for each change committed
+        while connected, for the datasets asked for. No history (use
+        GET /v1/changes), no snapshot frame and no subscribe frame: the
+        datasets query parameter is the subscription. A status with
+        resync_since says changes may have been missed since that
+        instant (the bus was down): HEAD the datasets and pull by
+        since_version. Close codes: 1013 the client could not keep up
+        (its CISP_STREAM_SEND_BUFFER_FRAMES queue stayed full for a
+        status period), 4401 re-login, 1001 the instance stops. At most
+        CISP_STREAM_MAX_CLIENTS clients per instance; the next is 503
+        stream_full with Retry-After.
+      security: []
+      parameters:
+        - name: datasets
+          in: query
+          required: false
+          description: Comma-separated datasets whose changes to receive; absent or empty is every dataset.
+          schema:
+            type: string
+            maxLength: 256
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "101":
+          description: |
+            Switched to the WebSocket protocol. Every message from the
+            server is a StreamFrame; the stream reads no data messages
+            (one ends the connection).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamFrame"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "426":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/Unavailable"
         default:
@@ -2527,6 +2597,117 @@ components:
           type: string
           enum: [operating, suspended, limited]
 
+    StreamFrame:
+      type: object
+      description: |
+        One WS /v1/stream frame: the common envelope (uspace-lab
+        schemas/common envelope/v1, M29) around the body named by schema.
+        Times are RFC 3339 UTC with Z and milliseconds, on the CISP's
+        clock (time_source system). producer is cisp/api. msg_id is a
+        ULID per frame (a change's own id is the body's msg_id).
+      required: [schema, msg_id, producer, ts, rx_ts, captured_at, time_source, backlog, body]
+      properties:
+        schema:
+          type: string
+          enum: [console/status/v1, cis/change/v1]
+        msg_id:
+          type: string
+          pattern: "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        producer:
+          type: string
+        ts:
+          type: [string, "null"]
+        rx_ts:
+          type: string
+        captured_at:
+          type: string
+        time_source:
+          type: string
+          enum: [system]
+        backlog:
+          type: boolean
+        body:
+          oneOf:
+            - $ref: "#/components/schemas/StreamStatus"
+            - $ref: "#/components/schemas/Change"
+    StreamStatus:
+      type: object
+      description: |
+        The console/status/v1 body (uspace-lab schemas/common, M29) with
+        the CISP's extras. degraded names database, nats, jwks and
+        publisher_stale; degraded_since says since when. nats is
+        connected, reconnecting, never_connected, closed or
+        not_configured, with nats_since while it is not connected.
+        datasets holds each dataset's current version (decimal) and its
+        age; cis_age_s is the age of the newest change. resync_since is
+        set on the first status after the bus returns and on no other.
+        sources is empty: the CISP's data comes from its publishers,
+        listed with their heartbeats in publishers (stale after
+        stale_after_s, 60 s).
+      required: [connection_id, server_ts, policy_version, stale_after_s, live_max_age_s, dropped_frames, degraded, sources, publishers]
+      properties:
+        connection_id:
+          type: string
+        server_ts:
+          type: string
+        policy_version:
+          type: string
+          description: A hash of the instance's configuration (the CISP has no display thresholds of its own).
+        stale_after_s:
+          type: number
+        live_max_age_s:
+          type: number
+        dropped_frames:
+          type: integer
+          minimum: 0
+        degraded:
+          type: array
+          items:
+            type: string
+        degraded_since:
+          type: object
+          additionalProperties:
+            type: string
+        sources:
+          type: array
+          items:
+            type: object
+        datasets:
+          type: object
+          additionalProperties:
+            type: object
+            required: [version, age_s]
+            properties:
+              version:
+                type: string
+              age_s:
+                type: number
+        cis_age_s:
+          type: number
+        nats:
+          type: string
+        nats_since:
+          type: string
+        resync_since:
+          type: string
+        publishers:
+          type: array
+          items:
+            type: object
+            required: [client_id, kind, last_heartbeat_at, heartbeat_age_s, stale_after_s, stale]
+            properties:
+              client_id:
+                type: string
+              kind:
+                type: string
+              last_heartbeat_at:
+                type: [string, "null"]
+              heartbeat_age_s:
+                type: [number, "null"]
+              stale_after_s:
+                type: number
+              stale:
+                type: boolean
     Change:
       type: object
       description: |

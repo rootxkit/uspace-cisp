@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,6 +31,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/obs"
 	"github.com/rootxkit/uspace-cisp/internal/restriction"
 	"github.com/rootxkit/uspace-cisp/internal/store"
+	"github.com/rootxkit/uspace-cisp/internal/stream"
 	"github.com/rootxkit/uspace-cisp/internal/subscription"
 )
 
@@ -87,6 +89,7 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 
 	reg := obs.NewRegistry()
 	status := obs.NewStatus(process, reg, time.Now())
+	status.CheckCatalogue()
 	// A disabled safeguard is shown at error level every period
 	// (CLAUDE.md hard rule 4).
 	auth.ReportMTLS(status.Component("mtls"), cfg.MTLSMode)
@@ -147,16 +150,21 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 	natsComp := status.Component("nats")
 	var nc *nats.Conn
 	var changes *bus.Bus
+	src := &streamStatus{status: status, policy: policyVersion(cfg), now: time.Now, configured: []httpapi.ConfiguredPublisher{
+		{ClientID: cfg.AuthorityClientID, Kind: "authority"}, {ClientID: cfg.ANSPClientID, Kind: "ansp"},
+	}}
 	if cfg.NATSURL == "" {
 		natsComp.SetDegraded(httpapi.CheckNotConfigured)
+		natsComp.SetSummary(natsNotConfigured)
 	} else {
-		changes, err = connectBus(ctx, cfg, logger, natsComp)
+		changes, err = connectBus(ctx, cfg.NATSURL, cfg.NATSCredsFile, cfg.PublicBaseURL, cfg.NATSConnectTimeout, logger, status)
 		if err != nil {
 			logger.ErrorContext(ctx, "nats refused", "error", err.Error())
 			return 1
 		}
 		nc = changes.Conn()
 		ready.NATS = natsCheck(nc)
+		src.busState = changes.State
 	}
 
 	server := &httpapi.Server{Ready: ready, Keys: sec.keys, Status: &httpapi.StatusReport{
@@ -171,9 +179,13 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 			opts.Bus = changes
 		}
 		st := store.New(pool, opts)
+		status.AddProbe(obs.MirrorCounters(status.Component("store"), st.Counters(), "Store", storeCounters...))
 		cache := startCache(ctx, st, status)
+		status.AddProbe(obs.MirrorCounters(status.Component("snapshot_cache"), cache.Counters(), "Snapshot cache", cacheCounters...))
+		src.cache, src.read = cache.SnapshotCache, st.Publishers
 		server.Publications = publications(cfg, st, sec, status, logger)
 		server.Publications.OnPublished = cache.poke
+		server.Publications.Seconds = httpapi.NewPublicationSeconds(reg)
 		server.Reads = reads(cfg, st, cache.SnapshotCache, sec, status, logger)
 		server.Status.Cache = cache.SnapshotCache
 		server.Status.Publishers = st.Publishers
@@ -202,6 +214,15 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		limits.Cheap = server.Reads.NotModified
 	}
 	limiter := httpapi.NewRateLimiter(limits)
+	status.AddProbe(src.probe)
+	streamHandler, stopStream, err := startStream(ctx, cfg, status, logger, changes, src, stream.ClaimsSessions{Verifier: sec.machine})
+	if err != nil {
+		logger.ErrorContext(ctx, "stream refused", "error", err.Error())
+		return 1
+	}
+	defer stopStream()
+	routes := sec.routes(cfg, status, limiter)
+	maps.Copy(routes, httpapi.StreamAuth(limiter))
 	router, err := httpapi.NewRouter(server, httpapi.Options{
 		Logger:               logger,
 		Status:               status,
@@ -211,7 +232,8 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		MaxBodyBytes:         cfg.MaxBodyBytes,
 		BodyReadMinBytesPerS: cfg.BodyReadMinBytesPerS,
 		RouteBodyCaps:        routeBodyCaps(cfg),
-		RouteMiddleware:      sec.routes(cfg, status, limiter),
+		RouteMiddleware:      routes,
+		RouteHandlers:        map[string]http.Handler{httpapi.StreamRoute: streamHandler},
 	})
 	if err != nil {
 		logger.ErrorContext(ctx, "routes refused", "error", err.Error())
@@ -283,29 +305,77 @@ func databaseCheck(pool *pgxpool.Pool) httpapi.Check {
 	}
 }
 
+// storeCounters and cacheCounters are the store's own counts, mirrored
+// into Prometheus and the status line (docs/RUNBOOKS/observability.md).
+var (
+	storeCounters = []string{"bus_publish_failed", "bus_publish_skipped", "change_bbox_unavailable"}
+	cacheCounters = []string{"snapshot_cache_evicted", "snapshot_cache_oversize", "snapshot_cache_refresh_failed"}
+)
+
 // connectBus connects to JetStream through internal/bus without ever
-// giving up (LESSONS B-08): the first connect does not block when the
-// broker is down, reconnects are unlimited, and the component's degraded
-// state follows the connection. Committed changes are published on it
-// (D6); while it is down they wait for deliver's scan.
-func connectBus(ctx context.Context, cfg *config.API, logger *slog.Logger, comp *obs.Component) (*bus.Bus, error) {
-	comp.SetDegraded("connecting")
+// giving up (LESSONS B-08): it waits at most CISP_NATS_CONNECT_TIMEOUT_S
+// for the broker, then starts without it ("never connected") and keeps
+// trying; reconnects are unlimited, and the nats component's degraded
+// state, summary, gauge and counters follow the connection. Committed
+// changes are published on it (D6); while it is down they wait for
+// deliver's scan, and the stream's clients are told (nats reconnecting).
+func connectBus(ctx context.Context, url, creds, publicBaseURL string, timeout time.Duration, logger *slog.Logger, status *obs.Status) (*bus.Bus, error) {
+	comp := status.Component("nats")
+	reconnects := comp.Counter("nats_reconnects", "Reconnections to the broker after a loss.")
+	slow := comp.Counter("nats_slow_consumer", "NATS slow-consumer errors on this process's subscriptions (messages dropped by the client).")
+	down := comp.Gauge("nats_degraded_s", "Seconds the broker connection has been down (0 when connected).")
+	var b *bus.Bus
+	report := func(st bus.State) {
+		comp.SetSummary(st.String())
+		if st.Kind == bus.StateConnected {
+			comp.SetHealthy()
+			return
+		}
+		reason := st.String()
+		if st.Reason != "" {
+			reason += ": " + st.Reason
+		}
+		comp.SetDegraded(reason)
+	}
 	b, err := bus.Connect(ctx, bus.Config{
-		URL: cfg.NATSURL, CredsFile: cfg.NATSCredsFile, Name: "uspace-cisp-" + process,
-		PublicBaseURL: cfg.PublicBaseURL,
-		OnState: func(connected bool, state string) {
-			if connected {
-				comp.SetHealthy()
-				logger.Info("nats " + state)
-				return
+		URL: url, CredsFile: creds, Name: "uspace-cisp-" + process, PublicBaseURL: publicBaseURL, ConnectTimeout: timeout,
+		OnSlowConsumer: func(err error) {
+			slow.Inc()
+			if ok, held := obs.Once("nats: slow consumer", time.Minute); ok {
+				logger.Warn("nats slow consumer: messages dropped; the stream's clients are told to resync", "error", err.Error(), "also_since_last_line", held)
 			}
-			comp.SetDegraded(state)
-			logger.Warn("nats disconnected", "reason", state)
 		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("nats connect: %w", err)
 	}
+	st := b.State()
+	report(st)
+	if st.Kind == bus.StateConnected {
+		logger.Info("nats connected")
+	} else {
+		logger.Warn("nats never connected; starting degraded and retrying", "within_s", int64(timeout/time.Second))
+	}
+	b.Watch(func(prev, next bus.State) {
+		report(next)
+		switch {
+		case next.Kind == bus.StateConnected && prev.Kind == bus.StateNeverConnected:
+			logger.Info("nats connected", "after_s", int64(next.Since.Sub(prev.Since)/time.Second))
+		case next.Kind == bus.StateConnected:
+			reconnects.Inc()
+			logger.Info("nats reconnected", "down_s", int64(next.Since.Sub(prev.Since)/time.Second))
+		case next.Kind == bus.StateReconnecting:
+			logger.Warn("nats disconnected", "reason", next.Reason)
+		}
+	})
+	status.AddProbe(func(context.Context) {
+		st := b.State()
+		if st.Kind == bus.StateConnected {
+			down.Set(0)
+			return
+		}
+		down.Set(time.Since(st.Since).Seconds())
+	})
 	return b, nil
 }
 

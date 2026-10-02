@@ -450,14 +450,16 @@ func TestRedactedNeverPrintsASecret(t *testing.T) {
 		dbPassword = "db-Pa55word-91"
 		tsPassword = "ts-Pa55word-42"
 		natsToken  = "nats-T0ken-77"
-		secretsKey = "secrets-key-value-for-the-test"
 		queryPass  = "q-Pa55-13"
 	)
+	secretsKey := k32()
 	env := []string{
 		"CISP_DATABASE_URL=postgres://cisp_api:" + dbPassword + "@db:5432/cisp?sslmode=disable",
 		"CISP_TIMESERIES_URL=postgres://db:5432/cisp_ts?user=cisp_api&password=" + queryPass + "&x=" + tsPassword[:0],
 		"CISP_NATS_URL=nats://" + natsToken + "@nats:4222",
 		"CISP_SECRETS_KEY=" + secretsKey,
+		"CISP_SESSION_KEY_FILE=/run/secrets/cisp-session.pem",
+		"CISP_CONSOLE_ISSUER=https://uspace-cisp.example/console",
 		"CISP_SIGNING_KEY_FILE=/run/secrets/cisp-signing.pem",
 		"CISP_SIGNING_KID=cisp-1",
 	}

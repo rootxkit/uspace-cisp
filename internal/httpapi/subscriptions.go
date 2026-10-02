@@ -751,9 +751,20 @@ func (ss *Subscriptions) deliveries(ctx context.Context, id string, params gen.L
 	if p != nil || err != nil {
 		return *p, err
 	}
-	recs, err := ss.Store.SubscriptionDeliveries(ctx, rec.ID, since, limit)
+	out, err := ss.deliveryList(ctx, rec.ID, since, limit)
 	if err != nil {
 		return ss.failure(ctx, err)
+	}
+	return jsonResponse{status: http.StatusOK, body: out}, nil
+}
+
+// deliveryList is the deliveries of a subscription queued at or after
+// since with their attempts from the delivery log (the console reads it
+// for any client's subscription).
+func (ss *Subscriptions) deliveryList(ctx context.Context, subscriptionID string, since time.Time, limit int) (gen.DeliveryList, error) {
+	recs, err := ss.Store.SubscriptionDeliveries(ctx, subscriptionID, since, limit)
+	if err != nil {
+		return gen.DeliveryList{}, err
 	}
 	out := gen.DeliveryList{Deliveries: make([]gen.Delivery, 0, len(recs)), Log: logNotConfigured}
 	byID := map[string][]gen.DeliveryAttempt{}
@@ -763,11 +774,11 @@ func (ss *Subscriptions) deliveries(ctx context.Context, id string, params gen.L
 			r := &recs[i]
 			ids = append(ids, r.ID)
 		}
-		attempts, err := ss.Log.AttemptsOf(ctx, rec.ID, ids)
+		attempts, err := ss.Log.AttemptsOf(ctx, subscriptionID, ids)
 		if err != nil {
 			out.Log = logUnavailable
 			ss.counter(CounterDeliveryLogFailed).Inc()
-			ss.logger().LogAttrs(ctx, slog.LevelWarn, "delivery log not read", slog.String("subscription_id", rec.ID),
+			ss.logger().LogAttrs(ctx, slog.LevelWarn, "delivery log not read", slog.String("subscription_id", subscriptionID),
 				slog.String("error", err.Error()))
 		} else {
 			out.Log = logComplete
@@ -793,7 +804,7 @@ func (ss *Subscriptions) deliveries(ctx context.Context, id string, params gen.L
 		}
 		out.Deliveries = append(out.Deliveries, d)
 	}
-	return jsonResponse{status: http.StatusOK, body: out}, nil
+	return out, nil
 }
 
 // --- POST /v1/subscriptions/{id}/deliveries/{delivery_id}/retry -----------

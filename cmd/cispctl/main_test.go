@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"os"
 	"os/exec"
@@ -28,7 +29,9 @@ func TestVersion(t *testing.T) {
 func TestConfigCheckOK(t *testing.T) {
 	code, out, errOut := runCtl([]string{"config", "check"}, []string{
 		"CISP_DATABASE_URL=postgres://cisp_api:hunter2-pw@db/cisp",
-		"CISP_SECRETS_KEY=very-secret-key-material",
+		"CISP_SECRETS_KEY=" + k32(),
+		"CISP_SESSION_KEY_FILE=/run/keys/session.pem",
+		"CISP_CONSOLE_ISSUER=https://uspace-cisp.example.test/console",
 		"CISP_TOKEN_ISSUER=https://authority.example.test/",
 		"CISP_TOKEN_JWKS_URL=https://authority.example.test/.well-known/jwks.json",
 		"CISP_AUDIENCES=uspace-cisp.example.test",
@@ -182,3 +185,7 @@ func TestBinary(t *testing.T) {
 		}
 	}
 }
+
+// k32 is a CISP_SECRETS_KEY for tests: 32 bytes in standard base64,
+// built at run time so no key-shaped literal sits in the repository.
+func k32() string { return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x5a}, 32)) }

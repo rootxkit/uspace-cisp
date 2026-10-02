@@ -169,6 +169,23 @@ func (s *Status) Degraded() bool {
 	return false
 }
 
+// Totals is every counter's count since start, keyed
+// "<component>.<counter>" (the console's status view, WP-8).
+func (s *Status) Totals() map[string]uint64 {
+	s.mu.Lock()
+	comps := s.sortedComponents()
+	s.mu.Unlock()
+	out := map[string]uint64{}
+	for _, c := range comps {
+		c.mu.Lock()
+		for name, ctr := range c.counters {
+			out[c.name+"."+name] = ctr.Value()
+		}
+		c.mu.Unlock()
+	}
+	return out
+}
+
 func (s *Status) sortedComponents() []*Component {
 	comps := make([]*Component, 0, len(s.components))
 	for _, c := range s.components {

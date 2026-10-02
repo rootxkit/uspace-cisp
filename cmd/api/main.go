@@ -173,12 +173,13 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		},
 		Registry: status, MTLSMode: cfg.MTLSMode, Logger: logger,
 	}}
+	var st *store.Store
 	if pool != nil {
 		opts := store.Options{Logger: logger}
 		if changes != nil {
 			opts.Bus = changes
 		}
-		st := store.New(pool, opts)
+		st = store.New(pool, opts)
 		status.AddProbe(obs.MirrorCounters(status.Component("store"), st.Counters(), "Store", storeCounters...))
 		cache := startCache(ctx, st, status)
 		status.AddProbe(obs.MirrorCounters(status.Component("snapshot_cache"), cache.Counters(), "Snapshot cache", cacheCounters...))
@@ -215,7 +216,19 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 	}
 	limiter := httpapi.NewRateLimiter(limits)
 	status.AddProbe(src.probe)
-	streamHandler, stopStream, err := startStream(ctx, cfg, status, logger, changes, src, stream.ClaimsSessions{Verifier: sec.machine})
+	consoleParts, err := startConsole(ctx, cfg, sec.console, sec, st, server, status, logger)
+	if err != nil {
+		logger.ErrorContext(ctx, "console refused", "error", err.Error())
+		return 1
+	}
+	server.Console = consoleParts.server
+	var sessions stream.SessionVerifier = stream.ClaimsSessions{Verifier: sec.machine}
+	if consoleParts.guard != nil {
+		// The stream's cookie is a console session only when the console
+		// would accept it: the issuer, the shape and not revoked.
+		sessions = consoleParts.guard
+	}
+	streamHandler, stopStream, err := startStream(ctx, cfg, status, logger, changes, src, sessions)
 	if err != nil {
 		logger.ErrorContext(ctx, "stream refused", "error", err.Error())
 		return 1
@@ -223,6 +236,7 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 	defer stopStream()
 	routes := sec.routes(cfg, status, limiter)
 	maps.Copy(routes, httpapi.StreamAuth(limiter))
+	maps.Copy(routes, consoleParts.routes)
 	router, err := httpapi.NewRouter(server, httpapi.Options{
 		Logger:               logger,
 		Status:               status,
@@ -414,7 +428,8 @@ func reads(cfg *config.API, st *store.Store, cache *store.SnapshotCache, sec *se
 // routeBodyCaps raises the cap of PUT /v1/publications/{dataset} to the
 // publication cap and sets the restriction and subscription writes' caps.
 func routeBodyCaps(cfg *config.API) map[string]int64 {
-	caps := map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes}
+	caps := httpapi.ConsoleBodyCaps()
+	caps[httpapi.PublicationRoute] = cfg.MaxPublicationBytes
 	for _, route := range httpapi.RestrictionWriteRoutes {
 		caps[route] = cfg.MaxRestrictionBytes
 	}

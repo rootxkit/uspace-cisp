@@ -123,6 +123,16 @@ func buildCatalogue() []Metric {
 	add(counters("JWKS disk copy writes.", "jwks_cache_written")...)
 	add(counter("jwks_cache_write_failed", "JWKS disk copy writes that failed (the previous copy stays).", "any increase"))
 
+	// Console sessions (WP-8; component console_auth) and the console.
+	add(counter("session_accepted", "Console sessions verified on a console route.", ""))
+	add(counters("Console sessions refused by the console's rules (component console_auth).",
+		"session_rejected_not_session", "session_rejected_realm", "session_rejected_role", "session_rejected_revoked", "session_rejected_role_too_low")...)
+	add(counter("session_check_failed", "Console requests refused 503 because the revocation list could not be read (fail closed).", "any increase"))
+	add(counter("session_revocation_cache_bypassed", "Session checks that asked the database because the revocation cache was full or stale.", "sustained increase"))
+	add(counter("console_logins", "Console sessions issued.", ""))
+	add(counter("console_logins_refused", "Console logins refused (wrong credentials, locked, TOTP).", "a burst (password guessing)"))
+	add(counter("console_actions", "Console actions written (accounts, subscriptions, retries, republications).", ""))
+
 	// Store counters mirrored into Prometheus.
 	add(counter("bus_publish_failed", "Committed changes whose bus publish failed (deliver's scan covers them).", "any increase"))
 	add(counter("bus_publish_skipped", "Committed changes not published because no bus is configured.", ""))

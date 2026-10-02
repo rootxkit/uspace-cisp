@@ -16,6 +16,7 @@ import (
 	"github.com/rootxkit/uspace-core/core"
 	"github.com/rootxkit/uspace-core/ed318"
 
+	"github.com/rootxkit/uspace-cisp/internal/obs"
 	"github.com/rootxkit/uspace-cisp/internal/publication"
 	"github.com/rootxkit/uspace-cisp/internal/store/relational"
 )
@@ -442,7 +443,11 @@ func (s *Store) publish(ctx context.Context, c publication.Change) {
 		s.opts.Counters.Inc("bus_publish_skipped")
 		return
 	}
+	ctx, span := obs.StartSpan(ctx, obs.SpanBusPublish)
+	defer span.End()
+	obs.SetChangeID(span, c.ID)
 	if err := s.opts.Bus.Publish(ctx, c); err != nil {
+		obs.SetError(span, err)
 		s.opts.Counters.Inc("bus_publish_failed")
 		s.opts.Logger.WarnContext(ctx, "change committed but not published to the bus; deliver's scan will send it",
 			"dataset", string(c.Dataset), "version", c.Version, "change_id", c.ID, "error", err.Error())

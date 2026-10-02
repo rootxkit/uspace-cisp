@@ -484,11 +484,15 @@ func (rs *Restrictions) create(ctx context.Context, signature *string) (restrict
 	case !errors.Is(err, store.ErrNotFound):
 		return rs.failure(ctx, &w, err)
 	}
+	vctx, vspan := obs.StartSpan(ctx, obs.SpanValidate)
 	acc, probs := dataset.ValidateRestriction(body.Feature, dataset.RestrictionWindow{StartsAt: body.StartsAt, EndsAt: body.EndsAt}, rs.featureLimits())
 	if probs != nil {
+		vspan.End()
 		return rs.refuse(ctx, w, http.StatusBadRequest, SlugRestrictionRefused, "Restriction refused", probs), nil
 	}
-	if resp, refused, err := rs.place(ctx, w, acc, body.AnspRef, body.UspaceAirspaceID); refused || err != nil {
+	resp, refused, err := rs.place(vctx, w, acc, body.AnspRef, body.UspaceAirspaceID)
+	vspan.End()
+	if refused || err != nil {
 		return resp, err
 	}
 	proposed := restriction.Head{
@@ -564,7 +568,12 @@ func (rs *Restrictions) apply(ctx context.Context, w write, target store.Restric
 	target.Body, target.ContentType = w.body, mediaJSONRestriction
 	target.PublisherClientID, target.ReceivedAt = w.caller.ClientID, w.received
 	target.PublisherSignature, target.SignatureKID = &w.header, &w.kid
-	res, err := rs.Store.ApplyRestriction(ctx, target, rs.Signer)
+	tctx, tspan := obs.StartSpan(ctx, obs.SpanPublishTx)
+	res, err := rs.Store.ApplyRestriction(tctx, target, rs.Signer)
+	if err == nil {
+		obs.SetChangeID(tspan, res.Change.ID)
+	}
+	tspan.End()
 	if errors.Is(err, store.ErrNotFound) {
 		return notFoundRestriction(ctx, target.ID+target.AnspRef), nil
 	}

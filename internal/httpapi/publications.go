@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rootxkit/uspace-core/core"
 	"github.com/rootxkit/uspace-core/ed269"
 	"github.com/rootxkit/uspace-core/ed318"
@@ -121,6 +122,63 @@ type Publications struct {
 	// active restrictions and counts the differences; it never acts on
 	// them).
 	OnANSPRefs func(ctx context.Context, refs []string)
+	// Seconds observes each PUT by dataset and outcome
+	// (cisp_publication_seconds, NewPublicationSeconds); nil: not
+	// observed.
+	Seconds *prometheus.HistogramVec
+}
+
+// Publication outcomes of cisp_publication_seconds.
+const (
+	OutcomeAccepted  = "accepted"
+	OutcomeUnchanged = "unchanged"
+	OutcomeRefused   = "refused"
+	OutcomeFailed    = "failed"
+)
+
+// NewPublicationSeconds is cisp_publication_seconds{dataset, outcome},
+// registered in reg (nil: not exported); one already registered is
+// reused.
+func NewPublicationSeconds(reg prometheus.Registerer) *prometheus.HistogramVec {
+	h := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "cisp_publication_seconds",
+		Help:    "PUT /v1/publications/{dataset} from the body read to the answer, by outcome.",
+		Buckets: []float64{.05, .1, .25, .5, 1, 2, 5, 10, 20, 30},
+	}, []string{"dataset", "outcome"})
+	if reg != nil {
+		var already prometheus.AlreadyRegisteredError
+		if err := reg.Register(h); errors.As(err, &already) {
+			if existing, ok := already.ExistingCollector.(*prometheus.HistogramVec); ok {
+				return existing
+			}
+		}
+	}
+	return h
+}
+
+// put is one publication, observed in Seconds by its outcome.
+func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObject) (gen.PutPublicationResponseObject, error) {
+	start := time.Now()
+	resp, err := p.putOnce(ctx, req)
+	if p.Seconds != nil && publication.Dataset(req.Dataset).Valid() {
+		p.Seconds.WithLabelValues(string(req.Dataset), outcomeOf(resp, err)).Observe(time.Since(start).Seconds())
+	}
+	return resp, err
+}
+
+// outcomeOf names a PUT's answer for cisp_publication_seconds.
+func outcomeOf(resp gen.PutPublicationResponseObject, err error) string {
+	switch r := resp.(type) {
+	case gen.PutPublication201JSONResponse:
+		return OutcomeAccepted
+	case gen.PutPublication200JSONResponse:
+		return OutcomeUnchanged
+	case problemResponse:
+		if err == nil && r.status < http.StatusInternalServerError {
+			return OutcomeRefused
+		}
+	}
+	return OutcomeFailed
 }
 
 func (p *Publications) now() time.Time {
@@ -428,7 +486,7 @@ func (p *Publications) storeFailure(ctx context.Context, ds publication.Dataset,
 
 // --- PUT /v1/publications/{dataset} -------------------------------------
 
-func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObject) (gen.PutPublicationResponseObject, error) {
+func (p *Publications) putOnce(ctx context.Context, req gen.PutPublicationRequestObject) (gen.PutPublicationResponseObject, error) {
 	ds := publication.Dataset(req.Dataset)
 	kind, ok := dataset.KindOf(ds)
 	if !ok {
@@ -464,14 +522,17 @@ func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObj
 	attempt.BodySHA256 = sum[:]
 
 	lim := ed318.Limits{MaxBytes: int(p.MaxPublicationBytes)}
+	vctx, vspan := obs.StartSpan(ctx, obs.SpanValidate)
 	acc, probs := dataset.For(kind).Validate(body, lim, received)
 	if probs == nil && len(acc.Rows) > 0 {
-		reserved, err := p.Store.Reserved(ctx, ds, rowIDs(acc.Rows))
+		reserved, err := p.Store.Reserved(vctx, ds, rowIDs(acc.Rows))
 		if err != nil {
+			vspan.End()
 			return p.storeFailure(ctx, ds, err)
 		}
 		probs = reservedProblems(acc.Rows, reserved)
 	}
+	vspan.End()
 	if probs != nil {
 		return p.refuse(ctx, ds, attempt, probs), nil
 	}
@@ -488,7 +549,12 @@ func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObj
 		Warnings: warnings, Reason: publication.ReasonPublication, ReceivedAt: received,
 		ExpectedVersion: &current,
 	}
-	res, err := p.Store.PublishTx(ctx, in, p.Signer)
+	tctx, tspan := obs.StartSpan(ctx, obs.SpanPublishTx)
+	res, err := p.Store.PublishTx(tctx, in, p.Signer)
+	if err == nil {
+		obs.SetChangeID(tspan, res.Change.ID)
+	}
+	tspan.End()
 	switch {
 	case errors.Is(err, store.ErrUnchanged):
 		p.count(string(ds), CounterPublicationsUnchanged)

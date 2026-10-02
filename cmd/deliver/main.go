@@ -85,6 +85,20 @@ func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer) 
 
 	reg := obs.NewRegistry()
 	status := obs.NewStatus(process, reg, time.Now())
+	status.CheckCatalogue()
+	tp, shutdownTracer, err := obs.NewTracerProvider(ctx, cfg.OTelEndpoint, process, version)
+	if err != nil {
+		logger.ErrorContext(ctx, "tracing refused", "error", err.Error())
+		return 1
+	}
+	defer func() {
+		flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.ShutdownTimeout)
+		defer cancel()
+		if err := shutdownTracer(flushCtx); err != nil {
+			logger.Warn("tracer shutdown", "error", err.Error())
+		}
+	}()
+	spans := obs.NewSpans(tp, cfg.OTelEndpoint != "")
 
 	// deliver is the only writer of the timeseries tree and never
 	// migrates it (docs/PLAN.md section 5.3): pending migrations stop the
@@ -120,7 +134,7 @@ func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer) 
 		comp.Gauge(deliver.GaugeInFlight, "Webhook deliveries in flight.").Set(0)
 		comp.SetSummary("idle: no database (" + config.EnvDatabaseURL + "); nothing is delivered")
 	} else {
-		changes, pool, err = start(workCtx, cfg, tsPool, status, reg, logger, &workers)
+		changes, pool, err = start(workCtx, cfg, tsPool, status, reg, spans, logger, &workers)
 		if err != nil {
 			logger.ErrorContext(ctx, "deliver refused", "error", err.Error())
 			return 1
@@ -156,7 +170,7 @@ func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer) 
 // log and the bus, and runs the sender, the scan and the consumer until
 // ctx ends. The caller closes the bus and the pool once workers is done.
 func start(ctx context.Context, cfg *config.Deliver, tsPool *pgxpool.Pool, status *obs.Status, reg prometheus.Registerer,
-	logger *slog.Logger, workers *sync.WaitGroup,
+	spans obs.Spans, logger *slog.Logger, workers *sync.WaitGroup,
 ) (*bus.Bus, *pgxpool.Pool, error) {
 	pool, err := store.OpenPool(ctx, store.PoolConfig{
 		URL: cfg.DatabaseURL, ApplicationName: "uspace-cisp-" + process, MaxConns: int32(cfg.DatabaseMaxConns),
@@ -184,8 +198,16 @@ func start(ctx context.Context, cfg *config.Deliver, tsPool *pgxpool.Pool, statu
 		natsComp.SetDegraded("not configured (" + config.EnvNATSURL + "): the scan alone queues deliveries, every 10 s")
 	} else {
 		natsComp.SetDegraded("connecting")
+		slow := natsComp.Counter("nats_slow_consumer", "NATS slow-consumer errors on this process's subscriptions (messages dropped by the client).")
 		changes, err = bus.Connect(ctx, bus.Config{
 			URL: cfg.NATSURL, CredsFile: cfg.NATSCredsFile, Name: "uspace-cisp-" + process, PublicBaseURL: cfg.PublicBaseURL,
+			ConnectTimeout: cfg.NATSConnectTimeout,
+			OnSlowConsumer: func(err error) {
+				slow.Inc()
+				if ok, held := obs.Once("nats: slow consumer", time.Minute); ok {
+					logger.Warn("nats slow consumer", "error", err.Error(), "also_since_last_line", held)
+				}
+			},
 			OnState: func(connected bool, state string) {
 				if connected {
 					natsComp.SetHealthy()
@@ -203,12 +225,14 @@ func start(ctx context.Context, cfg *config.Deliver, tsPool *pgxpool.Pool, statu
 		brokerState = func() string { _, s := changes.Status(); return s }
 	}
 
+	st := store.New(pool, store.Options{Logger: logger})
+	status.AddProbe(obs.MirrorCounters(status.Component("store"), st.Counters(), "Store", "bus_publish_failed", "bus_publish_skipped", "change_bbox_unavailable"))
 	instance := instanceName()
 	svc, err := deliver.New(deliver.Config{
 		Instance: instance, IssuerURL: cfg.IssuerURL, PublicBaseURL: cfg.PublicBaseURL, Version: version,
 		Policy: subscription.URLPolicy{AllowPrivate: cfg.AllowPrivateCallbacks, AllowInsecure: cfg.AllowInsecureCallbacks},
-	}, store.New(pool, store.Options{Logger: logger}), attempts, keys, deliver.Options{
-		Status: status, Registerer: reg, Logger: logger, BusState: brokerState,
+	}, st, attempts, keys, deliver.Options{
+		Status: status, Registerer: reg, Logger: logger, BusState: brokerState, Spans: spans,
 	})
 	if err != nil {
 		pool.Close()

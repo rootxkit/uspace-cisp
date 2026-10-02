@@ -19,6 +19,7 @@ import (
 	coreauth "github.com/rootxkit/uspace-core/auth"
 
 	"github.com/rootxkit/uspace-cisp/internal/bus"
+	"github.com/rootxkit/uspace-cisp/internal/obs"
 	"github.com/rootxkit/uspace-cisp/internal/publication"
 	"github.com/rootxkit/uspace-cisp/internal/store"
 	"github.com/rootxkit/uspace-cisp/internal/subscription"
@@ -245,6 +246,7 @@ func (s *Service) Dispatch(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	now := s.now()
+	claimStart := time.Now()
 	claims, err := s.store.ClaimDeliveries(ctx, now, now.Add(s.cfg.Lease), free, s.cfg.MaxPerSubscription)
 	if err != nil {
 		if ctx.Err() == nil {
@@ -257,6 +259,7 @@ func (s *Service) Dispatch(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	changes, versions, err := s.contextOf(ctx, claims)
+	claimed := claimSpan{start: claimStart, end: time.Now()}
 	if err != nil {
 		// The rows stay leased and become due again after Lease.
 		s.counter(CounterClaimFailed).Inc()
@@ -285,7 +288,7 @@ func (s *Service) Dispatch(ctx context.Context) (int, error) {
 				s.inFlight.Add(-1)
 				s.wg.Done()
 			}()
-			s.Attempt(context.WithoutCancel(ctx), cl, c, versions)
+			s.attempt(context.WithoutCancel(ctx), cl, c, versions, claimed)
 		}(*cl, c)
 	}
 	return len(claims), nil
@@ -336,6 +339,17 @@ func (s *Service) writeContext(ctx context.Context, cl store.Claim) (context.Con
 // first-attempt latency and the result counter. The writes after the
 // POST share one deadline inside the lease (writeContext).
 func (s *Service) Attempt(ctx context.Context, cl store.Claim, c *publication.Change, versions map[publication.Dataset]int64) {
+	s.attempt(ctx, cl, c, versions, claimSpan{})
+}
+
+// claimSpan is when the claim that leased a delivery ran (wall clock),
+// for its span; zero when the caller claimed nothing (Attempt).
+type claimSpan struct{ start, end time.Time }
+
+// attempt is Attempt traced: a delivery_attempt span from the claim (or
+// from now) with claim, sign and post under it and the change id on
+// it, when tracing is on (CISP_OTEL_ENDPOINT); nothing otherwise.
+func (s *Service) attempt(ctx context.Context, cl store.Claim, c *publication.Change, versions map[publication.Dataset]int64, claimed claimSpan) {
 	at := s.now()
 	changeAt := cl.CreatedAt
 	var changeID int64 = store.PingChangeID
@@ -343,14 +357,32 @@ func (s *Service) Attempt(ctx context.Context, cl store.Claim, c *publication.Ch
 		changeAt = c.At
 		changeID = c.ID
 	}
+	spanStart := claimed.start
+	if spanStart.IsZero() {
+		spanStart = time.Now()
+	}
+	ctx, span := s.spans.StartAt(ctx, obs.SpanDelivery, spanStart)
+	defer span.End()
+	obs.SetChangeID(span, changeID)
+	obs.SetString(span, "cisp.delivery_id", cl.DeliveryID)
+	if !claimed.start.IsZero() {
+		_, cspan := s.spans.StartAt(ctx, obs.SpanClaim, claimed.start)
+		obs.EndAt(cspan, claimed.end)
+	}
 	body := s.Body(cl, c, versions)
+	_, sspan := s.spans.Start(ctx, obs.SpanSign)
 	token, err := s.Sign(cl, body, at)
+	obs.SetError(sspan, err)
+	sspan.End()
 	var o Outcome
 	if err != nil {
 		s.counter(CounterSignFailed).Inc()
 		o = Outcome{Code: "error", Err: fmt.Errorf("not signed: %w", err)}
 	} else {
-		o = s.Post(ctx, cl, token)
+		pctx, pspan := s.spans.Start(ctx, obs.SpanPost)
+		o = s.Post(pctx, cl, token)
+		obs.SetString(pspan, "cisp.delivery_result", o.Code)
+		pspan.End()
 	}
 	end := s.now()
 	// What follows the POST must end inside the lease: a write still

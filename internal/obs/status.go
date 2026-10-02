@@ -43,6 +43,10 @@ type Status struct {
 	gaugeVec   map[string]*prometheus.GaugeVec
 	probes     []func(context.Context)
 	regErrors  []string
+	// checkCatalogue refuses (warns about) names outside Catalogue.
+	checkCatalogue bool
+	uncatalogued   []string
+	lines          int
 }
 
 // NewStatus returns an empty Status for process, registering metrics in
@@ -70,6 +74,31 @@ func (s *Status) Component(name string) *Component {
 	return c
 }
 
+// CheckCatalogue makes every counter and gauge registered from now on
+// a name of Catalogue: one outside it is still counted, and the status
+// line warns and names it ("metrics": uncatalogued), so a metric nobody
+// documented is seen at the first line. The processes turn it on; unit
+// tests of other packages keep their ad hoc names.
+func (s *Status) CheckCatalogue() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.checkCatalogue = true
+}
+
+func (s *Status) noteCatalogue(full string) {
+	if s.checkCatalogue && !Catalogued(full) {
+		s.uncatalogued = append(s.uncatalogued, full)
+	}
+}
+
+// Uncatalogued is every metric registered outside Catalogue since
+// CheckCatalogue.
+func (s *Status) Uncatalogued() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string{}, s.uncatalogued...)
+}
+
 // AddProbe registers a function run before every status line, so a
 // component can refresh its degraded state (a database ping, say).
 func (s *Status) AddProbe(probe func(context.Context)) {
@@ -89,7 +118,8 @@ func (s *Status) counterFor(name, help, component string) prometheus.Counter {
 	defer s.mu.Unlock()
 	vec, ok := s.counterVec[name]
 	if !ok {
-		vec = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "cisp_" + name + "_total", Help: help}, []string{"component"})
+		vec = prometheus.NewCounterVec(prometheus.CounterOpts{Name: counterName(name), Help: help}, []string{"component"})
+		s.noteCatalogue(counterName(name))
 		if !metricName.MatchString(name) {
 			s.registerError(name, errors.New("metric name must match "+metricName.String()))
 		} else if s.reg != nil {
@@ -107,7 +137,8 @@ func (s *Status) gaugeFor(name, help, component string) prometheus.Gauge {
 	defer s.mu.Unlock()
 	vec, ok := s.gaugeVec[name]
 	if !ok {
-		vec = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "cisp_" + name, Help: help}, []string{"component"})
+		vec = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: gaugeName(name), Help: help}, []string{"component"})
+		s.noteCatalogue(gaugeName(name))
 		if !metricName.MatchString(name) {
 			s.registerError(name, errors.New("metric name must match "+metricName.String()))
 		} else if s.reg != nil {
@@ -148,9 +179,12 @@ func (s *Status) sortedComponents() []*Component {
 }
 
 // Log runs the probes and writes one status line: every component with
-// its counters, gauges, warning and degraded reason. The line is at info
-// when nothing is degraded or warned, at warning when a component warns
-// and none is degraded, and at error when anything is degraded.
+// its counters (the count since the previous line; Prometheus has the
+// totals), gauges, summary, warning and degraded reason. The line is at
+// info when nothing is degraded or warned, at warning when a component
+// warns and none is degraded, and at error when anything is degraded.
+// The first line after start carries "start": true: it is the line
+// that says what the process found.
 func (s *Status) Log(ctx context.Context, logger *slog.Logger, now time.Time) {
 	s.mu.Lock()
 	probes := append([]func(context.Context){}, s.probes...)
@@ -162,11 +196,17 @@ func (s *Status) Log(ctx context.Context, logger *slog.Logger, now time.Time) {
 	s.mu.Lock()
 	comps := s.sortedComponents()
 	regErrors := append([]string{}, s.regErrors...)
+	uncatalogued := append([]string{}, s.uncatalogued...)
+	first := s.lines == 0
+	s.lines++
 	s.mu.Unlock()
 
 	level := slog.LevelInfo
 	var degraded, warned []string
 	attrs := []slog.Attr{slog.Int64("uptime_s", int64(now.Sub(s.started)/time.Second))}
+	if first {
+		attrs = append(attrs, slog.Bool("start", true))
+	}
 	for _, c := range comps {
 		group, reason, warning := c.attrs()
 		if reason != "" {
@@ -180,6 +220,10 @@ func (s *Status) Log(ctx context.Context, logger *slog.Logger, now time.Time) {
 	if len(regErrors) > 0 {
 		degraded = append(degraded, "metrics")
 		attrs = append(attrs, slog.Any("metric_register_errors", regErrors))
+	}
+	if len(uncatalogued) > 0 {
+		warned = append(warned, "metrics")
+		attrs = append(attrs, slog.Any("metrics_uncatalogued", uncatalogued))
 	}
 	if len(warned) > 0 {
 		level = slog.LevelWarn
@@ -346,7 +390,7 @@ func (c *Component) attrs() ([]slog.Attr, string, string) {
 	attrs := make([]slog.Attr, 0, len(names)+1)
 	for _, n := range names {
 		if ctr, ok := c.counters[n]; ok {
-			attrs = append(attrs, slog.Uint64(n, ctr.Value()))
+			attrs = append(attrs, slog.Uint64(n, ctr.sinceLast()))
 		}
 		if g, ok := c.gauges[n]; ok {
 			attrs = append(attrs, slog.Float64(n, g.Value()))
@@ -364,11 +408,18 @@ func (c *Component) attrs() ([]slog.Attr, string, string) {
 	return attrs, c.degraded, c.warning
 }
 
-// Counter is a monotonic count shown in the status line and exported to
-// Prometheus.
+// Counter is a monotonic count exported to Prometheus and shown in the
+// status line as the count since the previous line.
 type Counter struct {
-	v    atomic.Uint64
-	prom prometheus.Counter
+	v      atomic.Uint64
+	logged atomic.Uint64
+	prom   prometheus.Counter
+}
+
+// sinceLast is the count since the previous call (the previous line).
+func (c *Counter) sinceLast() uint64 {
+	v := c.v.Load()
+	return v - c.logged.Swap(v)
 }
 
 // Inc adds one.
@@ -398,3 +449,30 @@ func (g *Gauge) Set(v float64) {
 
 // Value is the current value.
 func (g *Gauge) Value() float64 { return math.Float64frombits(g.bits.Load()) }
+
+// CounterSource is a set of named counts kept elsewhere (core.Counters).
+type CounterSource interface {
+	Get(name string) uint64
+}
+
+// MirrorCounters returns a probe that copies the named counts of src
+// into comp's counters (and so into Prometheus and the status line)
+// before every status line: each call adds what src counted since the
+// previous one.
+func MirrorCounters(comp *Component, src CounterSource, help string, names ...string) func(context.Context) {
+	var mu sync.Mutex
+	seen := map[string]uint64{}
+	return func(context.Context) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, n := range names {
+			v := src.Get(n)
+			if v > seen[n] {
+				comp.Counter(n, help+" ("+n+").").Add(v - seen[n])
+			} else {
+				comp.Counter(n, help+" ("+n+").")
+			}
+			seen[n] = v
+		}
+	}
+}

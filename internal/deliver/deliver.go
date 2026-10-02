@@ -215,6 +215,7 @@ type Service struct {
 
 	comp      *obs.Component
 	busState  func() string
+	spans     obs.Spans
 	firstHist prometheus.Histogram
 	results   *prometheus.CounterVec
 
@@ -233,6 +234,9 @@ type Options struct {
 	Logger     *slog.Logger
 	// BusState says the broker's state for the status line; nil: "none".
 	BusState func() string
+	// Spans starts the delivery spans (claim, sign, post under one
+	// delivery_attempt span per attempt); the zero value starts none.
+	Spans obs.Spans
 }
 
 // New builds a Service. It refuses a Config without an instance, an
@@ -255,7 +259,7 @@ func New(cfg Config, st Store, log AttemptLog, signer Signer, opts Options) (*Se
 	}
 	s := &Service{
 		cfg: cfg, store: st, log: log, signer: signer, logger: opts.Logger,
-		comp: opts.Status.Component(Component), busState: opts.BusState,
+		comp: opts.Status.Component(Component), busState: opts.BusState, spans: opts.Spans,
 		sem: make(chan struct{}, cfg.MaxInFlight), wake: make(chan struct{}, 1),
 	}
 	s.client = newClient(cfg)

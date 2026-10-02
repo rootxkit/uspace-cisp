@@ -253,3 +253,16 @@ additively within `/v1`.
   `/v1/stream` and the GET-only `/public/v1/{dataset}`. The kit's form
   peers `react-hook-form` and `zod` are added; the fixture server
   answers the whole console API (`test/mock-console.mjs`) (§15 Q44).
+- WP-12 ED-269 bridge: `PUT /v1/publications/zones` takes
+  `application/vnd.ed269+json` (the signature over the ED-269 bytes,
+  checked first), read by `uspace-core/ed269` and mapped by
+  `ed318.FromED269` with `metadata.issued`, `metadata.provider` and
+  `?lang=` (default `ka`); the version's body is the mapped ED-318 and
+  the bytes sent are kept in `publications.source_body` (migration 0013);
+  the result says `mapped_from: ed269` and warns of the members carried
+  under `extendedProperties.ed269`. `GET /v1/{dataset}/versions/{v}?format=ed269`
+  exports `zones` and `restrictions` through `ed318.ToED269` (406
+  `not_representable` naming core's field), and `&source=true` serves
+  the ED-269 bytes with the publisher's signature. `cispctl ed269
+  convert --to ed318|ed269`. The circle outline places its vertices
+  with core `v1.3.0`'s `geodesy.Destination` (§15 Q43, Q45).

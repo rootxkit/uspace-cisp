@@ -254,6 +254,10 @@ jobs:
     defaults:
       run:
         working-directory: web
+    env:
+      # Plain output, so the counts copied to the step summary can be read.
+      NO_COLOR: "1"
+      FORCE_COLOR: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v6
@@ -279,7 +283,7 @@ jobs:
       - name: pnpm test (vitest)
         run: |
           pnpm test 2>&1 | tee vitest.log
-          { echo '### web: vitest'; echo '```'; grep -E '^ +(Test Files|Tests) ' vitest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### web: vitest'; echo '```'; grep -E '^ +(Test Files|Tests) ' vitest.log || echo 'counts not found in vitest.log'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/cache@v4
         with:
           path: web/.next/cache
@@ -305,7 +309,7 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
         run: |
           pnpm e2e 2>&1 | tee playwright.log
-          { echo '### web: Playwright'; echo '```'; grep -E '^ +[0-9]+ (passed|failed|skipped|flaky)' playwright.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### web: Playwright'; echo '```'; grep -E '^ +[0-9]+ (passed|failed|skipped|flaky)' playwright.log || echo 'counts not found in playwright.log'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           if ! grep -qE '^ +[1-9][0-9]* passed' playwright.log; then echo "playwright: zero tests passed"; exit 1; fi
       - uses: actions/upload-artifact@v4
         if: failure()

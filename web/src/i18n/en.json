@@ -1,0 +1,15 @@
+{
+  "cisp.app.title": "Common Information Service",
+  "cisp.app.tagline": "U-space airspace information as published by the authority and the air navigation service provider",
+  "cisp.nav.label": "Main navigation",
+  "cisp.nav.map": "Map",
+  "cisp.nav.console": "Console",
+  "cisp.skip": "Skip to content",
+  "cisp.locale.label": "Language",
+  "cisp.locale.ka": "ქართული",
+  "cisp.locale.en": "English",
+  "cisp.shell.map_pending": "The public zone map is shown here.",
+  "cisp.console.pending": "The console is shown here after sign-in.",
+  "cisp.footer.operator": "Operated by {name}",
+  "cisp.footer.contact": "Contact: {contact}"
+}

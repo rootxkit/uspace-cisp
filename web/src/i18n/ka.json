@@ -1,0 +1,15 @@
+{
+  "cisp.app.title": "საერთო საინფორმაციო მომსახურება",
+  "cisp.app.tagline": "U-space საჰაერო სივრცის ინფორმაცია, როგორც ის გამოაქვეყნეს უწყებამ და საჰაერო სანავიგაციო მომსახურების პროვაიდერმა",
+  "cisp.nav.label": "მთავარი ნავიგაცია",
+  "cisp.nav.map": "რუკა",
+  "cisp.nav.console": "კონსოლი",
+  "cisp.skip": "შინაარსზე გადასვლა",
+  "cisp.locale.label": "ენა",
+  "cisp.locale.ka": "ქართული",
+  "cisp.locale.en": "English",
+  "cisp.shell.map_pending": "აქ ნაჩვენებია ზონების საჯარო რუკა.",
+  "cisp.console.pending": "კონსოლი აქ გამოჩნდება შესვლის შემდეგ.",
+  "cisp.footer.operator": "ოპერატორი: {name}",
+  "cisp.footer.contact": "კონტაქტი: {contact}"
+}

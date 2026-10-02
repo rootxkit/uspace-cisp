@@ -9,10 +9,11 @@ import (
 )
 
 type Account struct {
-	ID            string
-	Username      string
-	PasswordHash  string
-	Role          string
+	ID           string
+	Username     string
+	PasswordHash string
+	Role         string
+	// TOTP secret, AES-256-GCM under CISP_SECRETS_KEY: 12-byte nonce || ciphertext, the account id as associated data.
 	TotpSecretEnc []byte
 	MfaRequired   bool
 	Status        string
@@ -20,6 +21,8 @@ type Account struct {
 	LastLoginAt   *time.Time
 	FailedLogins  int32
 	LockedUntil   *time.Time
+	// RFC 6238 step of the last accepted TOTP code; a code at or below it is a replay.
+	TotpLastStep *int64
 }
 
 // The change feed and the outbox (D6): id is the cursor; written in the publication transaction. Insert-only.

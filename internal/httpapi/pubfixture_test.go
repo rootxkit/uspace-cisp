@@ -87,6 +87,8 @@ type fakeStore struct {
 	updated    map[publication.Dataset]time.Time
 	changes    []publication.Change
 	publishers []store.Publisher
+	// What the restrictions need (WP-5).
+	restr *fakeRestrictions
 }
 
 func newFakeStore() *fakeStore {
@@ -298,7 +300,9 @@ type pubHarness struct {
 	cache   *store.SnapshotCache
 	ring    *jws.KeyRing
 	limiter *RateLimiter
-	// The ANSP's signing key (WP-5).
+	// The restrictions (WP-5) when the store serves them, and the ANSP's
+	// signing key.
+	rs         *Restrictions
 	anspSigner *rsa.PrivateKey
 }
 
@@ -375,6 +379,7 @@ func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pu
 		Registry:   status, MTLSMode: config.MTLSRequired,
 	}}
 	h.withReads(st, server, status, logger)
+	h.withRestrictions(st, server, status, logger)
 	read := g.RequireScopes(auth.ScopeRead)
 	for _, op := range []string{"GET /v1/{dataset}", "HEAD /v1/{dataset}", "GET /v1/{dataset}/versions", "GET /v1/{dataset}/versions/{version}", "GET /v1/changes"} {
 		routes[op] = read

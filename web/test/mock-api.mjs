@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // The Playwright fixture server: a stand-in for the deployment's Caddy in
 // front of `next start`. It answers the CISP's public surface from
-// fixtures (GET and HEAD /public/v1/*, WS /v1/stream) and the console's
-// sign-in and `me` (POST /v1/console/session, POST
-// /v1/console/session/mfa, GET /v1/console/me) in the shapes of
+// fixtures (GET and HEAD /public/v1/*, WS /v1/stream) and the console API
+// (/v1/console/*, test/mock-console.mjs) in the shapes of
 // api/openapi.yaml, and passes every other request to Next.js with the
 // X-Forwarded-* headers Caddy sets, so the browser sees one origin, as in
 // a deployment. The BFF reaches the console endpoints here too
@@ -24,12 +23,14 @@
 //   POST /__mock/state {stream?, unavailable?: [dataset], publisherStaleSince?, outlines?}
 //   POST /__mock/bump {dataset}           a new version of one dataset
 //   GET  /__mock/console                  the console requests answered
+//   POST /__mock/console-state {restrictions404?, anspStale?}
 //
-// Console accounts (test data, not credentials of anything): admin1 has
-// MFA and the fixed code MOCK_TOTP_CODE; viewer1 has none.
+// Console accounts: see test/mock-console.mjs (test data, not credentials
+// of anything).
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
+import { createConsole } from "./mock-console.mjs";
 
 const PORT = Number(process.env.MOCK_PORT ?? "3000");
 const UPSTREAM = new URL(process.env.MOCK_UPSTREAM ?? "http://127.0.0.1:3100");
@@ -133,77 +134,6 @@ function verdict(id, at) {
   return "applies";
 }
 
-// The console's sign-in, as the CISP answers it (Q41 (3)): the password
-// step of an account with MFA is 200 {mfa_token, expires_at}; the code
-// step spends the challenge for a session. Test values only.
-const MOCK_TOTP_CODE = "246810";
-const CONSOLE_ACCOUNTS = {
-  admin1: { password: "admin1-test-password", role: "admin", mfa: true },
-  viewer1: { password: "viewer1-test-password", role: "viewer", mfa: false },
-};
-const CHALLENGE_TTL_MS = 300_000;
-let consoleState;
-const consoleRequests = [];
-
-function resetConsole() {
-  consoleState = { challenges: new Map(), sessions: new Map(), next: 0 };
-  consoleRequests.length = 0;
-}
-
-function consoleAccount(username) {
-  const a = CONSOLE_ACCOUNTS[username];
-  return {
-    id: `acc-${username}`,
-    username,
-    role: a.role,
-    status: "active",
-    mfa_required: a.mfa,
-    mfa_enrolled: a.mfa,
-    created_at: UPDATED_AT,
-    failed_logins: 0,
-  };
-}
-
-function issueSession(res, username) {
-  const token = `mock-session-${++consoleState.next}`;
-  const expiresAt = new Date(Date.now() + 3600_000).toISOString();
-  consoleState.sessions.set(token, username);
-  json(res, 201, { token, expires_at: expiresAt, account: consoleAccount(username) });
-}
-
-async function consoleApi(req, res, path) {
-  const body = req.method === "POST" ? await readJson(req) : {};
-  consoleRequests.push({ method: req.method, path, keys: Object.keys(body).sort() });
-  if (req.method === "POST" && path === "/v1/console/session") {
-    const a = CONSOLE_ACCOUNTS[body.username];
-    if (a === undefined || a.password !== body.password) {
-      return problem(res, 401, "invalid_credentials", "Unauthorized");
-    }
-    if (!a.mfa) return issueSession(res, body.username);
-    const token = `mock-challenge-${++consoleState.next}`;
-    const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
-    consoleState.challenges.set(token, { username: body.username, expiresAt, used: false });
-    return json(res, 200, { mfa_token: token, expires_at: expiresAt.toISOString() });
-  }
-  if (req.method === "POST" && path === "/v1/console/session/mfa") {
-    const ch = consoleState.challenges.get(body.mfa_token);
-    if (ch === undefined || ch.used || ch.expiresAt.getTime() <= Date.now()) {
-      return problem(res, 401, "challenge_invalid", "Unauthorized");
-    }
-    if (body.code !== MOCK_TOTP_CODE) return problem(res, 401, "invalid_totp", "Unauthorized");
-    ch.used = true;
-    return issueSession(res, ch.username);
-  }
-  if (req.method === "GET" && path === "/v1/console/me") {
-    const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
-    const username = token === undefined ? undefined : consoleState.sessions.get(token);
-    if (username === undefined) return problem(res, 401, "unauthenticated", "Unauthorized");
-    const now = new Date().toISOString();
-    return json(res, 200, { account: consoleAccount(username), session: { jti: token, issued_at: now, expires_at: now } });
-  }
-  return problem(res, 404, "not_found", "Not found");
-}
-
 let state;
 function reset() {
   state = {
@@ -216,7 +146,6 @@ function reset() {
   };
 }
 reset();
-resetConsole();
 const requests = [];
 const clients = new Set();
 
@@ -267,14 +196,22 @@ function json(res, status, payload, headers = {}) {
   res.end(text);
 }
 
-function problem(res, status, slug, title, headers = {}) {
+function problem(res, status, slug, title, headers = {}, detail = undefined, errors = undefined) {
   json(
     res,
     status,
-    { type: `https://schemas.uspace.ge/problems/${slug}`, title, status },
+    {
+      type: `https://schemas.uspace.ge/problems/${slug}`,
+      title,
+      status,
+      ...(detail === undefined ? {} : { detail }),
+      ...(errors === undefined ? {} : { errors }),
+    },
     { "Content-Type": "application/problem+json", ...headers },
   );
 }
+
+const consoleApi = createConsole({ json, problem, readJson });
 
 function publicRead(req, res, url, dataset) {
   if (state.unavailable.has(dataset)) {
@@ -320,11 +257,11 @@ function readJson(req) {
 async function control(req, res, path) {
   if (path === "/__mock/health") return json(res, 200, { ok: true });
   if (path === "/__mock/requests") return json(res, 200, requests);
-  if (path === "/__mock/console") return json(res, 200, consoleRequests);
+  if (path === "/__mock/console") return json(res, 200, consoleApi.requests);
   const input = await readJson(req);
   if (path === "/__mock/reset") {
     reset();
-    resetConsole();
+    consoleApi.reset();
     requests.length = 0;
     for (const c of clients) c.destroy();
   } else if (path === "/__mock/state") {
@@ -335,6 +272,8 @@ async function control(req, res, path) {
     if (Array.isArray(input.unavailable)) state.unavailable = new Set(input.unavailable);
     if ("publisherStaleSince" in input) state.publisherStaleSince = input.publisherStaleSince;
     if (typeof input.outlines === "boolean") state.outlines = input.outlines;
+  } else if (path === "/__mock/console-state") {
+    return json(res, 200, consoleApi.control(input));
   } else if (path === "/__mock/bump") {
     if (typeof input.dataset === "string" && input.dataset in state.versions) state.versions[input.dataset] += 1;
   } else {
@@ -456,7 +395,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url.pathname.startsWith("/v1/console/")) {
-    void consoleApi(req, res, url.pathname);
+    void consoleApi.handle(req, res, url.pathname, url);
     return;
   }
   const m = /^\/public\/v1\/([a-z_]+)$/.exec(url.pathname);

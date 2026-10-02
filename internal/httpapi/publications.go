@@ -257,7 +257,7 @@ func (a PublicationAuth) Routes() map[string]func(http.Handler) http.Handler {
 			return []auth.Middleware{
 				g.RequireScopes(scope),
 				g.RequirePublisher(auth.PublisherAuthority),
-				requirePublicationMediaType,
+				requirePublicationMediaType(ds),
 				a.AuthoritySignature.RequireSignature(),
 				keepVerifiedBody,
 			}
@@ -362,16 +362,26 @@ func (a PublicationAuth) bindPublisher() auth.Middleware {
 var publicationMediaTypes = map[string]bool{"application/geo+json": true, "application/json": true}
 
 // requirePublicationMediaType answers 415 for any other content type.
-func requirePublicationMediaType(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || !publicationMediaTypes[mt] {
-			fe := core.Fieldf("Content-Type", "must be application/geo+json or application/json")
-			WriteProblem(w, http.StatusUnsupportedMediaType, SlugUnsupportedMediaType, "Unsupported media type", fe.Error(), fe)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// Zones may also be an ED-269 document (WP-12); the other datasets have
+// no ED-269 form.
+func requirePublicationMediaType(ds publication.Dataset) auth.Middleware {
+	ed269OK := ds == publication.DatasetZones
+	want := "must be application/geo+json or application/json"
+	if ed269OK {
+		want = "must be application/geo+json, application/json or " + dataset.MediaTypeED269
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+			allowed := publicationMediaTypes[mt] || (ed269OK && mt == dataset.MediaTypeED269)
+			if err != nil || !allowed {
+				fe := core.Fieldf("Content-Type", "%s", want)
+				WriteProblem(w, http.StatusUnsupportedMediaType, SlugUnsupportedMediaType, "Unsupported media type", fe.Error(), fe)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 type verifiedBodyKey struct{}
@@ -522,8 +532,25 @@ func (p *Publications) putOnce(ctx context.Context, req gen.PutPublicationReques
 	attempt.BodySHA256 = sum[:]
 
 	lim := ed318.Limits{MaxBytes: int(p.MaxPublicationBytes)}
+	mediaType, _, _ := mime.ParseMediaType(v.contentType)
 	vctx, vspan := obs.StartSpan(ctx, obs.SpanValidate)
-	acc, probs := dataset.For(kind).Validate(body, lim, received)
+	// An ED-269 publication (WP-12) is mapped onto ED-318 by core first;
+	// the mapped bytes are then validated and stored like any other, and
+	// the bytes received are kept as the source the signature covers.
+	stored, storedType := body, mediaType
+	var source *store.Source
+	var mapped *dataset.ED269Import
+	if mediaType == dataset.MediaTypeED269 {
+		imp, mprobs := p.mapED269(body, received, caller.ClientID, req.Params.Lang)
+		if mprobs != nil {
+			vspan.End()
+			return p.refuse(ctx, ds, attempt, mprobs), nil
+		}
+		mapped = &imp
+		stored, storedType = imp.Body, mediaGeoJSON
+		source = &store.Source{Body: body, ContentType: dataset.MediaTypeED269}
+	}
+	acc, probs := dataset.For(kind).Validate(stored, lim, received)
 	if probs == nil && len(acc.Rows) > 0 {
 		reserved, err := p.Store.Reserved(vctx, ds, rowIDs(acc.Rows))
 		if err != nil {
@@ -537,14 +564,16 @@ func (p *Publications) putOnce(ctx context.Context, req gen.PutPublicationReques
 		return p.refuse(ctx, ds, attempt, probs), nil
 	}
 
+	if mapped != nil {
+		acc.Warnings = append(append([]dataset.Warning{}, mapped.Warnings...), acc.Warnings...)
+	}
 	warnings, err := json.Marshal(nonNilWarnings(acc.Warnings))
 	if err != nil {
 		return nil, err
 	}
-	mediaType, _, _ := mime.ParseMediaType(v.contentType)
 	header, kid := *req.Params.XJWSSignature, sig.KID
 	in := store.PublishInput{
-		Dataset: ds, Body: body, ContentType: mediaType, PublisherClientID: caller.ClientID,
+		Dataset: ds, Body: stored, ContentType: storedType, Source: source, PublisherClientID: caller.ClientID,
 		PublisherSignature: &header, SignatureKID: &kid, Collection: acc.Collection, Rows: acc.Rows,
 		Warnings: warnings, Reason: publication.ReasonPublication, ReceivedAt: received,
 		ExpectedVersion: &current,
@@ -560,8 +589,12 @@ func (p *Publications) putOnce(ctx context.Context, req gen.PutPublicationReques
 		p.count(string(ds), CounterPublicationsUnchanged)
 		unchanged := true
 		etag := res.ETag
+		body := gen.PublicationResult{Dataset: gen.PublicationResultDataset(ds), Version: res.Version, Etag: etag, Unchanged: &unchanged}
+		if mapped != nil {
+			body.MappedFrom = mappedFromED269()
+		}
 		return gen.PutPublication200JSONResponse{
-			Body:    gen.PublicationResult{Dataset: gen.PublicationResultDataset(ds), Version: res.Version, Etag: etag, Unchanged: &unchanged},
+			Body:    body,
 			Headers: gen.PutPublication200ResponseHeaders{ETag: &etag},
 		}, nil
 	case errors.Is(err, store.ErrVersionMismatch):
@@ -585,10 +618,53 @@ func (p *Publications) putOnce(ctx context.Context, req gen.PutPublicationReques
 	}
 	attempt.Outcome, attempt.PublicationID = store.OutcomeAccepted, &res.PublicationID
 	p.record(ctx, attempt)
+	result := resultOf(ds, res, received, len(acc.Rows), acc.Warnings)
+	if mapped != nil {
+		result.MappedFrom = mappedFromED269()
+	}
 	return gen.PutPublication201JSONResponse{
-		Body:    resultOf(ds, res, received, len(acc.Rows), acc.Warnings),
+		Body:    result,
 		Headers: gen.PutPublication201ResponseHeaders{ETag: &res.ETag},
 	}, nil
+}
+
+func mappedFromED269() *gen.PublicationResultMappedFrom {
+	m := gen.PublicationResultMappedFromEd269
+	return &m
+}
+
+// mapED269 maps an ED-269 publication onto ED-318 through core
+// (dataset.FromED269), with metadata.issued the instant of receipt,
+// metadata.provider the publisher and the texts in lang (ka when
+// absent). A lang that is no language tag is refused before the body is
+// read, by name.
+func (p *Publications) mapED269(body []byte, received time.Time, publisher string, lang *string) (dataset.ED269Import, *ed269.Problems) {
+	tag := ""
+	if lang != nil {
+		if fe := checkLang(*lang); fe != nil {
+			return dataset.ED269Import{}, &ed269.Problems{List: []ed269.Problem{{Field: fe.Field, Reason: fe.Reason}}}
+		}
+		tag = *lang
+	}
+	return dataset.FromED269(body, int(p.MaxPublicationBytes), dataset.ED269Meta{Issued: received, Provider: publisher, Lang: tag})
+}
+
+// maxLangChars is the longest language tag ED-318 takes ("en-GB").
+const maxLangChars = 5
+
+// checkLang refuses a lang parameter that is not 1 to 5 characters of
+// letters, digits and hyphens.
+func checkLang(lang string) *core.FieldError {
+	if lang == "" || len(lang) > maxLangChars {
+		return core.Fieldf("lang", "must be a language tag of 1 to %d characters (ka, en-GB)", maxLangChars)
+	}
+	for _, r := range lang {
+		tagChar := r == '-' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		if !tagChar {
+			return core.Fieldf("lang", "must be a language tag of 1 to %d characters (ka, en-GB)", maxLangChars)
+		}
+	}
+	return nil
 }
 
 func preconditionFailed(ctx context.Context, got, etag string) problemResponse {

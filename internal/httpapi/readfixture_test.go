@@ -65,6 +65,14 @@ func (f *fakeStore) record(in store.PublishInput, version int64, rows []publicat
 		PublisherClientID: in.PublisherClientID, PublisherSignature: in.PublisherSignature, SignatureKID: in.SignatureKID,
 		ReceivedAt: in.ReceivedAt,
 	}
+	if in.Source != nil {
+		head := f.heads[ds][version]
+		head.SourceBody = append([]byte{}, in.Source.Body...)
+		head.SourceSHA256 = sha256Sum(in.Source.Body)
+		ct := in.Source.ContentType
+		head.SourceContentType = &ct
+		f.heads[ds][version] = head
+	}
 	f.updated[ds] = in.ReceivedAt
 	c := publication.ChangeOf(ds, version, diff, rows, in.Reason, in.ReceivedAt)
 	c.ID = int64(len(f.changes) + 1)

@@ -23,6 +23,7 @@ import (
 
 	"github.com/rootxkit/uspace-cisp/internal/applicability"
 	"github.com/rootxkit/uspace-cisp/internal/bus"
+	"github.com/rootxkit/uspace-cisp/internal/dataset"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
 	"github.com/rootxkit/uspace-cisp/internal/outline"
@@ -39,6 +40,7 @@ const (
 	SlugIntegrity           = "integrity"
 	SlugNoVersion           = "no_version"
 	SlugReadsUnavailable    = "reads_unavailable"
+	SlugNotRepresentable    = "not_representable"
 )
 
 // The headers of the reads (docs/PLAN.md section 6.3).
@@ -50,6 +52,7 @@ const (
 	HeaderAgeS          = "X-CIS-Age-S"
 	HeaderPublisherSig  = "X-Publisher-Signature"
 	HeaderPublisherKID  = "X-Publisher-Kid"
+	HeaderMappedFrom    = "X-CIS-Mapped-From"
 	retryAfterStaleS    = "5"
 	mediaGeoJSON        = "application/geo+json"
 	mediaJSON           = "application/json"
@@ -63,13 +66,15 @@ const (
 
 // Counters of the reads (component reads).
 const (
-	CounterApplicabilityUnknown = "applicability_unknown"
-	CounterIntegrityFailed      = "integrity_failed"
-	CounterStaleServed          = "stale_served"
-	CounterStaleRefused         = "stale_refused"
-	CounterSignatureEvicted     = "signature_cache_evicted"
-	CounterStalePublisherServed = "stale_publisher_served"
-	CounterOutlineFailed        = "outline_failed"
+	CounterApplicabilityUnknown  = "applicability_unknown"
+	CounterIntegrityFailed       = "integrity_failed"
+	CounterStaleServed           = "stale_served"
+	CounterStaleRefused          = "stale_refused"
+	CounterSignatureEvicted      = "signature_cache_evicted"
+	CounterStalePublisherServed  = "stale_publisher_served"
+	CounterOutlineFailed         = "outline_failed"
+	CounterED269Exported         = "ed269_exported"
+	CounterED269NotRepresentable = "ed269_not_representable"
 )
 
 // MemberPublisherStaleSince is the top-level member of a restrictions
@@ -96,6 +101,9 @@ type ReadStore interface {
 	ReadCurrent(ctx context.Context, ds publication.Dataset, box *store.BBox) (store.CurrentRead, error)
 	ReadDelta(ctx context.Context, ds publication.Dataset, from, maxBack int64) (store.DeltaRead, error)
 	Publication(ctx context.Context, ds publication.Dataset, version int64) (store.StoredPublication, error)
+	// Snapshot is the dataset body built at a version (the restrictions
+	// export reads the collection, not the ANSP's request).
+	Snapshot(ctx context.Context, ds publication.Dataset, version int64) (store.Snapshot, error)
 	Versions(ctx context.Context, ds publication.Dataset, before int64, limit int) ([]store.Version, error)
 	Changes(ctx context.Context, since int64, ds *publication.Dataset, limit int) ([]publication.Change, error)
 	Publishers(ctx context.Context) ([]store.Publisher, error)
@@ -131,6 +139,10 @@ type Reads struct {
 	SignatureCacheEntries int
 	// Daylight resolves ED-318 daylight events (nil: NOAADaylight).
 	Daylight ed318.Daylight
+	// MaxPublicationBytes is CISP_MAX_PUBLICATION_BYTES, the byte limit
+	// of ed318.Parse when a stored version is exported as ED-269 (0:
+	// DefaultMaxPublicationBytes).
+	MaxPublicationBytes int64
 	// PublisherStale, when set, says whether the ANSP, the publisher of
 	// the restrictions dataset, is stale and since when (nil: never
 	// heard from) (WP-5). A stale ANSP's dataset bodies carry
@@ -982,6 +994,10 @@ func (r *Reads) version(ctx context.Context, req gen.GetDatasetVersionRequestObj
 	if req.Version < 1 {
 		return badRequest(ctx, core.Fieldf("version", "must be at least 1")), nil
 	}
+	wantED269, wantSource, lang, fe := versionParams(req.Params)
+	if fe != nil {
+		return badRequest(ctx, fe), nil
+	}
 	p, err := r.Store.Publication(ctx, ds, req.Version)
 	if errors.Is(err, store.ErrNotFound) {
 		fe := core.Fieldf("version", "%s has no version %d", ds, req.Version)
@@ -1003,17 +1019,29 @@ func (r *Reads) version(ctx context.Context, req gen.GetDatasetVersionRequestObj
 		return problemOf(ctx, http.StatusServiceUnavailable, SlugSigningUnavailable, "Signing unavailable",
 			"no CISP signing key is configured (CISP_SIGNING_KEY_FILE); a version is never served unsigned"), nil
 	}
-	sig, err := r.signature(ctx, ds, p)
-	if err != nil {
-		return nil, err
+	switch {
+	case wantSource:
+		return r.source(ctx, ds, p, req.Params.IfNoneMatch)
+	case wantED269:
+		return r.exportED269(ctx, ds, p, lang, req.Params.IfNoneMatch)
 	}
 	h := r.headers(ds, p.Version, p.ReceivedAt, nil)
 	delete(h, "Vary")
 	if req.Params.IfNoneMatch != nil && etagMatches(*req.Params.IfNoneMatch, h["ETag"]) {
 		return notModified(h, false), nil
 	}
+	sig, err := r.signature(ctx, h["ETag"], p.Body)
+	if err != nil {
+		return nil, err
+	}
 	h["Content-Type"] = p.ContentType
 	h[HeaderSignature] = sig
+	if p.SourceBody != nil {
+		// The publisher signed the ED-269 it sent, not this mapping of
+		// it: its signature is served with the source (source=true).
+		h[HeaderMappedFrom] = dataset.MappedFromED269
+		return readResponse{status: http.StatusOK, headers: h, body: p.Body}, nil
+	}
 	if p.PublisherSignature != nil {
 		h[HeaderPublisherSig] = *p.PublisherSignature
 	}
@@ -1023,9 +1051,156 @@ func (r *Reads) version(ctx context.Context, req gen.GetDatasetVersionRequestObj
 	return readResponse{status: http.StatusOK, headers: h, body: p.Body}, nil
 }
 
-// signature is the CISP's signature over a version's bytes, made once
-// per version and kept in a bounded cache.
-func (r *Reads) signature(ctx context.Context, ds publication.Dataset, p store.StoredPublication) (string, error) {
+// versionParams checks format, source and lang of
+// GET /v1/{dataset}/versions/{v}: source and lang only with
+// format=ed269, and lang a language tag.
+func versionParams(params gen.GetDatasetVersionParams) (wantED269, wantSource bool, lang string, fe *core.FieldError) {
+	wantED269 = params.Format != nil
+	wantSource = params.Source != nil && *params.Source
+	switch {
+	case params.Format != nil && *params.Format != gen.GetDatasetVersionParamsFormatEd269:
+		return false, false, "", core.Fieldf("format", "must be ed269")
+	case wantSource && !wantED269:
+		return false, false, "", core.Fieldf("source", "is only read with format=ed269")
+	case params.Lang != nil && !wantED269:
+		return false, false, "", core.Fieldf("lang", "is only read with format=ed269")
+	case params.Lang != nil:
+		if fe := checkLang(*params.Lang); fe != nil {
+			return false, false, "", fe
+		}
+		lang = *params.Lang
+	}
+	if lang == "" {
+		lang = dataset.DefaultED269Lang
+	}
+	return wantED269, wantSource, lang, nil
+}
+
+// representationETag is the ETag of another representation of a
+// version: "<dataset>:<version>;<variant>".
+func representationETag(ds publication.Dataset, version int64, variant string) string {
+	return strings.TrimSuffix(publication.ETag(ds, version), `"`) + ";" + variant + `"`
+}
+
+// source answers format=ed269&source=true: the ED-269 bytes the
+// publisher sent and signed, verbatim, with its signature.
+func (r *Reads) source(ctx context.Context, ds publication.Dataset, p store.StoredPublication, ifNoneMatch *string) (gen.GetDatasetVersionResponseObject, error) {
+	if p.SourceBody == nil || p.SourceContentType == nil {
+		fe := core.Fieldf("source", "%s version %d was not published as ED-269; it has no source but its body", ds, p.Version)
+		return problemOf(ctx, http.StatusNotFound, SlugNotFound, "Not found", fe.Error(), fe), nil
+	}
+	if sum := sha256Sum(p.SourceBody); !bytes.Equal(sum, p.SourceSHA256) {
+		r.count(CounterIntegrityFailed)
+		r.logger().LogAttrs(ctx, slog.LevelError, "publication source integrity check failed; the source is not served",
+			slog.String("dataset", string(ds)), slog.Int64("version", p.Version),
+			slog.String("stored_sha256", hexOf(p.SourceSHA256)), slog.String("source_sha256", hexOf(sum)))
+		return problemOf(ctx, http.StatusInternalServerError, SlugIntegrity, "Integrity check failed",
+			"the stored source of this version does not match its recorded hash; it is not served and the failure is logged"), nil
+	}
+	h := r.headers(ds, p.Version, p.ReceivedAt, nil)
+	delete(h, "Vary")
+	h["ETag"] = representationETag(ds, p.Version, "source")
+	if ifNoneMatch != nil && etagMatches(*ifNoneMatch, h["ETag"]) {
+		return notModified(h, false), nil
+	}
+	sig, err := r.signature(ctx, h["ETag"], p.SourceBody)
+	if err != nil {
+		return nil, err
+	}
+	h["Content-Type"] = *p.SourceContentType
+	h[HeaderSignature] = sig
+	if p.PublisherSignature != nil {
+		h[HeaderPublisherSig] = *p.PublisherSignature
+	}
+	if p.SignatureKID != nil {
+		h[HeaderPublisherKID] = *p.SignatureKID
+	}
+	return readResponse{status: http.StatusOK, headers: h, body: p.SourceBody}, nil
+}
+
+// exportED269 answers format=ed269: the version as uspace-core maps it to
+// ED-269, or 406 naming what ED-269 cannot hold.
+func (r *Reads) exportED269(ctx context.Context, ds publication.Dataset, p store.StoredPublication, lang string, ifNoneMatch *string) (gen.GetDatasetVersionResponseObject, error) {
+	if ds != publication.DatasetZones && ds != publication.DatasetRestrictions {
+		fe := core.Fieldf("format", "%s has no ED-269 form; format=ed269 serves zones and restrictions", ds)
+		r.count(CounterED269NotRepresentable)
+		return problemOf(ctx, http.StatusNotAcceptable, SlugNotRepresentable, "Not representable in ED-269", fe.Error(), fe), nil
+	}
+	h := r.headers(ds, p.Version, p.ReceivedAt, nil)
+	delete(h, "Vary")
+	h["ETag"] = representationETag(ds, p.Version, "ed269;"+lang)
+	if ifNoneMatch != nil && etagMatches(*ifNoneMatch, h["ETag"]) {
+		return notModified(h, false), nil
+	}
+	collection := p.Body
+	if ds == publication.DatasetRestrictions {
+		// A restrictions version's body is the ANSP's request (or the
+		// expiry record); the collection at that version is its snapshot.
+		snap, err := r.Store.Snapshot(ctx, ds, p.Version)
+		if err != nil {
+			return r.failure(ctx, ds, err)
+		}
+		if collection, err = gunzipBounded(snap.BodyGz, r.maxPublicationBytes()); err != nil {
+			return nil, err
+		}
+	}
+	out, err := dataset.ToED269(collection, int(r.maxPublicationBytes()), lang)
+	if err != nil {
+		var fe *core.FieldError
+		if errors.As(err, &fe) {
+			r.count(CounterED269NotRepresentable)
+			return problemOf(ctx, http.StatusNotAcceptable, SlugNotRepresentable, "Not representable in ED-269", fe.Error(), fe), nil
+		}
+		r.logger().LogAttrs(ctx, slog.LevelError, "ED-269 export failed",
+			slog.String("dataset", string(ds)), slog.Int64("version", p.Version), slog.String("error", err.Error()))
+		return problemOf(ctx, http.StatusInternalServerError, SlugInternal, "Internal error",
+			"the stored version could not be exported; the failure is logged with this request id"), nil
+	}
+	sig, err := r.signature(ctx, h["ETag"], out)
+	if err != nil {
+		return nil, err
+	}
+	r.count(CounterED269Exported)
+	h["Content-Type"] = dataset.MediaTypeED269
+	h[HeaderSignature] = sig
+	h[HeaderMappedFrom] = dataset.MappedFromED318
+	return readResponse{status: http.StatusOK, headers: h, body: out}, nil
+}
+
+// gunzipBounded inflates a stored snapshot, refusing one larger than
+// maxBytes (E-10; the snapshot is the CISP's own, never untrusted).
+func gunzipBounded(gz []byte, maxBytes int64) ([]byte, error) {
+	zr, err := gzip.NewReader(bytes.NewReader(gz))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = zr.Close() }()
+	out, err := io.ReadAll(io.LimitReader(zr, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(out)) > maxBytes {
+		return nil, errors.New("the snapshot is larger than the publication cap")
+	}
+	return out, nil
+}
+
+// DefaultMaxPublicationBytes is the export's parse limit when
+// Reads.MaxPublicationBytes is not set: the CISP_MAX_PUBLICATION_BYTES
+// default.
+const DefaultMaxPublicationBytes = 32 << 20
+
+func (r *Reads) maxPublicationBytes() int64 {
+	if r.MaxPublicationBytes <= 0 {
+		return DefaultMaxPublicationBytes
+	}
+	return r.MaxPublicationBytes
+}
+
+// signature is the CISP's signature over the bytes of one representation
+// of a version (keyed by its ETag), made once and kept in a bounded
+// cache. An export is deterministic, so its signature is reused too.
+func (r *Reads) signature(ctx context.Context, key string, body []byte) (string, error) {
 	r.sigsOnce.Do(func() {
 		n := r.SignatureCacheEntries
 		if n <= 0 {
@@ -1033,11 +1208,10 @@ func (r *Reads) signature(ctx context.Context, ds publication.Dataset, p store.S
 		}
 		r.sigs = newSignatureCache(n, r.component().Counter(CounterSignatureEvicted, "Version signatures evicted from the bounded cache."))
 	})
-	key := publication.ETag(ds, p.Version)
 	if sig, ok := r.sigs.get(key); ok {
 		return sig, nil
 	}
-	sig, err := r.Signer.Sign(ctx, p.Body)
+	sig, err := r.Signer.Sign(ctx, body)
 	if err != nil {
 		return "", err
 	}

@@ -26,15 +26,18 @@ WHERE name = sqlc.arg(name);
 INSERT INTO publications (
     id, dataset, version, publisher_client_id, received_at, body, body_sha256,
     content_type, publisher_signature, signature_kid, feature_count, added,
-    changed, removed, supersedes_version, warnings, reason
+    changed, removed, supersedes_version, warnings, reason, source_body,
+    source_sha256, source_content_type
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+    $18, $19, $20
 );
 
 -- name: GetPublication :one
 SELECT id, dataset, version, publisher_client_id, received_at, body, body_sha256,
        content_type, publisher_signature, signature_kid, feature_count, added,
-       changed, removed, supersedes_version, warnings, reason
+       changed, removed, supersedes_version, warnings, reason, source_body,
+       source_sha256, source_content_type
 FROM publications
 WHERE dataset = $1 AND version = $2;
 

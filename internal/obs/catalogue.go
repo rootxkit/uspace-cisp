@@ -100,6 +100,8 @@ func buildCatalogue() []Metric {
 	add(counter("integrity_failed", "Stored versions whose body hash did not match when served.", "any increase"))
 	add(counter("signature_cache_evicted", "Version signatures evicted from the bounded cache.", ""))
 	add(counter("outline_failed", "Circles served without cis_display_geometry because no outline could be drawn.", "any increase"))
+	add(counter("ed269_exported", "Versions exported as ED-269 through uspace-core (format=ed269).", ""))
+	add(counter("ed269_not_representable", "ED-269 exports refused 406 because the version holds what ED-269 cannot.", ""))
 	add(counters("Public reads limited per client.", "rate_limited", "rate_limit_clients_evicted", "rate_limit_forwarded_for_unreadable")...)
 
 	// Restrictions.

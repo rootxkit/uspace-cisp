@@ -12,8 +12,9 @@ import (
 )
 
 // radiusToleranceM is how far from the published radius a written vertex
-// may lie, measured by geodesy.Inverse: the refinement settles within
-// 0.1 mm and the 1e-8 degree rounding adds about a millimetre.
+// may lie, measured by geodesy.Inverse: geodesy.Destination agrees with
+// it to under 0.1 mm and the 1e-8 degree rounding adds about a
+// millimetre.
 const radiusToleranceM = 0.005
 
 func checkRing(t *testing.T, centre core.LatLon, radiusM float64, ring []core.LatLon, n int) {

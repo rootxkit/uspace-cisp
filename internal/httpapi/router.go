@@ -25,6 +25,10 @@ import (
 // DefaultMaxBodyBytes is the body cap of a route that does not raise it.
 const DefaultMaxBodyBytes = 64 << 10
 
+// DefaultBodyReadMinBytesPerS is the slowest upload accepted when none
+// is configured (CISP_BODY_READ_MIN_BYTES_PER_S).
+const DefaultBodyReadMinBytesPerS = 64 << 10
+
 // DefaultHandlerTimeout is the handler deadline when none is configured.
 const DefaultHandlerTimeout = 10 * time.Second
 
@@ -40,6 +44,11 @@ type Options struct {
 	HandlerTimeout time.Duration
 	// MaxBodyBytes is the default body cap (CISP_MAX_BODY_BYTES).
 	MaxBodyBytes int64
+	// BodyReadMinBytesPerS is the slowest upload accepted
+	// (CISP_BODY_READ_MIN_BYTES_PER_S): a body has its route cap divided
+	// by it, and at least HandlerTimeout, to arrive. The handler deadline
+	// starts once it has.
+	BodyReadMinBytesPerS int64
 	// RouteBodyCaps raises (or lowers) the cap of a route, keyed by its
 	// ServeMux pattern ("PUT /v1/publications/{dataset}").
 	RouteBodyCaps map[string]int64
@@ -145,6 +154,9 @@ func Wrap(mux *http.ServeMux, opts Options) http.Handler {
 	if opts.MaxBodyBytes <= 0 {
 		opts.MaxBodyBytes = DefaultMaxBodyBytes
 	}
+	if opts.BodyReadMinBytesPerS <= 0 {
+		opts.BodyReadMinBytesPerS = DefaultBodyReadMinBytesPerS
+	}
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
@@ -168,6 +180,10 @@ func Wrap(mux *http.ServeMux, opts Options) http.Handler {
 	h := unmatched(mux)
 	h = routeMiddleware(h, opts.RouteMiddleware)
 	h = deadline(h, opts.HandlerTimeout)
+	h = readBody(h, bodyReadPolicy{
+		defaultCap: opts.MaxBodyBytes, caps: opts.RouteBodyCaps,
+		minBytesPerS: opts.BodyReadMinBytesPerS, floor: opts.HandlerTimeout, now: opts.Now,
+	})
 	h = bodyCap(h, opts.MaxBodyBytes, opts.RouteBodyCaps)
 	h = tracing(h, opts.Tracer)
 	h = recoverer(h, opts.Logger, panics)

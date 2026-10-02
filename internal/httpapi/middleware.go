@@ -1,13 +1,17 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"time"
@@ -169,6 +173,71 @@ func bodyCap(next http.Handler, defaultCap int64, caps map[string]int64) http.Ha
 		if r.Body != nil {
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// SlugBodyTimeout is the problem of a body that did not arrive within
+// its read deadline.
+const SlugBodyTimeout = "body_timeout"
+
+// bodyReadPolicy sizes the read deadline of a request body.
+type bodyReadPolicy struct {
+	defaultCap   int64
+	caps         map[string]int64
+	minBytesPerS int64
+	floor        time.Duration
+	now          func() time.Time
+}
+
+// readFor is how long a body on route may take: its cap at the minimum
+// rate, and never less than floor.
+func (p bodyReadPolicy) readFor(route string) time.Duration {
+	limit := p.defaultCap
+	if c, ok := p.caps[route]; ok {
+		limit = c
+	}
+	d := time.Duration(float64(limit) / float64(p.minBytesPerS) * float64(time.Second))
+	return max(d, p.floor)
+}
+
+// readBody reads the whole (capped) body before the handler deadline
+// starts, under a read deadline of its own sized to the route's cap and
+// the minimum upload rate, so a large publication on a slow link is not
+// cut by the handler deadline, and a stalled one is cut by its own (408
+// body_timeout). The handler then reads the same bytes from memory.
+func readBody(next http.Handler, p bodyReadPolicy) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body == nil || r.Body == http.NoBody {
+			next.ServeHTTP(w, r)
+			return
+		}
+		rc := http.NewResponseController(w)
+		// A writer that cannot set deadlines (a test recorder) reads
+		// without one; the server's connection always can.
+		_ = rc.SetReadDeadline(p.now().Add(p.readFor(routeOf(r.Context()))))
+		body, err := io.ReadAll(r.Body)
+		_ = rc.SetReadDeadline(time.Time{})
+		var tooLarge *http.MaxBytesError
+		var netErr net.Error
+		switch {
+		case errors.As(err, &tooLarge):
+			WriteProblem(w, http.StatusRequestEntityTooLarge, SlugBodyTooLarge, "Request body too large",
+				"the body is larger than this route accepts")
+			return
+		case errors.Is(err, os.ErrDeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()):
+			w.Header().Set("Connection", "close")
+			WriteProblem(w, http.StatusRequestTimeout, SlugBodyTimeout, "Request body too slow",
+				"the body did not arrive within its read deadline",
+				core.Fieldf("body", "%d bytes arrived within %s", len(body), p.readFor(routeOf(r.Context()))))
+			return
+		case err != nil:
+			WriteProblem(w, http.StatusBadRequest, SlugBadRequest, "Bad request", "the body could not be read",
+				core.Fieldf("body", "could not be read: %v", err))
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.ContentLength = int64(len(body))
 		next.ServeHTTP(w, r)
 	})
 }

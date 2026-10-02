@@ -161,14 +161,15 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 		server.Publications = publications(cfg, pool, changes, sec, status, logger)
 	}
 	router, err := httpapi.NewRouter(server, httpapi.Options{
-		Logger:          logger,
-		Status:          status,
-		Registerer:      reg,
-		Tracer:          tp,
-		HandlerTimeout:  cfg.HandlerTimeout,
-		MaxBodyBytes:    cfg.MaxBodyBytes,
-		RouteBodyCaps:   map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes},
-		RouteMiddleware: sec.routes(cfg, status),
+		Logger:               logger,
+		Status:               status,
+		Registerer:           reg,
+		Tracer:               tp,
+		HandlerTimeout:       cfg.HandlerTimeout,
+		MaxBodyBytes:         cfg.MaxBodyBytes,
+		BodyReadMinBytesPerS: cfg.BodyReadMinBytesPerS,
+		RouteBodyCaps:        map[string]int64{httpapi.PublicationRoute: cfg.MaxPublicationBytes},
+		RouteMiddleware:      sec.routes(cfg, status),
 	})
 	if err != nil {
 		logger.ErrorContext(ctx, "routes refused", "error", err.Error())

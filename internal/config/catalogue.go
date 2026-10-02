@@ -29,6 +29,7 @@ const (
 	EnvShutdownTimeoutS          = "CISP_SHUTDOWN_TIMEOUT_S"
 	EnvHandlerTimeoutS           = "CISP_HANDLER_TIMEOUT_S"
 	EnvMaxBodyBytes              = "CISP_MAX_BODY_BYTES"
+	EnvBodyReadMinBytesPerS      = "CISP_BODY_READ_MIN_BYTES_PER_S"
 	EnvOTelEndpoint              = "CISP_OTEL_ENDPOINT"
 	EnvDatabaseURL               = "CISP_DATABASE_URL"
 	EnvTimeseriesURL             = "CISP_TIMESERIES_URL"
@@ -87,6 +88,7 @@ var Catalogue = []Var{
 	{Name: EnvHTTPAddr, Default: ":8080"},
 	{Name: EnvHandlerTimeoutS, Default: "10"},
 	{Name: EnvMaxBodyBytes, Default: "65536"},
+	{Name: EnvBodyReadMinBytesPerS, Default: "65536"},
 	{Name: EnvTokenIssuer, Default: ""},
 	{Name: EnvTokenJWKSURL, Default: ""},
 	{Name: EnvLabIssuer, Default: ""},

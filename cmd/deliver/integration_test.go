@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -189,10 +190,12 @@ func TestDeliverWithoutTheBrokerOnPostgres(t *testing.T) {
 		return err == nil && state == "delivered"
 	})
 	line = statusSummary(t, logs, "0 queued, 0 due", 5*time.Second)
-	if d, _ := line["deliver"].(map[string]any); d["deliveries_from_scan"] == float64(0) || d["deliveries_delivered"] == float64(0) {
-		t.Errorf("counters not in the line: %v", d)
+	// A status line counts what happened since the previous one (WP-7):
+	// the lines since the start add up to the totals.
+	if scan, delivered := sumCounter(logs, "deliver", "deliveries_from_scan"), sumCounter(logs, "deliver", "deliveries_delivered"); scan == 0 || delivered < 2 {
+		t.Errorf("counters not in the lines: from_scan %v, delivered %v; last %v", scan, delivered, line["deliver"])
 	} else {
-		t.Logf("after the scan: %v", d)
+		t.Logf("after the scan: from_scan %v, delivered %v; last line %v", scan, delivered, line["deliver"])
 	}
 
 	cancel()
@@ -217,4 +220,21 @@ func eventually(t *testing.T, within time.Duration, what string, ok func() bool)
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("not within %s: %s", within, what)
+}
+
+// sumCounter adds a component's counter over every status line so far.
+func sumCounter(logs *syncBuffer, component, name string) float64 {
+	total := 0.0
+	for _, l := range strings.Split(logs.String(), "\n") {
+		var m map[string]any
+		if json.Unmarshal([]byte(l), &m) != nil || m["msg"] != "status" {
+			continue
+		}
+		if c, ok := m[component].(map[string]any); ok {
+			if v, ok := c[name].(float64); ok {
+				total += v
+			}
+		}
+	}
+	return total
 }

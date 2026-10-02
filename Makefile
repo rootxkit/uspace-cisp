@@ -3,7 +3,11 @@
 # for example: make test GO=/c/Users/<you>/AppData/Local/anaconda3/bin/go
 #
 # bash, not /bin/sh: the recipes use pipefail, which ubuntu's dash lacks.
-SHELL   := bash
+# -e and pipefail on every recipe line: a command that fails anywhere in
+# a line, also on the left of a pipe into tee or tail, fails the target.
+# Without them only the last command of a line decides.
+SHELL       := bash
+.SHELLFLAGS := -eo pipefail -c
 GO      ?= go
 PKGS    ?= ./...
 
@@ -102,10 +106,12 @@ integration:
 	export CISP_TEST_DATABASE_URL="$${CISP_TEST_DATABASE_URL:-postgres://cisp_api:$${PG_CISP_API_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/cisp?sslmode=disable}"; \
 	export CISP_TEST_TIMESERIES_URL="$${CISP_TEST_TIMESERIES_URL:-postgres://cisp_deliver:$${PG_CISP_DELIVER_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/cisp_ts?sslmode=disable}"; \
 	export CISP_TEST_NATS_URL="$${CISP_TEST_NATS_URL:-nats://127.0.0.1:$${DEV_NATS_PORT:-4222}}"; \
-	set -o pipefail; \
-	$(GO) test -tags integration -count=1 -p 1 -v $(INTEGRATION_PKGS) 2>&1 | tee integration.log; \
+	rc=0; \
+	$(GO) test -tags integration -count=1 -p 1 -v $(INTEGRATION_PKGS) 2>&1 | tee integration.log || rc=$$?; \
 	n=$$(grep -c '^--- PASS' integration.log || true); \
-	echo "integration: $$n top-level tests passed"; \
+	f=$$(grep -c '^--- FAIL' integration.log || true); \
+	echo "integration: $$n top-level tests passed, $$f failed"; \
+	if [ "$$rc" -ne 0 ]; then echo "integration: go test exited $$rc"; exit "$$rc"; fi; \
 	if [ "$$n" -eq 0 ]; then echo "integration: zero tests ran"; exit 1; fi
 
 # The compose-driven end to end tests (test/e2e, WP-6): PostgreSQL +
@@ -115,10 +121,12 @@ integration:
 # The latency, the kill-the-subscriber and the NATS-outage summaries go
 # to $GITHUB_STEP_SUMMARY in CI.
 e2e:
-	@set -o pipefail; \
-	(cd test/e2e && $(GO) test -tags e2e -count=1 -v -timeout 20m .) 2>&1 | tee e2e.log; \
+	@rc=0; \
+	(cd test/e2e && $(GO) test -tags e2e -count=1 -v -timeout 20m .) 2>&1 | tee e2e.log || rc=$$?; \
 	n=$$(grep -c '^--- PASS' e2e.log || true); \
-	echo "e2e: $$n tests passed"; \
+	f=$$(grep -c '^--- FAIL' e2e.log || true); \
+	echo "e2e: $$n top-level tests passed, $$f failed"; \
+	if [ "$$rc" -ne 0 ]; then echo "e2e: go test exited $$rc"; exit "$$rc"; fi; \
 	if [ "$$n" -eq 0 ]; then echo "e2e: zero tests ran"; exit 1; fi
 
 # uspace-core's vector tests with this module's build list, then this

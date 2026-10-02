@@ -17,7 +17,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/jws"
 )
 
-func keyRing(t *testing.T) *jws.KeyRing {
+func keyRing(t testing.TB) *jws.KeyRing {
 	t.Helper()
 	cur, err := jws.EncodePrivateKeyPEM(authtest.Key(t, "cisp", 3072))
 	if err != nil {

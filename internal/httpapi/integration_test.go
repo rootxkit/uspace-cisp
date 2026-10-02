@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -218,56 +217,4 @@ func TestPublication5000ZonesBudget(t *testing.T) {
 	if rec := h.put("zones", []byte(emptyCollection)); rec.Code != 201 {
 		t.Fatalf("empty again = %d", rec.Code)
 	}
-}
-
-// syntheticZones is an ED-318 collection of n PROHIBITED zones, each a
-// polygon of vertices positions on a grid around Tbilisi, padded with
-// message texts to at least minBytes in all.
-func syntheticZones(t *testing.T, n, vertices, minBytes int) []byte {
-	t.Helper()
-	const latDeg, lonDeg, stepDeg, radiusDeg = 41.60, 44.65, 0.004, 0.0015
-	cols := int(math.Ceil(math.Sqrt(float64(n))))
-	pad := strings.Repeat("Synthetic load zone for the 5000-zone publication budget. ", 4)[:200]
-	feature := func(i, texts int) map[string]any {
-		cLat, cLon := latDeg+float64(i/cols)*stepDeg, lonDeg+float64(i%cols)*stepDeg
-		ring := make([]any, 0, vertices+1)
-		for k := range vertices {
-			a := 2 * math.Pi * float64(k) / float64(vertices)
-			ring = append(ring, []any{math.Round((cLon+radiusDeg*math.Cos(a))*1e7) / 1e7, math.Round((cLat+radiusDeg*math.Sin(a))*1e7) / 1e7})
-		}
-		ring = append(ring, ring[0])
-		msgs := make([]any, texts)
-		for k := range msgs {
-			msgs[k] = map[string]any{"lang": "en-GB", "text": pad}
-		}
-		id := fmt.Sprintf("Z%04d", i)
-		return map[string]any{
-			"type": "Feature", "id": id,
-			"geometry": map[string]any{
-				"type": "Polygon", "coordinates": []any{ring},
-				"layer": map[string]any{"lower": 0, "lowerReference": "AGL", "upper": 120, "upperReference": "AGL", "uom": "m"},
-			},
-			"properties": map[string]any{
-				"identifier": id, "country": "GEO", "type": "PROHIBITED", "variant": "COMMON", "reason": []any{"SENSITIVE"},
-				"name":          []any{map[string]any{"lang": "en-GB", "text": "Synthetic zone " + id}},
-				"message":       msgs,
-				"zoneAuthority": []any{map[string]any{"name": []any{map[string]any{"lang": "en-GB", "text": "Test authority"}}, "purpose": "AUTHORIZATION"}},
-			},
-		}
-	}
-	one, _ := json.Marshal(feature(0, 0))
-	perText := len(`{"lang":"en-GB","text":""},`) + len(pad)
-	texts := max(0, (minBytes/n-len(one))/perText+1)
-	fs := make([]any, n)
-	for i := range fs {
-		fs[i] = feature(i, texts)
-	}
-	body, err := json.Marshal(map[string]any{"type": "FeatureCollection", "features": fs})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(body) < minBytes {
-		t.Fatalf("synthetic body is %d bytes, under %d", len(body), minBytes)
-	}
-	return body
 }

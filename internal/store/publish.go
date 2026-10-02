@@ -68,6 +68,11 @@ type PublishInput struct {
 	// ActorType and ActorID name the actor in the audit row; empty is
 	// the client PublisherClientID.
 	ActorType, ActorID string
+	// Rows, when set, are publication.Rows(Collection) already built by
+	// the caller (the dataset rules build them): PublishTx uses them
+	// instead of building them again, after checking they are one row
+	// per feature in order. Nil builds them.
+	Rows []publication.FeatureRow
 	// ExpectedVersion, when set, is the version the publisher read
 	// (If-Match): checked under the dataset lock, so two publishers
 	// racing on one version cannot both win (ErrVersionMismatch).
@@ -116,6 +121,16 @@ func (in *PublishInput) validate() error {
 	if len(in.Warnings) > 0 && !json.Valid(in.Warnings) {
 		return core.Fieldf("warnings", "not JSON")
 	}
+	if in.Rows != nil {
+		if in.Collection == nil || len(in.Rows) != len(in.Collection.Features) {
+			return core.Fieldf("rows", "are not one row per feature of the collection")
+		}
+		for i := range in.Rows {
+			if in.Rows[i].ID != in.Collection.Features[i].Properties.Identifier {
+				return core.Fieldf("rows", "row %d is %q, feature %d is %q", i, in.Rows[i].ID, i, in.Collection.Features[i].Properties.Identifier)
+			}
+		}
+	}
 	return nil
 }
 
@@ -138,7 +153,10 @@ func (s *Store) PublishTx(ctx context.Context, in PublishInput, signer Signer) (
 		return PublishResult{}, ErrNoopSigner
 	}
 	var next []publication.FeatureRow
-	if in.Collection != nil {
+	switch {
+	case in.Rows != nil:
+		next = in.Rows
+	case in.Collection != nil:
 		rows, err := publication.Rows(in.Collection)
 		if err != nil {
 			return PublishResult{}, err

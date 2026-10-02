@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -71,7 +72,9 @@ type fakeStore struct {
 	// beforePublish runs inside PublishTx with the lock held, before the
 	// version check (a publication that won the race).
 	beforePublish func(*fakeStore)
-	attemptFn     func(store.Attempt) error
+	// rowsGiven says whether the last PublishTx was handed its rows.
+	rowsGiven bool
+	attemptFn func(store.Attempt) error
 }
 
 func newFakeStore() *fakeStore {
@@ -132,8 +135,11 @@ func (f *fakeStore) PublishTx(ctx context.Context, in store.PublishInput, signer
 	if in.ExpectedVersion != nil && *in.ExpectedVersion != current {
 		return store.PublishResult{Version: current, ETag: publication.ETag(in.Dataset, current)}, store.ErrVersionMismatch
 	}
+	f.rowsGiven = in.Rows != nil
 	var next []publication.FeatureRow
-	if in.Collection != nil {
+	if in.Rows != nil {
+		next = in.Rows
+	} else if in.Collection != nil {
 		rows, err := publication.Rows(in.Collection)
 		if err != nil {
 			return store.PublishResult{}, err
@@ -258,7 +264,7 @@ func (f *fakeStore) refused() []store.Attempt {
 // pubHarness is the api's router with the real guard, the authority's
 // signature verifier and the publication handlers on a store.
 type pubHarness struct {
-	t      *testing.T
+	t      testing.TB
 	h      http.Handler
 	store  PublicationStore
 	fake   *fakeStore
@@ -273,7 +279,7 @@ type pubHarness struct {
 type harnessOption func(*Publications, *Server)
 
 // newPubHarness builds the harness on st (nil: a fresh fake store).
-func newPubHarness(t *testing.T, st PublicationStore, opts ...harnessOption) *pubHarness {
+func newPubHarness(t testing.TB, st PublicationStore, opts ...harnessOption) *pubHarness {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -415,7 +421,7 @@ func (h *pubHarness) counter(component, name string) uint64 {
 
 // conformPut checks a PUT against the spec with a fresh copy of the body
 // (the handler consumed the request's).
-func conformPut(t *testing.T, req *http.Request, body []byte, rec *httptest.ResponseRecorder) {
+func conformPut(t testing.TB, req *http.Request, body []byte, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	clone := req.Clone(context.Background())
 	clone.Body = io.NopCloser(bytes.NewReader(body))
@@ -425,7 +431,7 @@ func conformPut(t *testing.T, req *http.Request, body []byte, rec *httptest.Resp
 // conformResponse checks only the response: for a request the spec
 // itself refuses (past a maxItems), whose refusal must still be
 // described.
-func conformResponse(t *testing.T, req *http.Request, rec *httptest.ResponseRecorder) {
+func conformResponse(t testing.TB, req *http.Request, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	route, params, err := spec(t).FindRoute(req)
 	if err != nil {
@@ -446,7 +452,7 @@ func conformResponse(t *testing.T, req *http.Request, rec *httptest.ResponseReco
 
 type doc = map[string]any
 
-func vectorDoc(t *testing.T, name string) doc {
+func vectorDoc(t testing.TB, name string) doc {
 	t.Helper()
 	f := vectors.Load(t, "ed318_roundtrip.json")
 	for _, c := range f.Cases {
@@ -468,7 +474,7 @@ func vectorDoc(t *testing.T, name string) doc {
 func feats(d doc) []any       { return d["features"].([]any) }
 func fprops(d doc, i int) doc { return feats(d)[i].(doc)["properties"].(doc) }
 
-func jsonBytes(t *testing.T, v any) []byte {
+func jsonBytes(t testing.TB, v any) []byte {
 	t.Helper()
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -479,7 +485,7 @@ func jsonBytes(t *testing.T, v any) []byte {
 
 // zonesBody is the vector collection as a zones publication: the
 // USPACE feature left out and DAR taken from TSD001's reasons.
-func zonesDoc(t *testing.T) doc {
+func zonesDoc(t testing.TB) doc {
 	t.Helper()
 	d := vectorDoc(t, "accept-authority-collection")
 	d["features"] = feats(d)[1:]
@@ -518,14 +524,14 @@ func withRequirements(d doc) doc {
 	return d
 }
 
-func uspaceDoc(t *testing.T) doc {
+func uspaceDoc(t testing.TB) doc {
 	t.Helper()
 	d := vectorDoc(t, "accept-authority-collection")
 	d["features"] = feats(d)[:1]
 	return withRequirements(d)
 }
 
-func usspListBody(t *testing.T) []byte {
+func usspListBody(t testing.TB) []byte {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("..", "..", "schemas", "cis", "ussp_list", "examples", "lab.json"))
 	if err != nil {
@@ -555,4 +561,56 @@ func hasProblem(p gen.Problem, field, phrase string) bool {
 		}
 	}
 	return false
+}
+
+// syntheticZones is an ED-318 collection of n PROHIBITED zones, each a
+// polygon of vertices positions on a grid around Tbilisi, padded with
+// message texts to at least minBytes in all.
+func syntheticZones(t testing.TB, n, vertices, minBytes int) []byte {
+	t.Helper()
+	const latDeg, lonDeg, stepDeg, radiusDeg = 41.60, 44.65, 0.004, 0.0015
+	cols := int(math.Ceil(math.Sqrt(float64(n))))
+	pad := strings.Repeat("Synthetic load zone for the 5000-zone publication budget. ", 4)[:200]
+	feature := func(i, texts int) map[string]any {
+		cLat, cLon := latDeg+float64(i/cols)*stepDeg, lonDeg+float64(i%cols)*stepDeg
+		ring := make([]any, 0, vertices+1)
+		for k := range vertices {
+			a := 2 * math.Pi * float64(k) / float64(vertices)
+			ring = append(ring, []any{math.Round((cLon+radiusDeg*math.Cos(a))*1e7) / 1e7, math.Round((cLat+radiusDeg*math.Sin(a))*1e7) / 1e7})
+		}
+		ring = append(ring, ring[0])
+		msgs := make([]any, texts)
+		for k := range msgs {
+			msgs[k] = map[string]any{"lang": "en-GB", "text": pad}
+		}
+		id := fmt.Sprintf("Z%04d", i)
+		return map[string]any{
+			"type": "Feature", "id": id,
+			"geometry": map[string]any{
+				"type": "Polygon", "coordinates": []any{ring},
+				"layer": map[string]any{"lower": 0, "lowerReference": "AGL", "upper": 120, "upperReference": "AGL", "uom": "m"},
+			},
+			"properties": map[string]any{
+				"identifier": id, "country": "GEO", "type": "PROHIBITED", "variant": "COMMON", "reason": []any{"SENSITIVE"},
+				"name":          []any{map[string]any{"lang": "en-GB", "text": "Synthetic zone " + id}},
+				"message":       msgs,
+				"zoneAuthority": []any{map[string]any{"name": []any{map[string]any{"lang": "en-GB", "text": "Test authority"}}, "purpose": "AUTHORIZATION"}},
+			},
+		}
+	}
+	one, _ := json.Marshal(feature(0, 0))
+	perText := len(`{"lang":"en-GB","text":""},`) + len(pad)
+	texts := max(0, (minBytes/n-len(one))/perText+1)
+	fs := make([]any, n)
+	for i := range fs {
+		fs[i] = feature(i, texts)
+	}
+	body, err := json.Marshal(map[string]any{"type": "FeatureCollection", "features": fs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(body) < minBytes {
+		t.Fatalf("synthetic body is %d bytes, under %d", len(body), minBytes)
+	}
+	return body
 }

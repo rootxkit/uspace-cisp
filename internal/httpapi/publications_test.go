@@ -269,19 +269,19 @@ func TestPutPublicationRefusalPairs(t *testing.T) {
 			func(t *testing.T) []byte {
 				return bytes.Replace(usspListBody(t), []byte(`"USSP-B2"`), []byte(`"USSP-DEV"`), 1)
 			},
-			usspListBody,
+			func(t *testing.T) []byte { return usspListBody(t) },
 			"ussps[1].ussp_id", "repeats ussps[0].ussp_id"},
 		{"USSP list base_url with userinfo", "ussp_list",
 			func(t *testing.T) []byte {
 				return bytes.Replace(usspListBody(t), []byte(`"https://ussp.example.test"`), []byte(`"https://admin:pw@ussp.example.test"`), 1)
 			},
-			usspListBody,
+			func(t *testing.T) []byte { return usspListBody(t) },
 			"ussps[0].base_url", "userinfo"},
 		{"USSP list with an unknown member", "ussp_list",
 			func(t *testing.T) []byte {
 				return bytes.Replace(usspListBody(t), []byte(`"ussps":`), []byte(`"note":"x","ussps":`), 1)
 			},
-			usspListBody,
+			func(t *testing.T) []byte { return usspListBody(t) },
 			"note", "unknown member"},
 		{"USSP list of 201 entries", "ussp_list",
 			func(t *testing.T) []byte { return usspList(t, dataset.MaxUssps+1) },

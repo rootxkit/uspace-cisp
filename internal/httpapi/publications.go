@@ -475,7 +475,7 @@ func (p *Publications) put(ctx context.Context, req gen.PutPublicationRequestObj
 	header, kid := *req.Params.XJWSSignature, sig.KID
 	in := store.PublishInput{
 		Dataset: ds, Body: body, ContentType: mediaType, PublisherClientID: caller.ClientID,
-		PublisherSignature: &header, SignatureKID: &kid, Collection: acc.Collection,
+		PublisherSignature: &header, SignatureKID: &kid, Collection: acc.Collection, Rows: acc.Rows,
 		Warnings: warnings, Reason: publication.ReasonPublication, ReceivedAt: received,
 		ExpectedVersion: &current,
 	}

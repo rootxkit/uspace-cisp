@@ -11,6 +11,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/rootxkit/uspace-core/core"
+	"github.com/rootxkit/uspace-core/ed318"
+
+	"github.com/rootxkit/uspace-cisp/internal/publication"
 )
 
 // The D8 backstop is recognised by its index, and only by it.
@@ -76,5 +79,34 @@ func TestInsertAttemptRefusesInconsistentRows(t *testing.T) {
 		if _, err := s.InsertAttempt(context.Background(), a); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
+	}
+}
+
+// Rows handed to PublishTx must be the collection's rows, one per
+// feature in order; matching rows pass (E-01).
+func TestPublishInputGivenRows(t *testing.T) {
+	in := validInput(t)
+	in.Collection = &ed318.FeatureCollection{Type: "FeatureCollection", Features: []ed318.Feature{
+		{Properties: ed318.UASZone{Identifier: "A1"}}, {Properties: ed318.UASZone{Identifier: "B2"}},
+	}}
+	in.Rows = []publication.FeatureRow{{ID: "A1"}, {ID: "B2"}}
+	if err := in.validate(); err != nil {
+		t.Fatalf("matching rows refused: %v", err)
+	}
+	for name, rows := range map[string][]publication.FeatureRow{
+		"one row short":   {{ID: "A1"}},
+		"out of order":    {{ID: "B2"}, {ID: "A1"}},
+		"another feature": {{ID: "A1"}, {ID: "C3"}},
+	} {
+		in.Rows = rows
+		var fe *core.FieldError
+		if err := in.validate(); !errors.As(err, &fe) || fe.Field != "rows" {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	ussp := validInput(t)
+	ussp.Dataset, ussp.Collection, ussp.Rows = publication.DatasetUSSPList, nil, []publication.FeatureRow{}
+	if err := ussp.validate(); err == nil {
+		t.Error("rows without a collection accepted")
 	}
 }

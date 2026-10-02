@@ -120,3 +120,27 @@ additively within `/v1`.
   with the active heads (counted and listed, never acted on);
   migration `0008_restriction_jobs`; `schemas/cis/restriction/v1.json`;
   a warning tier in the status line.
+- WP-6 subscriptions and signed webhook delivery (F3 push):
+  `POST|GET /v1/subscriptions`, `GET|PATCH|DELETE /v1/subscriptions/{id}`,
+  `GET /v1/subscriptions/{id}/deliveries` (with the delivery log read
+  from the timeseries database) and `POST .../deliveries/{id}/retry`,
+  all `cis.read` and audited; `internal/subscription` (the callback URL
+  policy and the address rule of the SSRF guard, dataset and box
+  matching, the 1 s to 300 s retry schedule for 24 h, suspension after
+  50 failures over an hour); `internal/deliver` and the `deliver`
+  process (the durable JetStream consumer `deliver`, the 10 s
+  reconciliation scan counted `deliveries_from_scan`, leased
+  `SKIP LOCKED` claims shared by every instance, at most 64 attempts in
+  flight, compact JWS by core's `SignCompact` with `aud` the callback
+  host, a 2 s timeout, no redirects, 1 KiB read, the dial-time address
+  guard counted `ssrf_refused`, `cisp_delivery_first_attempt_seconds`,
+  `cisp_delivery_result_total{code}`, and the status line's
+  "0 queued, 0 due" summary); migration `0009_deliver`;
+  `cis/change/v1` takes the webhook's producer and the
+  `subscription_test` record, with two examples; `test/e2e/` (the
+  reference subscriber container and the compose-driven latency,
+  kill-the-subscriber, NATS-outage and restriction latency tests, a CI
+  job); the api reads `CISP_ALLOW_PRIVATE_CALLBACKS`,
+  `CISP_ALLOW_INSECURE_CALLBACKS` and `CISP_TIMESERIES_URL`; deliver
+  needs `CISP_SIGNING_KEY_FILE`, `CISP_SIGNING_KID`, `CISP_ISSUER_URL`
+  and `CISP_PUBLIC_BASE_URL` with a database.

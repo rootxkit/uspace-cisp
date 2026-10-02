@@ -92,11 +92,15 @@ func (s *Store) RebuildCurrent(ctx context.Context, ds publication.Dataset, sign
 		if err != nil {
 			return fmt.Errorf("publication: %w", err)
 		}
-		body, err := publication.UsspListSnapshot(d.CurrentVersion, pub.ReceivedAt, pub.Body)
-		if ds.Kind() == publication.KindUsspList && err != nil {
-			return fmt.Errorf("snapshot: %w", err)
-		}
-		if ds.Kind() == publication.KindED318 {
+		var body []byte
+		switch ds.Kind() {
+		case publication.KindUsspList:
+			// The list's snapshot is its canonical form with the cis_*
+			// members; an ED-318 body never goes through it.
+			if body, err = publication.UsspListSnapshot(d.CurrentVersion, pub.ReceivedAt, pub.Body); err != nil {
+				return fmt.Errorf("snapshot: %w", err)
+			}
+		case publication.KindED318:
 			fc, probs := ed318.Parse(pub.Body, ed318.Limits{MaxBytes: len(pub.Body) + 1})
 			if probs != nil {
 				return fmt.Errorf("the stored body of version %d no longer parses: %w", d.CurrentVersion, probs)

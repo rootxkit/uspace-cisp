@@ -3,6 +3,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/rootxkit/uspace-core/ed318"
 
 	"github.com/rootxkit/uspace-cisp/internal/publication"
+	"github.com/rootxkit/uspace-cisp/internal/store/relational"
 )
 
 // If-Match under the lock: the expected version publishes, any other is
@@ -190,5 +192,53 @@ func TestHeartbeatReadBack(t *testing.T) {
 	}
 	if p, _ := s.Publisher(ctx, id); p.ActiveRefs == nil || len(p.ActiveRefs) != 0 {
 		t.Errorf("an empty list read back as %v", p.ActiveRefs)
+	}
+}
+
+// rebuild-current on each kind rebuilds the snapshot publish made: the
+// USSP list's canonical form with its cis_* members, an ED-318
+// collection's Snapshot. Byte-equal, so no signer is needed and nothing
+// is re-signed; a lost snapshot is rebuilt with those same bytes.
+func TestRebuildCurrentSnapshotPerKind(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t, Options{})
+	list := []byte(`{"schema":"cis/ussp_list/v1","issued":"2026-10-02T00:00:00Z","ussps":[],"n":"` + suffix(t) + `"}`)
+	if _, err := s.PublishTx(ctx, PublishInput{Dataset: publication.DatasetUSSPList, Body: list, ContentType: "application/json",
+		PublisherClientID: "authority-01", Reason: publication.ReasonPublication}, NoopSigner{}); err != nil {
+		t.Fatal(err)
+	}
+	fc, body := base(t, "K")
+	if _, err := s.PublishTx(ctx, input(publication.DatasetZones, fc, body), NoopSigner{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, ds := range []publication.Dataset{publication.DatasetUSSPList, publication.DatasetZones} {
+		v := currentVersion(t, s, ds)
+		before, err := s.Snapshot(ctx, ds, v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rep, err := s.RebuildCurrent(ctx, ds, nil)
+		if err != nil || rep.SnapshotRebuilt {
+			t.Fatalf("%s: rebuild gave other bytes than publish: %+v %v", ds, rep, err)
+		}
+		// Lose the snapshot: the rebuild writes the same bytes again.
+		if _, err := relational.New(s.pool).DeleteSnapshot(ctx, relational.DeleteSnapshotParams{Dataset: string(ds), Version: v}); err != nil {
+			t.Fatal(err)
+		}
+		if rep, err := s.RebuildCurrent(ctx, ds, NoopSigner{}); err != nil || !rep.SnapshotRebuilt {
+			t.Fatalf("%s: lost snapshot not rebuilt: %+v %v", ds, rep, err)
+		}
+		after, err := s.Snapshot(ctx, ds, v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a, _ := gunzip(before.BodyGz)
+		b, _ := gunzip(after.BodyGz)
+		if !bytes.Equal(a, b) {
+			t.Errorf("%s: rebuilt snapshot differs: %s / %s", ds, a, b)
+		}
+		if ds == publication.DatasetUSSPList && !bytes.Contains(b, []byte(`"cis_dataset":"ussp_list"`)) {
+			t.Errorf("the list snapshot lacks its cis_* members: %s", b)
+		}
 	}
 }

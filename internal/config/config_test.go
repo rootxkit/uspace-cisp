@@ -223,6 +223,13 @@ func TestValuesOverrideDefaults(t *testing.T) {
 	if api.Level().String() != "DEBUG" {
 		t.Errorf("Level = %v", api.Level())
 	}
+	proxies, err := LoadAPI(withBase("CISP_TRUSTED_PROXY_CIDR=172.18.0.7/16, ::1/128"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := proxies.TrustedProxies(); len(got) != 2 || got[0].String() != "172.18.0.0/16" || got[1].String() != "::1/128" {
+		t.Errorf("trusted proxies = %v", got)
+	}
 }
 
 // An empty value means "not set": the default applies.
@@ -309,6 +316,8 @@ func TestValidationFailuresAndSuccesses(t *testing.T) {
 		{EnvIssuerURL, "mailto:x@y", "https://cisp.example.test", loadAPIErr},
 		{EnvReadMaxAgeS, "-1", "86400", loadAPIErr},
 		{EnvPublicRPM, "0", "1", loadAPIErr},
+		{EnvTrustedProxyCIDR, "10.0.0.1", "10.0.0.1/32", loadAPIErr},
+		{EnvTrustedProxyCIDR, "172.18.0.0/16,caddy", "172.18.0.0/16, ::1/128", loadAPIErr},
 		{EnvMaxPublicationBytes, "1073741825", "1073741824", loadAPIErr},
 		{EnvMaxSubscriptionsPerClient, "twenty", "20", loadAPIErr},
 		{EnvDatabaseMaxConns, "0", "1", loadAPIErr},

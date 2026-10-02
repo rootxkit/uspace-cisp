@@ -8,6 +8,7 @@ package config
 import (
 	"log/slog"
 	"net"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"sort"
@@ -71,10 +72,13 @@ type API struct {
 	// detached signature may be from now, either way.
 	PublisherSignatureMaxSkew time.Duration
 
-	PublicBaseURL             string
-	IssuerURL                 string
-	ReadMaxAge                time.Duration
-	PublicRPM                 int64
+	PublicBaseURL string
+	IssuerURL     string
+	ReadMaxAge    time.Duration
+	PublicRPM     int64
+	// TrustedProxyCIDR lists the proxies (Caddy) whose X-Forwarded-For
+	// names the client of a public read.
+	TrustedProxyCIDR          []string
 	MaxPublicationBytes       int64
 	MaxSubscriptionsPerClient int64
 	BrandingFile              string
@@ -175,6 +179,7 @@ func LoadAPI(environ []string) (*API, error) {
 		IssuerURL:                 e.str(EnvIssuerURL),
 		ReadMaxAge:                e.seconds(EnvReadMaxAgeS),
 		PublicRPM:                 e.integer(EnvPublicRPM),
+		TrustedProxyCIDR:          e.list(EnvTrustedProxyCIDR),
 		MaxPublicationBytes:       e.integer(EnvMaxPublicationBytes),
 		MaxSubscriptionsPerClient: e.integer(EnvMaxSubscriptionsPerClient),
 		BrandingFile:              e.str(EnvBrandingFile),
@@ -385,9 +390,26 @@ func (c *API) Validate() error {
 	p = urlOK(p, EnvIssuerURL, c.IssuerURL, "http", "https")
 	p = durationIn(p, EnvReadMaxAgeS, c.ReadMaxAge, 0, 24*time.Hour)
 	p = intIn(p, EnvPublicRPM, c.PublicRPM, 1, 1_000_000)
+	for i, cidr := range c.TrustedProxyCIDR {
+		if _, err := netip.ParsePrefix(cidr); err != nil {
+			p = append(p, core.Fieldf(EnvTrustedProxyCIDR+"["+strconv.Itoa(i)+"]", "%q is not a CIDR (10.0.0.0/8, 2001:db8::/32, 127.0.0.1/32)", cidr))
+		}
+	}
 	p = intIn(p, EnvMaxPublicationBytes, c.MaxPublicationBytes, 1024, 1<<30)
 	p = intIn(p, EnvMaxSubscriptionsPerClient, c.MaxSubscriptionsPerClient, 1, 10_000)
 	return orNil(p)
+}
+
+// TrustedProxies is TrustedProxyCIDR parsed; Validate has refused a
+// value that does not parse, so none is left out.
+func (c *API) TrustedProxies() []netip.Prefix {
+	out := make([]netip.Prefix, 0, len(c.TrustedProxyCIDR))
+	for _, cidr := range c.TrustedProxyCIDR {
+		if p, err := netip.ParsePrefix(cidr); err == nil {
+			out = append(out, p.Masked())
+		}
+	}
+	return out
 }
 
 // Validate checks every deliver variable and returns every problem at once.

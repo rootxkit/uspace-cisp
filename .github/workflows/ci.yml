@@ -464,15 +464,27 @@ jobs:
     name: gitleaks
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Pinned (and in the Makefile); change both together. The binary,
+      # checked against its published SHA-256, not an action holding the
+      # GITHUB_TOKEN (core-ui-ci audit N13).
+      GITLEAKS_VERSION: "8.24.3"
+      GITLEAKS_SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pinned (and in the Makefile); change both together.
-          GITLEAKS_VERSION: "8.24.3"
+          persist-credentials: false
+      - name: install gitleaks (pinned, checksum verified)
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/$tarball" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tarball"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP/bin" gitleaks
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: make secrets (history and working tree)
+        run: make secrets
 
   # main and v* tags only, after every gate passed: the images, tagged by
   # short SHA (and by the git tag on a tag). `latest` is never pushed.

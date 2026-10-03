@@ -239,6 +239,17 @@ type Snapshot struct {
 	BuiltAt       time.Time
 }
 
+// Re-signatures of a stored snapshot under a later key (cispctl resign-current); the newest whose body_gz_sha256 matches is served. Append-only.
+type SnapshotSignature struct {
+	ID           int64
+	Dataset      string
+	Version      int64
+	Kid          string
+	Signature    string
+	BodyGzSha256 []byte
+	SignedAt     time.Time
+}
+
 type Subscription struct {
 	ID                  string
 	ClientID            string

@@ -1,6 +1,7 @@
 // Command cispctl is the CISP's operations tool: the version, the
 // configuration check, the migrations of the two trees, the rebuild of
-// the materialised current version, the delivery log's retention, the
+// the materialised current version, the re-signature of the current
+// snapshots, the delivery log's retention, the
 // signing key rotation, the console's accounts, audit export and
 // verification and events partitions (WP-8), the offline ED-269 mapping
 // (WP-12), and two dev helpers that sign a body and verify a detached
@@ -57,6 +58,10 @@ commands:
   rebuild-current --dataset zones|uspace_airspace|ussp_list
                   rebuild features_current and the current snapshot from
                   the current publication's body; print counts before and after
+  resign-current --dataset zones|uspace_airspace|ussp_list|restrictions|all
+                  sign the current snapshot's stored bytes again with the
+                  active key (after a key compromise); append-only, the
+                  bytes and the ETag unchanged; restart api afterwards
   set-retention --days N
                   replace the delivery log's retention policy (default 90)
   rotate-key [--out local/] [--kid K] [--force]
@@ -127,6 +132,8 @@ func runIO(ctx context.Context, args, environ []string, stdin io.Reader, stdout,
 		return migrate(ctx, args[1:], environ, stdout, stderr)
 	case len(args) >= 1 && args[0] == "rebuild-current":
 		return rebuildCurrent(ctx, args[1:], environ, stdout, stderr)
+	case len(args) >= 1 && args[0] == "resign-current":
+		return resignCurrent(ctx, args[1:], environ, stdout, stderr, now)
 	case len(args) >= 1 && args[0] == "set-retention":
 		return setRetention(ctx, args[1:], environ, stdout, stderr)
 	case len(args) >= 1 && args[0] == "create-account":

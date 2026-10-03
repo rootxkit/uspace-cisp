@@ -5,8 +5,16 @@
 
 -- name: GetSnapshotForRead :one
 -- One stored snapshot with the received_at (metadata.issued and
--- Last-Modified) and the publisher of its version.
-SELECT s.dataset, s.version, s.etag, s.body_gz, s.cisp_signature, s.built_at,
+-- Last-Modified) and the publisher of its version. cisp_signature is
+-- the newest re-signature of these exact bytes (cispctl resign-current,
+-- 0014), or the one the snapshot was built with.
+SELECT s.dataset, s.version, s.etag, s.body_gz,
+       COALESCE((SELECT ss.signature FROM snapshot_signatures ss
+                 WHERE ss.dataset = s.dataset AND ss.version = s.version
+                   AND ss.body_gz_sha256 = sha256(s.body_gz)
+                 ORDER BY ss.signed_at DESC, ss.id DESC LIMIT 1),
+                s.cisp_signature)::text AS cisp_signature,
+       s.built_at,
        p.received_at, p.publisher_client_id
 FROM snapshots s
 JOIN publications p ON p.dataset = s.dataset AND p.version = s.version

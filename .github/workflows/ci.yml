@@ -477,9 +477,10 @@ jobs:
   # main and v* tags only, after every gate passed: the images, tagged by
   # short SHA (and by the git tag on a tag). `latest` is never pushed.
   # Each is signed by digest with cosign keyless (the workflow's OIDC
-  # identity), carries a syft SPDX SBOM as a signed attestation, and is
-  # verified with deploy/deploy.sh --verify-only, the check the deploy
-  # makes (spec 06 section 4).
+  # identity) and verified with deploy/deploy.sh --verify-only, the check
+  # the deploy makes (spec 06 section 4); the sbom and attest jobs then
+  # attach a syft SPDX SBOM as a signed attestation. No step between the
+  # registry login and the signing is a third party's SBOM tool.
   image:
     name: images
     if: github.event_name == 'push'
@@ -490,8 +491,13 @@ jobs:
       contents: read
       packages: write
       id-token: write
+    outputs:
+      go_digest: ${{ steps.go.outputs.digest }}
+      web_digest: ${{ steps.web.outputs.digest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: tags
         id: tags
         run: |
@@ -533,29 +539,13 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
-      - name: SBOM of the Go image (syft, SPDX)
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          image: ghcr.io/rootxkit/uspace-cisp@${{ steps.go.outputs.digest }}
-          format: spdx-json
-          output-file: sbom-uspace-cisp.spdx.json
-          upload-artifact: false
-      - name: SBOM of the web image (syft, SPDX)
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          image: ghcr.io/rootxkit/uspace-cisp-web@${{ steps.web.outputs.digest }}
-          format: spdx-json
-          output-file: sbom-uspace-cisp-web.spdx.json
-          upload-artifact: false
-      - name: sign both digests and attach the SBOMs (cosign keyless)
+      - name: sign both digests (cosign keyless)
         env:
           GO_REF: ghcr.io/rootxkit/uspace-cisp@${{ steps.go.outputs.digest }}
           WEB_REF: ghcr.io/rootxkit/uspace-cisp-web@${{ steps.web.outputs.digest }}
         run: |
           cosign sign --yes "$GO_REF"
           cosign sign --yes "$WEB_REF"
-          cosign attest --yes --type spdxjson --predicate sbom-uspace-cisp.spdx.json "$GO_REF"
-          cosign attest --yes --type spdxjson --predicate sbom-uspace-cisp-web.spdx.json "$WEB_REF"
       - name: verify as the deploy does (deploy/deploy.sh --verify-only)
         env:
           GO_REF: ghcr.io/rootxkit/uspace-cisp@${{ steps.go.outputs.digest }}
@@ -572,7 +562,72 @@ jobs:
             cat verify.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: forget the registry credential
+        if: always()
+        run: docker logout ghcr.io
+
+  # The SBOMs, apart from the push and the signing: the third-party SBOM
+  # action runs with a read-only package token and no OIDC token, never
+  # beside a registry credential that can push (core-ui-ci audit B1).
+  sbom:
+    name: SBOMs
+    if: github.event_name == 'push'
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: read-only registry login
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      - name: SBOM of the Go image (syft, SPDX)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ghcr.io/rootxkit/uspace-cisp@${{ needs.image.outputs.go_digest }}
+          format: spdx-json
+          output-file: sbom-uspace-cisp.spdx.json
+          upload-artifact: false
+      - name: SBOM of the web image (syft, SPDX)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ghcr.io/rootxkit/uspace-cisp-web@${{ needs.image.outputs.web_digest }}
+          format: spdx-json
+          output-file: sbom-uspace-cisp-web.spdx.json
+          upload-artifact: false
+      - name: forget the registry credential
+        if: always()
+        run: docker logout ghcr.io
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: sbom
           path: sbom-*.spdx.json
+
+  # The SBOMs attached to the digests as signed attestations: cosign
+  # alone, with the write and OIDC permissions this needs.
+  attest:
+    name: attest SBOMs
+    if: github.event_name == 'push'
+    needs: [image, sbom]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sbom
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
+      - name: attach the SBOMs (cosign keyless)
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GO_REF: ghcr.io/rootxkit/uspace-cisp@${{ needs.image.outputs.go_digest }}
+          WEB_REF: ghcr.io/rootxkit/uspace-cisp-web@${{ needs.image.outputs.web_digest }}
+        run: |
+          echo "$TOKEN" | cosign login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          cosign attest --yes --type spdxjson --predicate sbom-uspace-cisp.spdx.json "$GO_REF"
+          cosign attest --yes --type spdxjson --predicate sbom-uspace-cisp-web.spdx.json "$WEB_REF"

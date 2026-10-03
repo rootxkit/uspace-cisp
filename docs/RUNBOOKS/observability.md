@@ -124,6 +124,7 @@ section 9) where it names one.
 | `cisp_publisher_stale` | gauge | `component` | Configured publishers whose last heartbeat is older than stale_after_s (or never heard). | above 0 (warning: the publisher is silent; nothing is ended) |
 | `cisp_rate_limit_clients_evicted_total` | counter | `component` | Public reads limited per client. | — |
 | `cisp_rate_limit_forwarded_for_unreadable_total` | counter | `component` | Public reads limited per client. | — |
+| `cisp_rate_limit_proxy_untrusted_forwarded_for_total` | counter | `component` | Requests whose X-Forwarded-For came from a peer outside CISP_TRUSTED_PROXY_CIDR (not believed): the proxy's clients share one bucket. | any increase in production |
 | `cisp_rate_limited_total` | counter | `component` | Public reads limited per client. | — |
 | `cisp_rejected_algorithm_total` | counter | `component` | Bearer tokens refused, by core's reason (component auth). | — |
 | `cisp_rejected_audience_total` | counter | `component` | Bearer tokens refused, by core's reason (component auth). | — |

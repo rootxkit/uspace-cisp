@@ -103,6 +103,7 @@ func buildCatalogue() []Metric {
 	add(counter("ed269_exported", "Versions exported as ED-269 through uspace-core (format=ed269).", ""))
 	add(counter("ed269_not_representable", "ED-269 exports refused 406 because the version holds what ED-269 cannot.", ""))
 	add(counters("Public reads limited per client.", "rate_limited", "rate_limit_clients_evicted", "rate_limit_forwarded_for_unreadable")...)
+	add(counter("rate_limit_proxy_untrusted_forwarded_for", "Requests whose X-Forwarded-For came from a peer outside CISP_TRUSTED_PROXY_CIDR (not believed): the proxy's clients share one bucket.", "any increase in production"))
 
 	// Restrictions.
 	add(counters("Dynamic restrictions.", "restrictions_accepted", "restrictions_refused", "restrictions_replayed", "restrictions_expired")...)

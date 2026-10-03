@@ -28,7 +28,20 @@ On every push to `main` and every `v*` tag, the `images` job of
 ## Deploy
 
 On the droplet, in the checkout of the tag (or commit) being deployed,
-with `deploy/.env` filled from `deploy/.env.example`:
+with `deploy/.env` filled from `deploy/.env.example`.
+
+Before the first deploy set `CISP_TRUSTED_PROXY_CIDR` to **both** the
+shared Caddy's edge network and this project's `uspace-cisp` network
+(`docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}'
+<network>` prints each subnet). Public reads arrive from Caddy and every
+`/v1/console/*` request, the login included, from the `web` container,
+which writes the browser's address into `X-Forwarded-For`. Left empty,
+every client is the proxy's address and shares one rate-limit bucket:
+20 failed logins from anyone lock every operator out for 15 minutes.
+The api then shows `ratelimit_proxy` degraded at error level in every
+status line, and `rate_limit_proxy_untrusted_forwarded_for` counts the
+forwarded headers it did not believe.
+
 
 ```
 deploy/deploy.sh ghcr.io/rootxkit/uspace-cisp:<sha or tag> ghcr.io/rootxkit/uspace-cisp-web:<sha or tag>
@@ -54,7 +67,8 @@ It refuses, and pulls and starts nothing, when:
 Check after a deploy: `docker compose -f deploy/compose.yml ps` shows
 every service healthy; the api's status line (`docker compose logs api
 | grep '"msg":"status"' | tail -1`) has no `degraded` component other
-than the expected `mtls: off` on staging; `GET /public/v1/zones` answers
+than the expected `mtls: off` on staging (never `ratelimit_proxy`), and
+`rate_limit_proxy_untrusted_forwarded_for` stays at 0; `GET /public/v1/zones` answers
 with the expected `ETag`.
 
 Record the two digests and the deploy time in the deployment log.

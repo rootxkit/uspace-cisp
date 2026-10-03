@@ -24,6 +24,10 @@ const (
 	CounterRateLimited         = "rate_limited"
 	CounterRateLimitEvicted    = "rate_limit_clients_evicted"
 	CounterRateLimitBadForward = "rate_limit_forwarded_for_unreadable"
+	// CounterRateLimitUntrustedForward counts requests that carried
+	// X-Forwarded-For from a peer outside CISP_TRUSTED_PROXY_CIDR: behind
+	// Caddy or the BFF it says every client shares the proxy's bucket.
+	CounterRateLimitUntrustedForward = "rate_limit_proxy_untrusted_forwarded_for"
 )
 
 // Rate limiter defaults (docs/WORKPACKAGES/WP-4.md).
@@ -155,10 +159,14 @@ func (l *RateLimiter) ClientAddr(r *http.Request) netip.Addr {
 	} else if a, err := netip.ParseAddr(r.RemoteAddr); err == nil {
 		addr = a.Unmap()
 	}
+	hops := r.Header.Values(headerForwardedFor)
 	if !l.trusted(addr) {
+		if len(hops) > 0 {
+			l.cfg.Component.Counter(CounterRateLimitUntrustedForward,
+				"Requests whose X-Forwarded-For came from a peer outside CISP_TRUSTED_PROXY_CIDR (not believed).").Inc()
+		}
 		return addr
 	}
-	hops := r.Header.Values(headerForwardedFor)
 	var entries []string
 	for _, h := range hops {
 		entries = append(entries, strings.Split(h, ",")...)
@@ -175,6 +183,23 @@ func (l *RateLimiter) ClientAddr(r *http.Request) netip.Addr {
 		}
 	}
 	return addr
+}
+
+// TrustedProxiesReason is the degraded reason of an https deployment
+// with no trusted proxy.
+const TrustedProxiesReason = "CISP_TRUSTED_PROXY_CIDR is empty while CISP_PUBLIC_BASE_URL is https (an edge in front): " +
+	"every client is the proxy's address and shares one rate-limit bucket, the console login's included; " +
+	"set it to the shared Caddy's edge network and this project's network (the web container forwards the browser's address)"
+
+// ReportTrustedProxies degrades comp, at error level every status
+// period, when the public base URL is https (there is an edge) and no
+// proxy is trusted; otherwise it is healthy (CLAUDE.md hard rule 4).
+func ReportTrustedProxies(comp *obs.Component, publicBaseURL string, proxies []netip.Prefix) {
+	if strings.HasPrefix(strings.ToLower(publicBaseURL), "https://") && len(proxies) == 0 {
+		comp.SetDegraded(TrustedProxiesReason)
+		return
+	}
+	comp.SetHealthy()
 }
 
 func (l *RateLimiter) trusted(a netip.Addr) bool {

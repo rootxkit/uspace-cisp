@@ -93,6 +93,7 @@ func serve(ctx context.Context, cfg *config.API, logger *slog.Logger) int {
 	// A disabled safeguard is shown at error level every period
 	// (CLAUDE.md hard rule 4).
 	auth.ReportMTLS(status.Component("mtls"), cfg.MTLSMode)
+	httpapi.ReportTrustedProxies(status.Component("ratelimit_proxy"), cfg.PublicBaseURL, cfg.TrustedProxies())
 
 	sec, err := startSecurity(ctx, cfg, status, logger)
 	if err != nil {

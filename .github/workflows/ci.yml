@@ -411,19 +411,29 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # The uspace-lab commit the suite runs at: a lab change reaches this
+      # job only through a reviewed `ci:` commit here, so a run is
+      # reproducible and lab code is not run unreviewed (core-ui-ci audit
+      # S7). Bump it with the lab's main SHA when the suite changes.
+      LAB_REF: 9be1c13e72a94ceda56acd55eff245717385e9bc
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: rootxkit/uspace-lab
+          ref: ${{ env.LAB_REF }}
           path: lab
+          persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
           cache: true
       - name: make conformance
         run: |
-          echo "uspace-lab at $(git -C lab rev-parse --short HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "uspace-lab at $(git -C lab rev-parse --short HEAD) (pinned LAB_REF ${LAB_REF::7})" | tee -a "$GITHUB_STEP_SUMMARY"
           make conformance LAB_DIR=lab
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

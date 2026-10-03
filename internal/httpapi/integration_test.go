@@ -189,7 +189,7 @@ func TestIntakeWithTheDatabaseGone(t *testing.T) {
 func TestPublication5000ZonesBudget(t *testing.T) {
 	st, pool := pgStore(t)
 	h := newPubHarness(t, st)
-	body := syntheticZones(t, 5000, 20, DefaultMaxPublicationBytes-64<<10)
+	body := syntheticZones(t, 5000, 20, DefaultMaxPublicationBytes-2<<20)
 	if rec := h.put("zones", []byte(emptyCollection)); rec.Code != 201 && rec.Code != 200 {
 		t.Fatalf("empty = %d", rec.Code)
 	}

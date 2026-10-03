@@ -241,6 +241,14 @@ func (h *Hub) attach(conn frameConn, datasets map[string]bool, console bool, rea
 	}
 	h.mu.Lock()
 	h.reserved--
+	if h.closed {
+		// Close ran between reserve and attach and could not see this
+		// client: close it now, as Close would have.
+		h.mu.Unlock()
+		cancel()
+		_ = conn.Close(CloseGoingAway, "the instance is stopping")
+		return
+	}
 	h.clients[c] = struct{}{}
 	n := len(h.clients)
 	h.mu.Unlock()

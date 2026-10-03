@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coder/websocket"
 	coreauth "github.com/rootxkit/uspace-core/auth"
@@ -220,7 +221,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		n, ok := NormalizeOrigin(origin)
 		if !ok || !h.origins[n] {
 			h.refuse(w, r, CounterRefusedOrigin, http.StatusForbidden, SlugOrigin, "Origin not allowed",
-				core.Fieldf("Origin", "%q is not an origin this stream accepts", truncate(origin, 128)))
+				core.Fieldf("Origin", "%q is not an origin this stream accepts", truncateOrigin(origin)))
 			return
 		}
 	}
@@ -281,9 +282,18 @@ func (h *Handler) session(r *http.Request, hasOrigin bool) (console, ok bool) {
 	return false, false
 }
 
-func truncate(s string, n int) string {
+// maxOriginEchoBytes bounds the refused Origin a problem echoes.
+const maxOriginEchoBytes = 128
+
+// truncateOrigin is s cut to at most maxOriginEchoBytes on a rune
+// boundary, so a problem detail never holds half a UTF-8 sequence.
+func truncateOrigin(s string) string {
+	n := maxOriginEchoBytes
 	if len(s) <= n {
 		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
 	}
 	return s[:n]
 }

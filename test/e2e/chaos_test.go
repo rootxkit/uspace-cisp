@@ -780,6 +780,25 @@ func (s *chaosStack) largePublication(t *testing.T) {
 			}
 		}
 	}
+	// Server time of each HEAD while the PUT ran, from the api's access
+	// log (section 9 budgets HEAD as server time; the client's figure
+	// also holds the runner's scheduling of 50 readers, the test and
+	// eleven containers on two CPUs).
+	var serverHeads []time.Duration
+	for _, l := range rawAfter[min(len(rawBefore), len(rawAfter)):] {
+		var m struct {
+			Msg        string    `json:"msg"`
+			Time       time.Time `json:"time"`
+			Route      string    `json:"route"`
+			DurationMS int64     `json:"duration_ms"`
+		}
+		if json.Unmarshal([]byte(l), &m) != nil || m.Msg != "request" || m.Route != "HEAD /public/v1/{dataset}" {
+			continue
+		}
+		if !m.Time.Before(start) && !m.Time.After(start.Add(took)) {
+			serverHeads = append(serverHeads, time.Duration(m.DurationMS)*time.Millisecond)
+		}
+	}
 	st := s.state(t, "api")
 	mu.Lock()
 	defer mu.Unlock()
@@ -793,7 +812,10 @@ func (s *chaosStack) largePublication(t *testing.T) {
 	names := []string{"before the PUT", "during the PUT", "after the PUT"}
 	rows := [][]string{{"publication", fmt.Sprintf("%d bytes, 200-vertex polygons, zones:%d, accepted in %s", len(body), v, took.Round(time.Millisecond))}}
 	for ph, n := range names {
-		rows = append(rows, []string{"HEAD " + n, stats(heads[ph])}, []string{"GET (gzip) " + n, stats(gets[ph])})
+		rows = append(rows, []string{"HEAD " + n + " (client)", stats(heads[ph])}, []string{"GET (gzip) " + n + " (client)", stats(gets[ph])})
+		if ph == 1 {
+			rows = append(rows, []string{"HEAD during the PUT (api server time, access log, 1 ms resolution)", stats(serverHeads)})
+		}
 	}
 	rows = append(rows,
 		[]string{"failed reads", fmt.Sprintf("%d %v", failures.Load(), failed)},
@@ -801,16 +823,16 @@ func (s *chaosStack) largePublication(t *testing.T) {
 		[]string{"api container", st})
 	tab := table([]string{"measure", "observed"}, rows)
 	t.Logf("\n%s", tab)
-	summary(t, fmt.Sprintf("### Chaos: a publication at the cap under %d public readers\n\nCISP_MAX_PUBLICATION_BYTES at its default (%d); each reader asks every %s (HEAD, every tenth a full GET), %d requests a second in all; HEAD p99 budget 50 ms.\n\n%s",
+	summary(t, fmt.Sprintf("### Chaos: a publication at the cap under %d public readers\n\nCISP_MAX_PUBLICATION_BYTES at its default (%d); each reader asks every %s (HEAD, every tenth a full GET), %d requests a second in all; HEAD p99 budget 50 ms, asserted on the api's server time; the client's figure is printed beside it.\n\n%s",
 		readers, limit, readerPeriod, readers*int(time.Second/readerPeriod), tab))
 	if failures.Load() > 0 {
 		t.Errorf("%d reads failed: %v", failures.Load(), failed)
 	}
-	if len(heads[1]) == 0 {
-		t.Fatal("no HEAD measured while the PUT ran")
+	if len(heads[1]) == 0 || len(serverHeads) == 0 {
+		t.Fatalf("HEADs measured while the PUT ran: %d by the client, %d in the api's log", len(heads[1]), len(serverHeads))
 	}
-	if p99 := percentile(heads[1], 0.99); p99 >= 50*time.Millisecond {
-		t.Errorf("HEAD p99 during the PUT %s, over 50 ms", p99)
+	if p99 := percentile(serverHeads, 0.99); p99 >= 50*time.Millisecond {
+		t.Errorf("HEAD p99 server time during the PUT %s, over 50 ms", p99)
 	}
 	if !strings.HasPrefix(st, "running") || !strings.Contains(st, "oom=false") {
 		t.Errorf("api after the publication: %s", st)

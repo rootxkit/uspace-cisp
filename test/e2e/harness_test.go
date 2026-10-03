@@ -16,20 +16,16 @@ package e2e
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/rsa"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -37,27 +33,9 @@ import (
 	"time"
 
 	coreauth "github.com/rootxkit/uspace-core/auth"
-	"github.com/rootxkit/uspace-core/vectors"
 
 	"github.com/rootxkit/uspace-cisp/internal/authtest"
-	"github.com/rootxkit/uspace-cisp/internal/jws"
 )
-
-// The identities of the e2e stack.
-const (
-	tokenIssuer  = "https://authority.e2e.test/"
-	cispIssuer   = "https://uspace-cisp.e2e.test"
-	authorityID  = "authority-01"
-	anspID       = "ansp-01"
-	labClient    = "lab-01"
-	tokenKID     = "tok-1"
-	authorityKID = "authority-sig-1"
-	anspKID      = "ansp-sig-1"
-	cispKID      = "cisp-e2e-1"
-	project      = "uspace-cisp-e2e"
-)
-
-type doc = map[string]any
 
 // syncBuffer is a process's output, read while it runs.
 type syncBuffer struct {
@@ -123,33 +101,6 @@ func env(t *testing.T) *stack {
 		t.Fatal("the e2e stack did not start (see the first test's log)")
 	}
 	return theOne
-}
-
-func freePort(t *testing.T) int {
-	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port
-}
-
-func secret() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
-func writePEM(t *testing.T, path string, k *rsa.PrivateKey) {
-	t.Helper()
-	pemBytes, err := jws.EncodePrivateKeyPEM(k)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, pemBytes, 0o600); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func (s *stack) compose(t *testing.T, args ...string) string {
@@ -286,22 +237,6 @@ func (s *stack) start(t *testing.T) {
 		"CISP_TIMESERIES_URL=" + db("cisp_deliver", pw["PG_CISP_DELIVER_PASSWORD"], "cisp_ts"),
 	}, common...), "delivering")
 	t.Logf("stack up in %s: api %s, subscriber %s", time.Since(start).Round(time.Second), s.apiURL, s.subURL)
-}
-
-// composeEnv is the test's environment without the variables the env
-// file sets: compose prefers the shell's value of a variable to the env
-// file's, so a developer's exported dev passwords would win over the
-// ones the test generated.
-func composeEnv() []string {
-	var out []string
-	for _, kv := range os.Environ() {
-		name, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(name, "E2E_") || strings.HasPrefix(name, "PG_CISP_") || name == "POSTGRES_PASSWORD" {
-			continue
-		}
-		out = append(out, kv)
-	}
-	return out
 }
 
 // cleanEnv is the test's environment without CISP_* plus extra.
@@ -478,15 +413,6 @@ func (s *stack) publish(t *testing.T, ds string, body []byte) int64 {
 	return out.Version
 }
 
-// change is one record of GET /v1/changes.
-type change struct {
-	MsgID   string    `json:"msg_id"`
-	Dataset string    `json:"dataset"`
-	Version int64     `json:"version"`
-	Reason  string    `json:"reason"`
-	At      time.Time `json:"at"`
-}
-
 func (s *stack) changes(t *testing.T, since int64) ([]change, int64) {
 	t.Helper()
 	resp, raw := s.call(t, http.MethodGet, fmt.Sprintf("/v1/changes?since=%d&limit=500", since), s.token(t, labClient, "localhost", "cis.read"), nil, nil)
@@ -503,17 +429,6 @@ func (s *stack) changes(t *testing.T, since int64) ([]change, int64) {
 	return out.Changes, out.Next
 }
 
-// received is one record of the subscriber's GET /received.
-type received struct {
-	ReceivedAt time.Time `json:"received_at"`
-	DeliveryID string    `json:"delivery_id"`
-	ChangeID   string    `json:"change_id"`
-	Reason     string    `json:"reason"`
-	Verified   bool      `json:"verified"`
-	Pulled     bool      `json:"pulled"`
-	Note       string    `json:"note"`
-}
-
 func (s *stack) received(t *testing.T) []received {
 	t.Helper()
 	resp, err := http.Get(s.subURL + "/received")
@@ -524,18 +439,6 @@ func (s *stack) received(t *testing.T) []received {
 	var out []received
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	return out
-}
-
-func eventually(t *testing.T, within time.Duration, what string, ok func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(within)
-	for time.Now().Before(deadline) {
-		if ok() {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("not within %s: %s", within, what)
 }
 
 var subOnce sync.Once
@@ -568,82 +471,4 @@ func (s *stack) subscribe(t *testing.T) {
 		})
 		t.Logf("subscription %s active", sub.ID)
 	})
-}
-
-// zonesBody is the vector's authority collection without its U-space
-// airspace, its first zone named n (a new version each time).
-func zonesBody(t *testing.T, n int) []byte {
-	t.Helper()
-	d := vectorDoc(t)
-	feats := d["features"].([]any)
-	d["features"] = feats[1:]
-	p := feats[1].(doc)["properties"].(doc)
-	p["reason"] = []any{"EMERGENCY"}
-	p["name"] = []any{doc{"lang": "en-GB", "text": fmt.Sprintf("e2e zone, publication %d", n)}}
-	raw, _ := json.Marshal(d)
-	return raw
-}
-
-// uspaceBody is the vector's U-space airspace TSU001 with its
-// requirements block.
-func uspaceBody(t *testing.T) []byte {
-	t.Helper()
-	d := vectorDoc(t)
-	d["features"] = d["features"].([]any)[:1]
-	p := d["features"].([]any)[0].(doc)["properties"].(doc)
-	ext, _ := p["extendedProperties"].(doc)
-	if ext == nil {
-		ext = doc{}
-		p["extendedProperties"] = ext
-	}
-	ext["uspace_requirements"] = doc{
-		"uas_requirements": doc{}, "operational_conditions": doc{}, "airspace_constraints": doc{},
-		"service_performance": doc{"nid_update_hz": 1, "ti_update_hz": 1, "cis_latency_s": 5},
-		"services_required":   []any{"NID", "GEO", "FA", "TI"}, "adjacent": []any{},
-	}
-	raw, _ := json.Marshal(d)
-	return raw
-}
-
-func vectorDoc(t *testing.T) doc {
-	t.Helper()
-	f := vectors.Load(t, "ed318_roundtrip.json")
-	for _, c := range f.Cases {
-		if c.Name != "accept-authority-collection" {
-			continue
-		}
-		var in struct {
-			Document doc `json:"document"`
-		}
-		if err := json.Unmarshal(c.Input, &in); err != nil {
-			t.Fatal(err)
-		}
-		return in.Document
-	}
-	t.Fatal("no accept-authority-collection case")
-	return nil
-}
-
-// percentile is the p-th percentile (nearest rank) of ds.
-func percentile(ds []time.Duration, p float64) time.Duration {
-	s := append([]time.Duration{}, ds...)
-	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
-	idx := int(p*float64(len(s))+0.999999) - 1
-	return s[max(0, min(idx, len(s)-1))]
-}
-
-// summary appends markdown to the CI step summary when there is one.
-func summary(t *testing.T, md string) {
-	t.Helper()
-	path := os.Getenv("GITHUB_STEP_SUMMARY")
-	if path == "" {
-		return
-	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		t.Logf("step summary: %v", err)
-		return
-	}
-	defer f.Close()
-	_, _ = f.WriteString(md + "\n")
 }

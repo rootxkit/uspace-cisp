@@ -1,0 +1,224 @@
+# The chaos stack (test/e2e/chaos_*_test.go, build tag chaos; WP-13):
+# the built Go image (CHAOS_IMAGE) as compose runs it in production
+# (read-only, non-root, the memory limits of deploy/compose.yml), beside
+# PostgreSQL + TimescaleDB, NATS and three reference subscribers. The
+# test writes every key, certificate and environment file into
+# CHAOS_DIR and every port into the --env-file; nothing is a default.
+#
+# No service restarts by itself (restart: "no"): a process that dies
+# under a fault stays dead and the test sees it, instead of compose
+# hiding it behind a restart.
+#
+# Profile caddy: the shared Caddy's reference snippet
+# (deploy/caddy/Caddyfile.snippet) as two edges, one in front of
+# api-edge (an api in CISP_MTLS_MODE=required with the per-IP limit of
+# production) and one in front of echo, which answers with the
+# X-Client-Cert-Subject it received, so the test reads what reaches the
+# upstream.
+name: uspace-cisp-chaos
+
+x-cisp: &cisp
+  image: ${CHAOS_IMAGE:?set by the chaos test}
+  restart: "no"
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  volumes:
+    - ${CHAOS_DIR:?}:/run/chaos:ro
+  networks: [chaos]
+
+services:
+  postgres:
+    image: timescale/timescaledb-ha:pg16
+    restart: "no"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      PG_CISP_API_PASSWORD: ${PG_CISP_API_PASSWORD:?}
+      PG_CISP_DELIVER_PASSWORD: ${PG_CISP_DELIVER_PASSWORD:?}
+    command: ["postgres", "-c", "shared_buffers=128MB"]
+    volumes:
+      - ../../deploy/postgres/init.sql:/docker-entrypoint-initdb.d/10-cisp.sql:ro
+    networks: [chaos]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  nats:
+    image: nats:2-alpine
+    restart: "no"
+    command: ["-js", "-m", "8222"]
+    networks: [chaos]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *cisp
+    command: ["cispctl", "migrate", "all"]
+    env_file: ${CHAOS_DIR}/migrate.env
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  jwks:
+    # The token issuer's, the authority's and the ANSP's JWKS, over https
+    # (the api takes plain http for a JWKS on loopback only).
+    image: caddy:2.10.2-alpine
+    restart: "no"
+    command: ["caddy", "run", "--config", "/run/chaos/jwks.Caddyfile", "--adapter", "caddyfile"]
+    volumes:
+      - ${CHAOS_DIR}:/run/chaos:ro
+    networks: [chaos]
+
+  api:
+    <<: *cisp
+    command: ["api"]
+    env_file: ${CHAOS_DIR}/api.env
+    environment:
+      GOMEMLIMIT: 200MiB
+      # Every GC cycle's heap on stderr: the large-publication case reads
+      # the peak from it.
+      GODEBUG: gctrace=1
+      SSL_CERT_FILE: /run/chaos/ca.pem
+    ports:
+      - "127.0.0.1:${CHAOS_API_PORT:?}:8080"
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      nats: {condition: service_healthy}
+      jwks: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "api", "-probe=/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 256M}
+
+  deliver:
+    <<: *cisp
+    command: ["deliver"]
+    env_file: ${CHAOS_DIR}/deliver.env
+    environment:
+      GOMEMLIMIT: 48MiB
+      SSL_CERT_FILE: /run/chaos/ca.pem
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      nats: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "deliver", "-probe=/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 64M}
+
+  subscriber-a: &subscriber
+    build:
+      context: ../..
+      dockerfile: test/e2e/subscriber/Dockerfile
+    image: uspace-cisp-e2e-subscriber:local
+    restart: "no"
+    environment: &subscriber-env
+      CISP_JWKS_URL: http://api:8080/.well-known/jwks.json
+      CISP_ISSUER_URL: ${CHAOS_CISP_ISSUER_URL:?}
+      CISP_PUBLIC_BASE_URL: http://api:8080
+      SUBSCRIBER_AUDIENCE: subscriber-a
+      SUBSCRIBER_TOKEN: ${CHAOS_SUBSCRIBER_TOKEN:?}
+      TLS_CERT_FILE: /run/chaos/subscriber.pem
+      TLS_KEY_FILE: /run/chaos/subscriber-key.pem
+    volumes:
+      - ${CHAOS_DIR}:/run/chaos:ro
+    networks: [chaos]
+    ports:
+      - "127.0.0.1:${CHAOS_SUB_A_PORT:?}:8080"
+
+  subscriber-b:
+    <<: *subscriber
+    environment:
+      <<: *subscriber-env
+      SUBSCRIBER_AUDIENCE: subscriber-b
+    ports:
+      - "127.0.0.1:${CHAOS_SUB_B_PORT:?}:8080"
+
+  subscriber-slow:
+    <<: *subscriber
+    environment:
+      <<: *subscriber-env
+      SUBSCRIBER_AUDIENCE: subscriber-slow
+      SLOW_MS: "1500"
+    ports:
+      - "127.0.0.1:${CHAOS_SUB_SLOW_PORT:?}:8080"
+
+  api-edge:
+    <<: *cisp
+    profiles: [caddy]
+    command: ["api"]
+    env_file: ${CHAOS_DIR}/api-edge.env
+    environment:
+      GOMEMLIMIT: 200MiB
+      SSL_CERT_FILE: /run/chaos/ca.pem
+    ports:
+      - "127.0.0.1:${CHAOS_API_EDGE_PORT:?}:8080"
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      jwks: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "api", "-probe=/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  echo:
+    profiles: [caddy]
+    image: caddy:2.10.2-alpine
+    restart: "no"
+    command: ["caddy", "run", "--config", "/run/chaos/echo.Caddyfile", "--adapter", "caddyfile"]
+    volumes:
+      - ${CHAOS_DIR}:/run/chaos:ro
+    networks: [chaos]
+
+  edge: &edge
+    profiles: [caddy]
+    image: caddy:2.10.2-alpine
+    restart: "no"
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    environment:
+      CISP_HOST: localhost
+      CISP_ANSP_MTLS_CA: /run/chaos/mtls-ca.pem
+      CISP_API_UPSTREAM: api-edge:8080
+      CISP_WEB_UPSTREAM: echo:8080
+      USPACE_BASEMAP_DIR: /run/chaos/basemap
+    volumes:
+      - ../../deploy/caddy/Caddyfile.snippet:/etc/caddy/Caddyfile:ro
+      - ${CHAOS_DIR}:/run/chaos:ro
+    networks:
+      chaos:
+        ipv4_address: ${CHAOS_EDGE_IP:?}
+    ports:
+      - "127.0.0.1:${CHAOS_EDGE_PORT:?}:443"
+
+  edge-echo:
+    <<: *edge
+    environment:
+      CISP_HOST: localhost
+      CISP_ANSP_MTLS_CA: /run/chaos/mtls-ca.pem
+      CISP_API_UPSTREAM: echo:8080
+      CISP_WEB_UPSTREAM: echo:8080
+      USPACE_BASEMAP_DIR: /run/chaos/basemap
+    networks: [chaos]
+    ports:
+      - "127.0.0.1:${CHAOS_EDGE_ECHO_PORT:?}:443"
+
+networks:
+  chaos:
+    ipam:
+      config:
+        - subnet: ${CHAOS_SUBNET:?}
+          # Dynamic addresses from the lower half only, so the edge's fixed
+          # address in the upper half is never taken first.
+          ip_range: ${CHAOS_IP_RANGE:?}

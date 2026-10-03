@@ -12,7 +12,9 @@
 // SUBSCRIBER_AUDIENCE (this receiver's host as the callback names it),
 // SUBSCRIBER_TOKEN (bearer for the pulls, optional), LISTEN_ADDR
 // (:8080), FAIL_FIRST (answer the first n notifications 500), SLOW_MS
-// (delay every answer).
+// (delay every answer), TLS_CERT_FILE and TLS_KEY_FILE (serve https
+// with that pair: the chaos suite's callbacks are https, because deliver
+// takes plain http only for a localhost target).
 package main
 
 import (
@@ -238,8 +240,15 @@ func main() {
 		os.Exit(2) //nolint:forbidigo // main: a configuration refused
 	}
 	srv := &http.Server{Addr: addr, Handler: newReceiver(cfg, os.Stdout), ReadHeaderTimeout: 5 * time.Second}
-	logger.Info("listening", "addr", addr, "audience", cfg.audience, "fail_first", cfg.failFirst)
-	if err := srv.ListenAndServe(); err != nil {
+	certFile, keyFile := os.Getenv("TLS_CERT_FILE"), os.Getenv("TLS_KEY_FILE")
+	logger.Info("listening", "addr", addr, "audience", cfg.audience, "fail_first", cfg.failFirst, "tls", certFile != "")
+	var err error
+	if certFile != "" || keyFile != "" {
+		err = srv.ListenAndServeTLS(certFile, keyFile)
+	} else {
+		err = srv.ListenAndServe()
+	}
+	if err != nil {
 		logger.Error("serve", "error", err.Error())
 		os.Exit(1) //nolint:forbidigo // main: the listener failed
 	}

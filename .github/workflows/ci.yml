@@ -47,6 +47,10 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           filters: |
+            # Everything a Go test reads, not only Go: the embedded
+            # migrations, the schemas, testdata and fixtures, the Caddy
+            # snippet and the PLAN rows its test checks (core-ui-ci
+            # audit S1: a skipped job is green to a required check).
             go:
               - '**/*.go'
               - 'go.mod'
@@ -55,6 +59,13 @@ jobs:
               - 'Makefile'
               - 'tools/**'
               - 'api/**'
+              - 'migrations/**'
+              - 'schemas/**'
+              - 'sqlc.yaml'
+              - '**/testdata/**'
+              - 'test/**'
+              - 'deploy/**'
+              - 'docs/PLAN.md'
               - '.github/workflows/ci.yml'
             generate:
               - '**/*.go'
@@ -74,8 +85,10 @@ jobs:
               - 'migrations/**'
               - 'go.mod'
               - 'go.sum'
-              - 'deploy/postgres/**'
-              - 'test/e2e/**'
+              - 'deploy/**'
+              - 'test/**'
+              - '**/testdata/**'
+              - 'schemas/**'
               - 'Makefile'
               - '.github/workflows/ci.yml'
             web:

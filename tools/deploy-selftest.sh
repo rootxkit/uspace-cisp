@@ -52,7 +52,7 @@ expect() {
     fails=$((fails + 1))
   else
     echo "ok   $name: exit $rc"
-    echo "$out" | grep -E 'deploy:|cosign:' | sed 's/^/       /' | head -8
+    echo "$out" | { grep -E 'deploy:|cosign:' || true; } | sed 's/^/       /' | sed -n '1,8p'
   fi
 }
 

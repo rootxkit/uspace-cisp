@@ -544,3 +544,60 @@ func TestPerSubscriptionCapOnPostgres(t *testing.T) {
 	close(release)
 	a.Wait()
 }
+
+// On the real store: a webhook over MaxTokenBytes expires without a
+// POST and leaves the subscription's failure run where it was (49 stay
+// 49, still active); the twin inside the bound answered 502 makes it 50
+// and suspends the subscription (E-01).
+func TestPayloadTooLargeOnPostgres(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		maxBytes int
+		code     int
+		large    bool
+	}{
+		{"over the bound", 600, http.StatusNoContent, true},
+		{"inside the bound, 502", 0, http.StatusBadGateway, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := setup(t)
+			ctx := context.Background()
+			r := newCounting(t, tc.code)
+			sub := p.subscribe(t, r.srv.URL+"/hook", true)
+			if _, err := p.api.Exec(ctx, `UPDATE subscriptions SET consecutive_failures = 49, failing_since = now() - interval '2 hours' WHERE id = $1`, sub.ID); err != nil {
+				t.Fatal(err)
+			}
+			ch := p.change(t, publication.DatasetZones, time.Now())
+			svc, status := p.service(t, "it-payload", func(c *Config) { c.MaxTokenBytes = tc.maxBytes })
+			if _, err := svc.Intake(ctx, ch); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := svc.Dispatch(ctx); err != nil {
+				t.Fatal(err)
+			}
+			svc.Wait()
+			var failures int
+			var subStatus, lastError string
+			if err := p.api.QueryRow(ctx, `SELECT s.consecutive_failures, s.status, COALESCE(d.last_error, '')
+				FROM subscriptions s JOIN deliveries d ON d.subscription_id = s.id WHERE s.id = $1 AND d.change_id = $2`,
+				sub.ID, ch.ID).Scan(&failures, &subStatus, &lastError); err != nil {
+				t.Fatal(err)
+			}
+			state := p.rows(t, ch.ID)[sub.ID]
+			posted := len(r.snapshot())
+			tooLarge := status.Component(Component).Counter(CounterPayloadTooLarge, "").Value()
+			if !tc.large {
+				if posted != 1 || failures != 50 || subStatus != string(subscription.Suspended) || state != store.DeliveryFailed || tooLarge != 0 {
+					t.Errorf("posted %d, failures %d, status %s, delivery %s, too large %d", posted, failures, subStatus, state, tooLarge)
+				}
+				return
+			}
+			if posted != 0 || state != store.DeliveryExpired || !strings.Contains(lastError, "over the 600-byte bound") {
+				t.Errorf("posted %d, delivery %s, last error %q", posted, state, lastError)
+			}
+			if failures != 49 || subStatus != string(subscription.Active) || tooLarge != 1 {
+				t.Errorf("failures %d, status %s, too large %d: the payload's failure counted against the subscriber", failures, subStatus, tooLarge)
+			}
+		})
+	}
+}

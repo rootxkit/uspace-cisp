@@ -175,6 +175,7 @@ func buildCatalogue() []Metric {
 	add(counter("intake_failed", "Bus messages deliver could not queue (redelivered).", "any increase for 5 min"))
 	add(counters("Webhook delivery outcomes.", "deliveries_delivered", "deliveries_failed", "subscriptions_verified")...)
 	add(counter("deliveries_expired", "Deliveries given up 24 h after their change.", "any increase"))
+	add(counter("delivery_payload_too_large", "Webhooks not sent because the signed token is over CISP_WEBHOOK_MAX_TOKEN_BYTES (expired; the subscriber is not charged).", "any increase"))
 	add(counter("ssrf_refused", "Callback dials refused by the address policy.", ""))
 	add(counter("subscriptions_suspended_total", "Subscriptions suspended after 50 consecutive failures over 1 h.", ""))
 	add(counters("Delivery bookkeeping failures.", "delivery_log_write_failed", "delivery_record_failed", "delivery_sign_failed", "delivery_claim_failed")...)

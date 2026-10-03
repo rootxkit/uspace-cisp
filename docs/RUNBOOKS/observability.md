@@ -91,6 +91,7 @@ section 9) where it names one.
 | `cisp_delivery_first_attempt_seconds` | histogram | — | From a change's commit (changes.at) to its first webhook attempt. | p99 above 2 s for 10 min |
 | `cisp_delivery_log_read_failed_total` | counter | `component` | Delivery-log reads that failed (the list says unavailable). | — |
 | `cisp_delivery_log_write_failed_total` | counter | `component` | Delivery bookkeeping failures. | — |
+| `cisp_delivery_payload_too_large_total` | counter | `component` | Webhooks not sent because the signed token is over CISP_WEBHOOK_MAX_TOKEN_BYTES (expired; the subscriber is not charged). | any increase |
 | `cisp_delivery_record_failed_total` | counter | `component` | Delivery bookkeeping failures. | — |
 | `cisp_delivery_result_total` | counter | `code` | Webhook attempts by result code (2xx, 4xx, 5xx, timeout, refused, ...). | — |
 | `cisp_delivery_scan_failed_total` | counter | `component` | Reconciliation scans that failed. | any increase for 1 min |

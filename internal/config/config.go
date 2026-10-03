@@ -145,6 +145,10 @@ type Deliver struct {
 	DeliveryLogRetentionDays int64
 	AllowPrivateCallbacks    bool
 	AllowInsecureCallbacks   bool
+	// WebhookMaxTokenBytes bounds a signed webhook: the bound receivers
+	// verify (core's auth.DefaultMaxTokenBytes by default). A larger one
+	// is not sent and never counts against the subscriber.
+	WebhookMaxTokenBytes int64
 }
 
 // Ctl is the configuration of cmd/cispctl.
@@ -265,6 +269,7 @@ func LoadDeliver(environ []string) (*Deliver, error) {
 		DeliveryLogRetentionDays: e.integer(EnvDeliveryLogRetentionDays),
 		AllowPrivateCallbacks:    e.boolean(EnvAllowPrivateCallbacks),
 		AllowInsecureCallbacks:   e.boolean(EnvAllowInsecureCallbacks),
+		WebhookMaxTokenBytes:     e.integer(EnvWebhookMaxTokenBytes),
 	}
 	return c, finish(e, &c.Common, c.Validate)
 }
@@ -561,6 +566,7 @@ func (c *Deliver) Validate() error {
 		p = required(p, EnvPublicBaseURL, c.PublicBaseURL)
 	}
 	p = intIn(p, EnvDeliveryLogRetentionDays, c.DeliveryLogRetentionDays, 1, 3650)
+	p = intIn(p, EnvWebhookMaxTokenBytes, c.WebhookMaxTokenBytes, 2048, 1<<20)
 	return orNil(p)
 }
 

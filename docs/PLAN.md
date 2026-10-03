@@ -766,7 +766,8 @@ only on `web/**` changes.
   `CISP_ISSUER_URL`, `CISP_READ_MAX_AGE_S` (60), `CISP_PUBLIC_RPM`,
   `CISP_MAX_PUBLICATION_BYTES`, `CISP_MAX_SUBSCRIPTIONS_PER_CLIENT`,
   `CISP_DELIVERY_LOG_RETENTION_DAYS`, `CISP_ALLOW_PRIVATE_CALLBACKS`,
-  `CISP_ALLOW_INSECURE_CALLBACKS`, `CISP_OTEL_ENDPOINT`, `CISP_LOG_LEVEL`,
+  `CISP_ALLOW_INSECURE_CALLBACKS`, `CISP_WEBHOOK_MAX_TOKEN_BYTES` (8192,
+  core's verifier bound), `CISP_OTEL_ENDPOINT`, `CISP_LOG_LEVEL`,
   `CISP_BRANDING_FILE` (console name, logo path, contact: branding is
   configuration), `NEXT_PUBLIC_API_BASE_URL` for `web`.
 - **Production** is separate state infrastructure; the compose file is

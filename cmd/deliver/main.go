@@ -230,7 +230,8 @@ func start(ctx context.Context, cfg *config.Deliver, tsPool *pgxpool.Pool, statu
 	instance := instanceName()
 	svc, err := deliver.New(deliver.Config{
 		Instance: instance, IssuerURL: cfg.IssuerURL, PublicBaseURL: cfg.PublicBaseURL, Version: version,
-		Policy: subscription.URLPolicy{AllowPrivate: cfg.AllowPrivateCallbacks, AllowInsecure: cfg.AllowInsecureCallbacks},
+		Policy:        subscription.URLPolicy{AllowPrivate: cfg.AllowPrivateCallbacks, AllowInsecure: cfg.AllowInsecureCallbacks},
+		MaxTokenBytes: int(cfg.WebhookMaxTokenBytes),
 	}, st, attempts, keys, deliver.Options{
 		Status: status, Registerer: reg, Logger: logger, BusState: brokerState, Spans: spans,
 	})

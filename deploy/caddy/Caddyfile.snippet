@@ -48,8 +48,10 @@
 		reverse_proxy {$CISP_API_UPSTREAM}
 	}
 
-	# The public read subset, cached by Caddy on the full URL; api sets
-	# Cache-Control.
+	# The public read subset. Not cached by this snippet: stock Caddy has
+	# no HTTP cache. api sets Cache-Control for clients and any CDN; a
+	# server-side cache is uspace-deploy's decision (docs/PLAN.md section
+	# 15 Q48).
 	handle /public/* {
 		reverse_proxy {$CISP_API_UPSTREAM}
 	}

@@ -377,7 +377,8 @@ leave `features_current` (they are in history by version).
 `GET` / `HEAD /public/v1/{dataset}` with the same filters and headers as
 §6.3 but no token, no `since_version`, no `/versions/{v}`, no
 `/changes`, and `X-CIS-Signature` on unfiltered responses. Served by
-`api`, cached by Caddy (`Cache-Control` as above, keyed on the full URL),
+`api` with `Cache-Control` as above for clients and CDNs (no server-side
+cache: stock Caddy has none, §15 Q48),
 rate-limited per IP (`CISP_PUBLIC_RPM`, default 60 for full-dataset GETs,
 600 for `HEAD` and 304s). Content: the full `zones`, `uspace_airspace`
 and `restrictions` datasets, and the USSP list without `base_url` and
@@ -514,7 +515,7 @@ at the publish site because the scan covers it.
 | T4 impersonation of a publisher | token `aud` ∈ `CISP_AUDIENCES` (the CISP's host), `sub` ∈ configured publisher ids, scope per dataset, detached JWS by the publisher's own signing key (the authority's from the authority's JWKS, the ANSP's from the ANSP's JWKS; §15 Q8), `iat` in the JWS protected header within 5 min, body hash bound by the signature; ANSP additionally by mTLS subject | accepted publication beside: wrong `aud`, wrong `sub`, right `sub` wrong scope, valid token no signature, signature by an unknown `kid`, stale `iat`, body altered after signing, mTLS subject mismatch |
 | T4 impersonation of the CISP towards subscribers | compact JWS with `iss`, `aud`, `jti`, `iat`; JWKS with rotation overlap | the lab's subscriber simulator verifies and refuses a token signed by another key |
 | T7 tamper of records | `publications` and `events` are insert-only for the application role; `events` hash-chained monthly; `body_sha256` checked when serving a version | a `cispctl verify-audit` run over a tampered row fails and names it |
-| T8 denial of service | body caps (publications 8 MiB (§15 Q46), restrictions and subscriptions 256 KiB, console 64 KiB), `ed269.Limits` (depth, ring vertices 5000, problems 100), per-client and per-IP rate limits, connection caps on the WS hub, Caddy cache on the public surface, a 10 s handler deadline | each cap exceeded by one test (E-10) |
+| T8 denial of service | body caps (publications 8 MiB (§15 Q46), restrictions and subscriptions 256 KiB, console 64 KiB), `ed269.Limits` (depth, ring vertices 5000, problems 100), per-client and per-IP rate limits, connection caps on the WS hub, a Caddy cache on the public surface (planned, deployment: stock Caddy has none and the snippet configures none, §15 Q48; today the limiter and `Cache-Control` for clients and CDNs), a 10 s handler deadline | each cap exceeded by one test (E-10) |
 | T9 malicious or faulty publisher | `ed318.Parse` validates and never repairs; refusal lists every problem; a publication that `ToZones` cannot build is refused for geometry and limit errors (so no USSP can be handed a zone it cannot judge) and warned for the rest; identifier collisions across datasets refused (D8) | the `ed318_roundtrip.json` refusals through `PUT` |
 | SSRF through `callback_url` | scheme, host and resolved-address policy (§6.5), no redirects followed, 2 s timeout, response body discarded after 1 KiB, outbound only from `deliver` | each refused URL class beside an accepted one; a redirecting callback counts as failure |
 | T10 supply chain, public repository | `gitleaks` in CI; `.env.example` only; keys generated at run time into `local/`; `go.sum` and `pnpm-lock.yaml` frozen; `govulncheck`; images built in CI from pinned bases, SBOM and cosign signature; Dependabot | CI |

@@ -75,6 +75,12 @@ commands:
                   recompute the events hash chain over [from, to); exit 0
                   with the count verified, 1 naming the first row that
                   breaks it
+  verify-backup --dump FILE|DIR [--pg-restore CMD] [--restore-host H:P]
+                  restore the newest relational dump into a scratch
+                  database (VERIFY_BACKUP_ADMIN_URL: a role that may
+                  create databases), check every current_version, every
+                  body hash and the events chain, drop it; exit 1 naming
+                  what is wrong
   partitions [--ensure-months N]
                   create the monthly events partitions from this month
                   through N months ahead (default 3; run monthly)
@@ -127,6 +133,8 @@ func runIO(ctx context.Context, args, environ []string, stdin io.Reader, stdout,
 		return createAccount(ctx, args[1:], environ, stdout, stderr)
 	case len(args) >= 1 && args[0] == "verify-audit":
 		return verifyAudit(ctx, args[1:], environ, stdout, stderr, now)
+	case len(args) >= 1 && args[0] == "verify-backup":
+		return verifyBackup(ctx, args[1:], environ, stdout, stderr, now)
 	case len(args) >= 1 && args[0] == "export-audit":
 		return exportAudit(ctx, args[1:], environ, stdout, stderr, now)
 	case len(args) >= 1 && args[0] == "partitions":

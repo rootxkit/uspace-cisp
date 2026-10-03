@@ -252,6 +252,21 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 		secs := max(minRetryAfterS, int(math.Ceil(wait)))
 		w.Header().Set("Retry-After", strconv.Itoa(secs))
 		fe := core.Fieldf("rate", "this client may make %d full reads a minute (burst %d); retry after %d s", l.cfg.RPM, l.burst, secs)
+		if l.cfg.Window > 0 {
+			fe = core.Fieldf("rate", "this client may make %d requests per %s; retry after %d s", l.burst, windowText(l.cfg.Window), secs)
+		}
 		WriteProblem(w, http.StatusTooManyRequests, SlugRateLimited, "Too many requests", fe.Error(), fe)
 	})
+}
+
+// windowText says a window in whole minutes when it is one ("15
+// minutes"), otherwise as a duration.
+func windowText(d time.Duration) string {
+	if d%time.Minute == 0 {
+		if m := int(d / time.Minute); m != 1 {
+			return strconv.Itoa(m) + " minutes"
+		}
+		return "minute"
+	}
+	return d.String()
 }

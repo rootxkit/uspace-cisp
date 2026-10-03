@@ -158,3 +158,32 @@ func TestRateLimitIPv6ByPrefix(t *testing.T) {
 		t.Errorf("IPv4: %d clients", l.Len())
 	}
 }
+
+// The 429 says the limit that refused it: the login limiter's 20
+// requests per 15 minutes, never the public reads' per-minute rate it
+// does not use (S6); the public limiter's text is unchanged (E-01).
+func TestRateLimitProblemNamesItsLimit(t *testing.T) {
+	l := NewRateLimiter(RateLimiterConfig{Burst: LoginBurst, Window: LoginWindow})
+	h := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(401) }))
+	var rec *httptest.ResponseRecorder
+	for range LoginBurst + 1 {
+		req := httptest.NewRequest(http.MethodPost, "/v1/console/session", http.NoBody)
+		req.RemoteAddr = "198.51.100.7:1"
+		rec = httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+	}
+	if body := rec.Body.String(); rec.Code != 429 || !strings.Contains(body, "20 requests per 15 minutes") || strings.Contains(body, "a minute") {
+		t.Errorf("login 429: %d %s", rec.Code, body)
+	}
+	pub := NewRateLimiter(RateLimiterConfig{RPM: 60})
+	ph := pub.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }))
+	for range DefaultPublicBurst + 1 {
+		req := httptest.NewRequest(http.MethodGet, "/public/v1/zones", http.NoBody)
+		req.RemoteAddr = "198.51.100.7:1"
+		rec = httptest.NewRecorder()
+		ph.ServeHTTP(rec, req)
+	}
+	if body := rec.Body.String(); rec.Code != 429 || !strings.Contains(body, "60 full reads a minute (burst 10)") {
+		t.Errorf("public 429: %d %s", rec.Code, body)
+	}
+}

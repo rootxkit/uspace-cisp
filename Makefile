@@ -31,7 +31,8 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: all build vet fmt fmt-check lint tools staticcheck tidy test race cover \
         generate generate-check integration vectors secrets vulncheck \
-        dev-deps dev-deps-down image ci clean jws-smoke e2e
+        dev-deps dev-deps-down image ci clean jws-smoke e2e chaos caddy \
+        conformance conformance-selftest deploy-selftest
 
 all: ci
 
@@ -42,6 +43,7 @@ vet:
 	$(GO) vet $(PKGS)
 	$(GO) vet -tags integration ./...
 	$(GO) vet -tags e2e ./test/e2e/...
+	$(GO) vet -tags chaos ./test/e2e/...
 
 fmt:
 	gofmt -w .
@@ -92,9 +94,11 @@ generate-check: generate
 	if [ -n "$$out" ]; then echo "$$out"; \
 	  echo "generated files differ from the committed ones: run 'make generate' and commit"; exit 1; fi
 
-# Real PostgreSQL + PostGIS, TimescaleDB and NATS JetStream. The three
+# Real PostgreSQL + PostGIS, TimescaleDB and NATS JetStream. The
 # CISP_TEST_* URLs come from the environment (CI) or, when unset, from
-# the passwords `make dev-deps` wrote to $(DEV_ENV). Fails when a test
+# the passwords `make dev-deps` wrote to $(DEV_ENV); CISP_TEST_ADMIN_URL
+# (the superuser) and CISP_TEST_PG_CONTAINER (pg_dump and pg_restore run
+# inside it) serve cispctl verify-backup's test. Fails when a test
 # fails and when zero tests ran: a suite that ran nothing proves nothing.
 # The integration tests live in test/integration and beside the packages
 # they exercise (internal/store, internal/bus, cmd/*), all behind the
@@ -106,6 +110,8 @@ integration:
 	export CISP_TEST_DATABASE_URL="$${CISP_TEST_DATABASE_URL:-postgres://cisp_api:$${PG_CISP_API_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/cisp?sslmode=disable}"; \
 	export CISP_TEST_TIMESERIES_URL="$${CISP_TEST_TIMESERIES_URL:-postgres://cisp_deliver:$${PG_CISP_DELIVER_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/cisp_ts?sslmode=disable}"; \
 	export CISP_TEST_NATS_URL="$${CISP_TEST_NATS_URL:-nats://127.0.0.1:$${DEV_NATS_PORT:-4222}}"; \
+	export CISP_TEST_ADMIN_URL="$${CISP_TEST_ADMIN_URL:-postgres://postgres:$${POSTGRES_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/postgres?sslmode=disable}"; \
+	export CISP_TEST_PG_CONTAINER="$${CISP_TEST_PG_CONTAINER:-$$($(COMPOSE_DEV) ps -q postgres 2>/dev/null)}"; \
 	rc=0; \
 	$(GO) test -tags integration -count=1 -p 1 -v $(INTEGRATION_PKGS) 2>&1 | tee integration.log || rc=$$?; \
 	n=$$(grep -c '^--- PASS' integration.log || true); \
@@ -128,6 +134,46 @@ e2e:
 	echo "e2e: $$n top-level tests passed, $$f failed"; \
 	if [ "$$rc" -ne 0 ]; then echo "e2e: go test exited $$rc"; exit "$$rc"; fi; \
 	if [ "$$n" -eq 0 ]; then echo "e2e: zero tests ran"; exit 1; fi
+
+# The chaos suite (test/e2e/chaos_test.go, WP-13): the built image in
+# compose (test/e2e/chaos.compose.yml) under real faults, about 35
+# minutes because one subscriber stays down for 30 (CHAOS_SUBSCRIBER_DOWN
+# shortens it locally). CHAOS_IMAGE reuses a built image. Fails when a
+# test fails and when zero tests ran; the observation tables go to
+# $GITHUB_STEP_SUMMARY in CI.
+chaos:
+	@rc=0; \
+	(cd test/e2e && $(GO) test -tags chaos -count=1 -v -timeout 60m -run '^TestChaos$$' .) 2>&1 | tee chaos.log || rc=$$?; \
+	n=$$(grep -c '^--- PASS' chaos.log || true); \
+	echo "chaos: $$n top-level tests passed"; \
+	if [ "$$rc" -ne 0 ]; then echo "chaos: go test exited $$rc"; exit "$$rc"; fi; \
+	if [ "$$n" -eq 0 ]; then echo "chaos: zero tests ran"; exit 1; fi
+
+# The reference Caddy snippet in front of the built image (WP-13):
+# /metrics, the public cache, /basemap/ ranges, mTLS and the forged
+# subject header, the rate limit behind the edge.
+caddy:
+	@rc=0; \
+	(cd test/e2e && $(GO) test -tags chaos -count=1 -v -timeout 20m -run '^TestCaddyProfile$$' .) 2>&1 | tee caddy.log || rc=$$?; \
+	n=$$(grep -c '^--- PASS' caddy.log || true); \
+	echo "caddy: $$n top-level tests passed"; \
+	if [ "$$rc" -ne 0 ]; then echo "caddy: go test exited $$rc"; exit "$$rc"; fi; \
+	if [ "$$n" -eq 0 ]; then echo "caddy: zero tests ran"; exit 1; fi
+
+# The lab's conformance suite (docs/PLAN.md section 10.6): LAB_DIR
+# (default ../uspace-lab) with conformance/cisp/ runs it against the
+# chaos stack and fails on a failure; without it, says so and exits 0.
+conformance:
+	GO=$(GO) tools/conformance.sh
+
+# tools/conformance.sh in each state, against fake suites.
+conformance-selftest:
+	tools/conformance-selftest.sh
+
+# deploy/deploy.sh refusing an unsigned image from a local registry
+# (docker and cosign required).
+deploy-selftest:
+	tools/deploy-selftest.sh
 
 # uspace-core's vector tests with this module's build list, then this
 # module's own vector adapters (TestVectors<File>; none until WP-3).
@@ -177,4 +223,5 @@ image:
 ci: build vet lint race jws-smoke generate-check vectors vulncheck secrets integration
 
 clean:
-	rm -f coverage.out integration.log e2e.log
+	rm -f coverage.out integration.log e2e.log chaos.log caddy.log
+	rm -rf conformance-report

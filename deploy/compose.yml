@@ -1,21 +1,24 @@
 # uspace-cisp demo deployment (docs/PLAN.md section 11): one compose
-# project on its own network. Images are built in CI and pulled by tag;
-# `latest` is never deployed. Secrets and addresses come from deploy/.env
-# (copy deploy/.env.example; git-ignored).
+# project on its own network. Images are built and signed in CI and run
+# by digest; `latest` is never deployed. Secrets and addresses come from
+# deploy/.env (copy deploy/.env.example; git-ignored). deploy/deploy.sh
+# resolves the two images to digests, verifies their cosign signatures
+# and starts this file with them (docs/RUNBOOKS/deploy.md):
 #
-#   CISP_IMAGE_TAG=<short sha or tag> docker compose -f deploy/compose.yml up -d
+#   deploy/deploy.sh ghcr.io/rootxkit/uspace-cisp:<sha or tag> ghcr.io/rootxkit/uspace-cisp-web:<sha or tag>
 #
 # Caddy is shared and lives in the deployment repository (uspace-deploy),
 # which attaches api and web to its edge network and composes
 # deploy/caddy/Caddyfile.snippet into the real Caddyfile.
 #
-# Until WP-1, `cispctl migrate` answers "not implemented" and exits 4, so
-# api and deliver (which wait for migrate to succeed) do not start: the
-# stack refuses to run unmigrated rather than pretending.
+# `cispctl migrate all` applies both migration trees; api and deliver
+# wait for it to succeed, so the stack refuses to run unmigrated rather
+# than pretending. (The command was `cispctl migrate`, a usage error since
+# WP-1, so this file could not have started; the chaos suite runs it.)
 name: uspace-cisp
 
 x-go-image: &go-image
-  image: ghcr.io/rootxkit/uspace-cisp:${CISP_IMAGE_TAG:?set CISP_IMAGE_TAG to a short SHA or tag}
+  image: ${CISP_GO_IMAGE:?run deploy/deploy.sh, which sets CISP_GO_IMAGE to a verified digest}
   env_file: .env
   restart: unless-stopped
   networks: [cisp]
@@ -66,7 +69,7 @@ services:
   migrate:
     <<: *go-image
     restart: "no"
-    command: ["cispctl", "migrate"]
+    command: ["cispctl", "migrate", "all"]
     depends_on:
       postgres: {condition: service_healthy}
     deploy:
@@ -76,6 +79,12 @@ services:
   api:
     <<: *go-image
     command: ["api"]
+    environment:
+      # The Go runtime's soft limit under the container's 256M: the GC
+      # works harder near it instead of growing past the limit. With the
+      # 8 MiB publication cap a PUT peaks near 170 MB of heap
+      # (docs/PLAN.md section 15 Q46).
+      GOMEMLIMIT: 200MiB
     depends_on:
       migrate: {condition: service_completed_successfully}
       nats: {condition: service_started}
@@ -92,6 +101,8 @@ services:
   deliver:
     <<: *go-image
     command: ["deliver"]
+    environment:
+      GOMEMLIMIT: 48MiB
     depends_on:
       migrate: {condition: service_completed_successfully}
       nats: {condition: service_started}
@@ -112,7 +123,7 @@ services:
     # is the MFA challenge seal, from deploy/.env. Caddy routes /_bff/*
     # and every page here, /public/*, /v1/* and /basemap/* elsewhere.
     profiles: [web]
-    image: ghcr.io/rootxkit/uspace-cisp-web:${CISP_IMAGE_TAG:?set CISP_IMAGE_TAG to a short SHA or tag}
+    image: ${CISP_WEB_IMAGE:?run deploy/deploy.sh, which sets CISP_WEB_IMAGE to a verified digest}
     restart: unless-stopped
     networks: [cisp]
     read_only: true

@@ -127,7 +127,7 @@ var Catalogue = []Var{
 	{Name: EnvReadMaxAgeS, Default: "60"},
 	{Name: EnvPublicRPM, Default: "60"},
 	{Name: EnvTrustedProxyCIDR, Default: ""},
-	{Name: EnvMaxPublicationBytes, Default: "33554432"},
+	{Name: EnvMaxPublicationBytes, Default: "8388608"},
 	{Name: EnvMaxSubscriptionsPerClient, Default: "20"},
 	{Name: EnvBrandingFile, Default: ""},
 	{Name: EnvMaxRestrictionBytes, Default: "262144"},

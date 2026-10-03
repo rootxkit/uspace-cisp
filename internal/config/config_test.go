@@ -154,7 +154,7 @@ func TestDefaults(t *testing.T) {
 		{EnvIssuerURL, api.IssuerURL, ""},
 		{EnvReadMaxAgeS, api.ReadMaxAge, 60 * time.Second},
 		{EnvPublicRPM, api.PublicRPM, int64(60)},
-		{EnvMaxPublicationBytes, api.MaxPublicationBytes, int64(32 << 20)},
+		{EnvMaxPublicationBytes, api.MaxPublicationBytes, int64(8 << 20)},
 		{EnvMaxSubscriptionsPerClient, api.MaxSubscriptionsPerClient, int64(20)},
 		{EnvBrandingFile, api.BrandingFile, ""},
 		{EnvMaxRestrictionBytes, api.MaxRestrictionBytes, int64(256 << 10)},

@@ -50,6 +50,24 @@ func TestMigrateBothTrees(t *testing.T) {
 	}
 }
 
+// migrate all applies both trees, relational first, the compose
+// migrate service's command (deploy/compose.yml); without the
+// timeseries URL it applies the relational tree and then stops naming
+// the missing variable (E-01 twin).
+func TestMigrateAll(t *testing.T) {
+	env := testEnv(t)
+	code, out, errOut := runCtl([]string{"migrate", "all"}, env)
+	ri, ti := strings.Index(out, "relational: applied versions"), strings.Index(out, "timeseries: applied versions")
+	if code != exitOK || ri < 0 || ti < ri {
+		t.Fatalf("migrate all = %d %q %q", code, out, errOut)
+	}
+	t.Log(strings.TrimSpace(out))
+	code, out, errOut = runCtl([]string{"migrate", "all"}, env[:1])
+	if code != exitConfig || !strings.Contains(out, "relational: applied versions") || !strings.Contains(errOut, "CISP_TIMESERIES_URL is not set") {
+		t.Fatalf("without the timeseries URL = %d %q %q", code, out, errOut)
+	}
+}
+
 // The relational tree against the timeseries database is refused.
 func TestMigrateRefusesTheWrongDatabase(t *testing.T) {
 	env := testEnv(t)

@@ -37,6 +37,8 @@ jobs:
       generate: ${{ github.event_name != 'pull_request' || steps.filter.outputs.generate == 'true' }}
       integration: ${{ github.event_name != 'pull_request' || steps.filter.outputs.integration == 'true' }}
       web: ${{ github.event_name != 'pull_request' || steps.filter.outputs.web == 'true' }}
+      caddy: ${{ github.event_name != 'pull_request' || steps.filter.outputs.caddy == 'true' }}
+      release: ${{ github.event_name != 'pull_request' || steps.filter.outputs.release == 'true' }}
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
@@ -80,6 +82,22 @@ jobs:
               - 'web/**'
               - 'api/openapi.yaml'
               - 'deploy/Dockerfile.web'
+              - '.github/workflows/ci.yml'
+            caddy:
+              - 'deploy/**'
+              - 'Dockerfile'
+              - 'test/e2e/**'
+              - 'internal/auth/**'
+              - 'internal/httpapi/**'
+              - 'cmd/api/**'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/ci.yml'
+            release:
+              - 'deploy/deploy.sh'
+              - 'tools/conformance*.sh'
+              - 'tools/deploy-selftest.sh'
+              - 'Makefile'
               - '.github/workflows/ci.yml'
 
   build-vet-lint:
@@ -209,6 +227,8 @@ jobs:
             echo "CISP_TEST_DATABASE_URL=postgres://cisp_api:${api_pw}@127.0.0.1:5432/cisp?sslmode=disable"
             echo "CISP_TEST_TIMESERIES_URL=postgres://cisp_deliver:${deliver_pw}@127.0.0.1:5432/cisp_ts?sslmode=disable"
             echo "CISP_TEST_NATS_URL=nats://127.0.0.1:4222"
+            echo "CISP_TEST_ADMIN_URL=postgres://postgres:ci-superuser-only-in-this-job@127.0.0.1:5432/postgres?sslmode=disable"
+            echo "CISP_TEST_PG_CONTAINER=${{ job.services.postgres.id }}"
           } >> "$GITHUB_ENV"
       - name: make integration (fails when zero tests ran)
         run: make integration
@@ -319,6 +339,86 @@ jobs:
             web/test-results
             web/playwright.log
 
+  # The reference Caddy snippet in front of the built image (WP-13): the
+  # chaos stack's caddy profile. The observations go to the step summary.
+  caddy:
+    name: Caddy profile (built image)
+    needs: changes
+    if: needs.changes.outputs.caddy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: docker/setup-buildx-action@v3
+      - name: the Go image, as the image job builds it
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: uspace-cisp:chaos-ci
+          build-args: VERSION=caddy-${{ github.sha }}
+          cache-from: type=gha,scope=go
+      - name: make caddy (fails when zero tests ran)
+        env:
+          CHAOS_IMAGE: uspace-cisp:chaos-ci
+        run: make caddy
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: caddy-log
+          path: caddy.log
+
+  # The release tooling against fakes: make conformance in each state,
+  # and deploy/deploy.sh refusing an unsigned image from a local registry.
+  release-tooling:
+    name: conformance target and deploy script
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: sigstore/cosign-installer@v3
+      - name: make conformance-selftest
+        run: make conformance-selftest | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: make deploy-selftest
+        run: |
+          cosign version 2>&1 | grep -E '^GitVersion' | tee -a "$GITHUB_STEP_SUMMARY"
+          make deploy-selftest | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The lab's conformance suite (docs/PLAN.md section 10.6), main only:
+  # run against the chaos stack when uspace-lab has conformance/cisp/,
+  # otherwise a visible "skipped" line in the step summary.
+  conformance:
+    name: lab conformance
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: rootxkit/uspace-lab
+          path: lab
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: make conformance
+        run: |
+          echo "uspace-lab at $(git -C lab rev-parse --short HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          make conformance LAB_DIR=lab
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-report
+          path: conformance-report
+          if-no-files-found: ignore
+
   vectors:
     name: knowledge vectors
     needs: changes
@@ -376,16 +476,20 @@ jobs:
 
   # main and v* tags only, after every gate passed: the images, tagged by
   # short SHA (and by the git tag on a tag). `latest` is never pushed.
-  # SBOM and cosign are WP-13.
+  # Each is signed by digest with cosign keyless (the workflow's OIDC
+  # identity), carries a syft SPDX SBOM as a signed attestation, and is
+  # verified with deploy/deploy.sh --verify-only, the check the deploy
+  # makes (spec 06 section 4).
   image:
     name: images
     if: github.event_name == 'push'
-    needs: [build-vet-lint, generate-check, test-race, integration, e2e, web, vectors, govulncheck, gitleaks]
+    needs: [build-vet-lint, generate-check, test-race, integration, e2e, web, vectors, govulncheck, gitleaks, caddy, release-tooling]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - name: tags
@@ -409,6 +513,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Go image (api, deliver, cispctl)
+        id: go
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -418,6 +523,7 @@ jobs:
           cache-from: type=gha,scope=go
           cache-to: type=gha,mode=max,scope=go
       - name: web image (Next.js standalone, deploy/Dockerfile.web)
+        id: web
         uses: docker/build-push-action@v6
         with:
           context: web
@@ -426,3 +532,47 @@ jobs:
           tags: ${{ steps.tags.outputs.web }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+      - uses: sigstore/cosign-installer@v3
+      - name: SBOM of the Go image (syft, SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/rootxkit/uspace-cisp@${{ steps.go.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-uspace-cisp.spdx.json
+          upload-artifact: false
+      - name: SBOM of the web image (syft, SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/rootxkit/uspace-cisp-web@${{ steps.web.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-uspace-cisp-web.spdx.json
+          upload-artifact: false
+      - name: sign both digests and attach the SBOMs (cosign keyless)
+        env:
+          GO_REF: ghcr.io/rootxkit/uspace-cisp@${{ steps.go.outputs.digest }}
+          WEB_REF: ghcr.io/rootxkit/uspace-cisp-web@${{ steps.web.outputs.digest }}
+        run: |
+          cosign sign --yes "$GO_REF"
+          cosign sign --yes "$WEB_REF"
+          cosign attest --yes --type spdxjson --predicate sbom-uspace-cisp.spdx.json "$GO_REF"
+          cosign attest --yes --type spdxjson --predicate sbom-uspace-cisp-web.spdx.json "$WEB_REF"
+      - name: verify as the deploy does (deploy/deploy.sh --verify-only)
+        env:
+          GO_REF: ghcr.io/rootxkit/uspace-cisp@${{ steps.go.outputs.digest }}
+          WEB_REF: ghcr.io/rootxkit/uspace-cisp-web@${{ steps.web.outputs.digest }}
+        run: |
+          deploy/deploy.sh --verify-only "$GO_REF" "$WEB_REF" 2>&1 | tee verify.log
+          {
+            echo '### Images'
+            echo
+            echo "- $GO_REF"
+            echo "- $WEB_REF"
+            echo
+            echo '```'
+            cat verify.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom-*.spdx.json

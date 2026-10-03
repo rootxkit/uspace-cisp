@@ -24,9 +24,14 @@
 	# client certificate on the mTLS routes.
 	request_header -X-Client-Cert-Subject
 
+	# Without a client certificate the placeholder is null in CEL, and
+	# null != "" is true: the null test is what keeps a request without a
+	# certificate out of this route (it would otherwise forward the
+	# literal "{http.request.tls.client.subject}"; the chaos suite's
+	# Caddy profile caught it).
 	@mtls {
 		path /v1/restrictions /v1/restrictions/* /v1/publishers/heartbeat
-		expression {http.request.tls.client.subject} != ""
+		expression {http.request.tls.client.subject} != null && {http.request.tls.client.subject} != ""
 	}
 	handle @mtls {
 		reverse_proxy {$CISP_API_UPSTREAM} {
@@ -61,8 +66,12 @@
 		respond 404
 	}
 
+	# The shared basemap (M38), with range requests (file_server answers
+	# Range with 206) and a day's cache: the lab rebuilds the volume
+	# rarely, and a browser revalidates by ETag after the day.
 	handle_path /basemap/* {
 		root * {$USPACE_BASEMAP_DIR}
+		header Cache-Control "public, max-age=86400"
 		file_server
 	}
 

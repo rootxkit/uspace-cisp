@@ -50,6 +50,8 @@ commands:
   migrate relational|timeseries [--down-to N]
                   apply the tree's pending migrations (or roll back to
                   version N) and print the applied versions
+  migrate all     apply both trees, relational first (the compose
+                  migrate service)
   migrate status relational|timeseries
                   print every migration of the tree and whether it is applied
   rebuild-current --dataset zones|uspace_airspace|ussp_list
@@ -73,6 +75,12 @@ commands:
                   recompute the events hash chain over [from, to); exit 0
                   with the count verified, 1 naming the first row that
                   breaks it
+  verify-backup --dump FILE|DIR [--pg-restore CMD] [--restore-host H:P]
+                  restore the newest relational dump into a scratch
+                  database (VERIFY_BACKUP_ADMIN_URL: a role that may
+                  create databases), check every current_version, every
+                  body hash and the events chain, drop it; exit 1 naming
+                  what is wrong
   partitions [--ensure-months N]
                   create the monthly events partitions from this month
                   through N months ahead (default 3; run monthly)
@@ -113,6 +121,8 @@ func runIO(ctx context.Context, args, environ []string, stdin io.Reader, stdout,
 		return configCheck(environ, stdout, stderr)
 	case len(args) == 3 && args[0] == "migrate" && args[1] == "status":
 		return migrateStatus(ctx, args[2], environ, stdout, stderr)
+	case len(args) == 2 && args[0] == "migrate" && args[1] == "all":
+		return migrateAll(ctx, environ, stdout, stderr)
 	case len(args) >= 2 && args[0] == "migrate":
 		return migrate(ctx, args[1:], environ, stdout, stderr)
 	case len(args) >= 1 && args[0] == "rebuild-current":
@@ -123,6 +133,8 @@ func runIO(ctx context.Context, args, environ []string, stdin io.Reader, stdout,
 		return createAccount(ctx, args[1:], environ, stdout, stderr)
 	case len(args) >= 1 && args[0] == "verify-audit":
 		return verifyAudit(ctx, args[1:], environ, stdout, stderr, now)
+	case len(args) >= 1 && args[0] == "verify-backup":
+		return verifyBackup(ctx, args[1:], environ, stdout, stderr, now)
 	case len(args) >= 1 && args[0] == "export-audit":
 		return exportAudit(ctx, args[1:], environ, stdout, stderr, now)
 	case len(args) >= 1 && args[0] == "partitions":
@@ -272,6 +284,18 @@ func migrate(ctx context.Context, args, environ []string, stdout, stderr io.Writ
 		line += "; pending " + strings.Join(pending, ", ")
 	}
 	_, _ = fmt.Fprintln(stdout, line)
+	return exitOK
+}
+
+// migrateAll applies both trees, relational first, and stops at the
+// first that fails: the one-shot compose service (deploy/compose.yml),
+// which has no shell to run two commands.
+func migrateAll(ctx context.Context, environ []string, stdout, stderr io.Writer) int {
+	for _, tree := range []string{"relational", "timeseries"} {
+		if code := migrate(ctx, []string{tree}, environ, stdout, stderr); code != exitOK {
+			return code
+		}
+	}
 	return exitOK
 }
 

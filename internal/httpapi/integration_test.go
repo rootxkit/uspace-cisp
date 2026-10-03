@@ -183,13 +183,13 @@ func TestIntakeWithTheDatabaseGone(t *testing.T) {
 	t.Logf("database gone: %d %s", rec.Code, strings.TrimSpace(rec.Body.String()))
 }
 
-// A 20 MB publication of 5 000 zones (polygons of 20 vertices around
-// Tbilisi) completes under the section 9 budget; the duration is logged
-// and the test fails above 30 s.
+// A publication of 5 000 zones (polygons of 20 vertices around Tbilisi)
+// just under the 8 MiB default cap completes under the section 9 budget;
+// the duration is logged and the test fails above 30 s.
 func TestPublication5000ZonesBudget(t *testing.T) {
 	st, pool := pgStore(t)
 	h := newPubHarness(t, st)
-	body := syntheticZones(t, 5000, 20, 20_000_000)
+	body := syntheticZones(t, 5000, 20, DefaultMaxPublicationBytes-2<<20)
 	if rec := h.put("zones", []byte(emptyCollection)); rec.Code != 201 && rec.Code != 200 {
 		t.Fatalf("empty = %d", rec.Code)
 	}
@@ -202,6 +202,9 @@ func TestPublication5000ZonesBudget(t *testing.T) {
 		t.Fatalf("PUT = %d %s", rec.Code, rec.Body.String()[:min(rec.Body.Len(), 2000)])
 	}
 	r := decodeResult(t, rec)
+	if int64(len(body)) > DefaultMaxPublicationBytes {
+		t.Fatalf("the body is %d bytes, over the default cap", len(body))
+	}
 	t.Logf("5000-zone publication: %d bytes, %d features, version %d, accepted in %s (budget 10 s p95; fails above 30 s)",
 		len(body), *r.FeatureCount, r.Version, elapsed.Round(time.Millisecond))
 	if elapsed > 30*time.Second {

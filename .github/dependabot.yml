@@ -1,0 +1,60 @@
+# Dependency updates (spec 06 section 4, T10): weekly, grouped so one PR
+# per ecosystem carries the week's minor and patch bumps; majors arrive
+# one PR each, because a major is read, not merged on green. Every PR
+# runs the full CI (vectors included: a uspace-core bump is a behaviour
+# change only through a vector, docs/RELEASING.md).
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  # web/ uses pnpm; Dependabot's npm ecosystem updates pnpm-lock.yaml.
+  # The uspace-ui kit is a release tarball URL (docs/PLAN.md section 15
+  # Q14) and is bumped by hand with its integrity.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+    ignore:
+      - dependency-name: "@rootxkit/uspace-ui"
+    groups:
+      web-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The base images of the Go image, the web image and the subscriber.
+  - package-ecosystem: docker
+    directories: [/, /deploy, /test/e2e/subscriber]
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: build
+    groups:
+      images:
+        patterns: ["*"]

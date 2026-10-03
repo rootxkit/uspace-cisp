@@ -1188,7 +1188,7 @@ func gunzipBounded(gz []byte, maxBytes int64) ([]byte, error) {
 // DefaultMaxPublicationBytes is the export's parse limit when
 // Reads.MaxPublicationBytes is not set: the CISP_MAX_PUBLICATION_BYTES
 // default.
-const DefaultMaxPublicationBytes = 32 << 20
+const DefaultMaxPublicationBytes = 8 << 20
 
 func (r *Reads) maxPublicationBytes() int64 {
 	if r.MaxPublicationBytes <= 0 {

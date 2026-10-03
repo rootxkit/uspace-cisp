@@ -1032,3 +1032,35 @@ func TestRestrictionPlannedExpiry(t *testing.T) {
 		t.Error("an expired planned restriction is still current")
 	}
 }
+
+// HEAD agrees with GET on a restrictions dataset while the ANSP is
+// stale: no-store, as GET's body is, and no X-CIS-Signature (the stored
+// one signs bytes GET does not serve, so a client comparing it by HEAD
+// would never match). Heard from, HEAD and GET both carry the stored
+// signature and the cacheable Cache-Control (S4, E-01).
+func TestRestrictionsHeadWhileANSPStale(t *testing.T) {
+	h, t0 := restrictionHarness(t)
+	h.pubs.Now = func() time.Time { return t0 }
+	h.postRestriction(createDoc("NOTAM-H", 1, "active", "DARS002", t0, t0.Add(time.Hour)))
+	// Never heard from: stale.
+	get, head := h.read(http.MethodGet, "/v1/restrictions"), h.read(http.MethodHead, "/v1/restrictions")
+	if head.Code != http.StatusOK || head.Header().Get("Cache-Control") != "no-store" || head.Header().Get(HeaderSignature) != "" {
+		t.Errorf("stale HEAD: %d Cache-Control %q signature %q", head.Code, head.Header().Get("Cache-Control"), head.Header().Get(HeaderSignature))
+	}
+	if get.Header().Get("Cache-Control") != "no-store" || head.Header().Get("ETag") != get.Header().Get("ETag") {
+		t.Errorf("stale GET %q, ETags %q %q", get.Header().Get("Cache-Control"), get.Header().Get("ETag"), head.Header().Get("ETag"))
+	}
+	// Heard from: both cacheable, the same stored signature.
+	body := `{"sent_at":"` + t0.Format(time.RFC3339) + `","active_refs":["NOTAM-H"]}`
+	if _, rec := h.heartbeat(h.anspToken(), body, func(r *http.Request) { r.Header.Set(auth.HeaderClientCertSubject, anspSubject) }); rec.Code != http.StatusNoContent {
+		t.Fatalf("heartbeat = %d", rec.Code)
+	}
+	h.at(t0.Add(15 * time.Second))
+	get, head = h.read(http.MethodGet, "/v1/restrictions"), h.read(http.MethodHead, "/v1/restrictions")
+	if head.Header().Get("Cache-Control") == "no-store" || head.Header().Get("Cache-Control") != get.Header().Get("Cache-Control") {
+		t.Errorf("heard: HEAD %q GET %q", head.Header().Get("Cache-Control"), get.Header().Get("Cache-Control"))
+	}
+	if sig := head.Header().Get(HeaderSignature); sig == "" || sig != get.Header().Get(HeaderSignature) {
+		t.Errorf("heard: HEAD signature %q, GET %q", sig, get.Header().Get(HeaderSignature))
+	}
+}

@@ -637,7 +637,14 @@ func (r *Reads) unfiltered(ctx context.Context, ds publication.Dataset, q readQu
 	} else {
 		h["Content-Type"] = mediaGeoJSON
 	}
-	if member, stale := r.stalePublisher(ctx, ds, q.head); stale {
+	if member, stale := r.stalePublisher(ctx, ds); stale {
+		if q.head {
+			// What GET would answer has a body the stored signature does
+			// not sign, and is never cached: say so, without a signature
+			// a client would compare and never match (S4).
+			h["Cache-Control"] = "no-store"
+			return readResponse{status: http.StatusOK, headers: h, gz: snap.BodyGz, head: true}, nil
+		}
 		return r.withStalePublisher(ctx, ds, h, snap.BodyGz, member)
 	}
 	// Only a test store holds an unsigned snapshot (NoopSigner); an empty
@@ -652,8 +659,8 @@ func (r *Reads) unfiltered(ctx context.Context, ds publication.Dataset, q readQu
 // restrictions body while the ANSP is stale (a time, or null when never
 // heard from). A staleness that cannot be read is logged and leaves the
 // body as stored: the member says the ANSP is stale, never that it is not.
-func (r *Reads) stalePublisher(ctx context.Context, ds publication.Dataset, head bool) (json.RawMessage, bool) {
-	if ds != publication.DatasetRestrictions || r.PublisherStale == nil || head {
+func (r *Reads) stalePublisher(ctx context.Context, ds publication.Dataset) (json.RawMessage, bool) {
+	if ds != publication.DatasetRestrictions || r.PublisherStale == nil {
 		return nil, false
 	}
 	stale, since, err := r.PublisherStale(ctx)
@@ -768,10 +775,13 @@ func (r *Reads) filtered(ctx context.Context, ds publication.Dataset, f filter, 
 		return r.failure(ctx, ds, err)
 	}
 	h["Content-Type"] = mediaGeoJSON
-	if member, stale := r.stalePublisher(ctx, ds, q.head); stale {
+	if member, stale := r.stalePublisher(ctx, ds); stale {
+		// HEAD answers the headers of the same body (S4).
 		body = withTopMember(body, member)
 		h["Cache-Control"] = "no-store"
-		r.count(CounterStalePublisherServed)
+		if !q.head {
+			r.count(CounterStalePublisherServed)
+		}
 	}
 	return readResponse{status: http.StatusOK, headers: h, body: body, head: q.head}, nil
 }

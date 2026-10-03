@@ -78,6 +78,11 @@ type Options struct {
 	// route middleware, the body caps, the logs and the metrics all key
 	// on the operation. Set by NewRouter.
 	RouteAliases map[string]string
+	// Deprecations are the deprecated operations whose responses carry
+	// Deprecation, Sunset and Link, keyed by pattern; nil: Deprecated,
+	// the table of the published API. NewRouter refuses an entry for no
+	// operation and a sunset under MinDeprecationWindow.
+	Deprecations map[string]Deprecation
 }
 
 // PublicRoutes are the operations served without authentication: the
@@ -111,6 +116,12 @@ func NewRouter(server gen.StrictServerInterface, opts Options) (http.Handler, er
 		if !slices.Contains(mux.patterns, p) {
 			return nil, fmt.Errorf("a route handler for no operation: %s", p)
 		}
+	}
+	if opts.Deprecations == nil {
+		opts.Deprecations = Deprecated
+	}
+	if err := checkDeprecations(mux.patterns, opts.Deprecations); err != nil {
+		return nil, err
 	}
 	opts.RouteAliases = mux.aliases
 	return Wrap(mux.ServeMux, opts), nil
@@ -242,6 +253,7 @@ func Wrap(mux *http.ServeMux, opts Options) http.Handler {
 	h = bodyCap(h, opts.MaxBodyBytes, opts.RouteBodyCaps)
 	h = tracing(h, opts.Tracer)
 	h = recoverer(h, opts.Logger, panics)
+	h = deprecationHeaders(h, opts.Deprecations)
 	h = access(h, opts.Logger, hist, mux, opts.RouteAliases, opts.Now)
 	return requestID(h)
 }

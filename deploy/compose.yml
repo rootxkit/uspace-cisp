@@ -9,9 +9,10 @@
 # which attaches api and web to its edge network and composes
 # deploy/caddy/Caddyfile.snippet into the real Caddyfile.
 #
-# Until WP-1, `cispctl migrate` answers "not implemented" and exits 4, so
-# api and deliver (which wait for migrate to succeed) do not start: the
-# stack refuses to run unmigrated rather than pretending.
+# `cispctl migrate all` applies both migration trees; api and deliver
+# wait for it to succeed, so the stack refuses to run unmigrated rather
+# than pretending. (The command was `cispctl migrate`, a usage error since
+# WP-1, so this file could not have started; the chaos suite runs it.)
 name: uspace-cisp
 
 x-go-image: &go-image
@@ -66,7 +67,7 @@ services:
   migrate:
     <<: *go-image
     restart: "no"
-    command: ["cispctl", "migrate"]
+    command: ["cispctl", "migrate", "all"]
     depends_on:
       postgres: {condition: service_healthy}
     deploy:

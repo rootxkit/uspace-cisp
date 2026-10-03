@@ -706,3 +706,34 @@ func TestContractCopyIsTheLabs(t *testing.T) {
 		t.Error("a negative dropped_frames validates")
 	}
 }
+
+// A handler between reserve and attach when Close runs (N1): its client
+// is closed with 1001 at once and never counted, so the gauge does not
+// stay at 1 after the hub closed. A client attached before Close is
+// closed with 1001 by Close itself (E-01).
+func TestAttachAfterCloseIsClosed(t *testing.T) {
+	st := obs.NewStatus("api", nil, time.Now())
+	hub := NewHub(Config{Status: st, Source: healthyParts})
+	before := newFakeConn()
+	hub.reserve()
+	hub.attach(before, nil, false, nil)
+	if !hub.reserve() {
+		t.Fatal("reserve refused on an open hub")
+	}
+	hub.Close()
+	late := newFakeConn()
+	hub.attach(late, nil, false, nil)
+	for name, c := range map[string]*fakeConn{"before Close": before, "after Close": late} {
+		select {
+		case code := <-c.closed:
+			if code != CloseGoingAway {
+				t.Errorf("%s: closed with %d", name, code)
+			}
+		case <-time.After(2 * time.Second):
+			t.Errorf("%s: never closed", name)
+		}
+	}
+	if n := hub.Len(); n != 0 {
+		t.Errorf("%d clients after Close", n)
+	}
+}

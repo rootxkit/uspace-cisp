@@ -134,10 +134,17 @@ type Outcome struct {
 	// Err says why it failed; nil for a 2xx.
 	Err error
 	// Code labels cisp_delivery_result_total: the status code, or
-	// timeout, ssrf_refused, error.
+	// timeout, ssrf_refused, payload_too_large, error.
 	Code    string
 	Latency time.Duration
+	// Payload says the failure is the payload's (too large to send),
+	// never the subscriber's.
+	Payload bool
 }
+
+// ResultPayloadTooLarge labels a webhook not sent because it is over
+// MaxTokenBytes.
+const ResultPayloadTooLarge = "payload_too_large"
 
 // OK reports a 2xx.
 func (o Outcome) OK() bool { return o.Err == nil }
@@ -375,10 +382,18 @@ func (s *Service) attempt(ctx context.Context, cl store.Claim, c *publication.Ch
 	obs.SetError(sspan, err)
 	sspan.End()
 	var o Outcome
-	if err != nil {
+	switch {
+	case err != nil:
 		s.counter(CounterSignFailed).Inc()
 		o = Outcome{Code: "error", Err: fmt.Errorf("not signed: %w", err)}
-	} else {
+	case len(token) > s.cfg.MaxTokenBytes:
+		// Every receiver on core's defaults refuses it, on every attempt:
+		// retrying it would only build a failure run that suspends a
+		// healthy subscriber (docs/PLAN.md section 15 Q49).
+		s.counter(CounterPayloadTooLarge).Inc()
+		o = Outcome{Code: ResultPayloadTooLarge, Payload: true,
+			Err: fmt.Errorf("signed webhook of %d bytes is over the %d-byte bound receivers verify; not sent", len(token), s.cfg.MaxTokenBytes)}
+	default:
 		pctx, pspan := s.spans.Start(ctx, obs.SpanPost)
 		o = s.Post(pctx, cl, token)
 		obs.SetString(pspan, "cisp.delivery_result", o.Code)
@@ -444,15 +459,19 @@ func (s *Service) finishDelivered(ctx context.Context, cl store.Claim, end time.
 }
 
 func (s *Service) finishFailed(ctx context.Context, cl store.Claim, changeAt, end time.Time, o Outcome, errText string, attrs []any) {
-	f := store.FailedAttempt{DeliveryID: cl.DeliveryID, SubscriptionID: cl.SubscriptionID, At: end, Error: errText}
+	f := store.FailedAttempt{DeliveryID: cl.DeliveryID, SubscriptionID: cl.SubscriptionID, At: end, Error: errText, Payload: o.Payload}
 	if o.StatusCode != 0 {
 		code := o.StatusCode
 		f.StatusCode = &code
 	}
 	next, ok := subscription.NextAttempt(cl.Attempts+1, changeAt, end, s.cfg.Retry)
-	if ok {
+	switch {
+	case o.Payload:
+		// The same bytes would be refused again: expire now.
+		f.Expire = true
+	case ok:
 		f.NextRetryAt = &next
-	} else {
+	default:
 		f.Expire = true
 	}
 	res, err := s.store.FinishFailed(ctx, f)
@@ -463,6 +482,12 @@ func (s *Service) finishFailed(ctx context.Context, cl store.Claim, changeAt, en
 		return
 	}
 	s.counter(CounterFailed).Inc()
+	if o.Payload {
+		s.counter(CounterExpired).Inc()
+		s.logger.Error("delivery not sent: the signed webhook is too large for its receiver; the subscription is not charged",
+			append(attrs, slog.String("error", errText))...)
+		return
+	}
 	if res.State == store.DeliveryExpired {
 		s.counter(CounterExpired).Inc()
 		s.logger.Warn("delivery expired", append(attrs, slog.String("error", errText))...)

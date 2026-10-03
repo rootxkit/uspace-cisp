@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math"
@@ -165,7 +166,7 @@ func TestMigrationTreesUpDownUp(t *testing.T) {
 		tables []string
 		files  int
 	}{
-		{TreeRelational, "CISP_TEST_DATABASE_URL", []string{"datasets", "publications", "publication_attempts", "features", "features_current", "snapshots", "changes", "restrictions", "restriction_events", "publishers", "subscriptions", "deliveries", "accounts", "sessions", "events", "job_runs", "deliver_state", "login_challenges"}, 13},
+		{TreeRelational, "CISP_TEST_DATABASE_URL", []string{"datasets", "publications", "publication_attempts", "features", "features_current", "snapshots", "changes", "restrictions", "restriction_events", "publishers", "subscriptions", "deliveries", "accounts", "sessions", "events", "job_runs", "deliver_state", "login_challenges", "snapshot_signatures"}, 14},
 		{TreeTimeseries, "CISP_TEST_TIMESERIES_URL", []string{"delivery_attempts"}, 2},
 	}
 	for _, c := range cases {
@@ -822,3 +823,82 @@ func TestPublishTxWithAndWithoutTheBroker(t *testing.T) {
 }
 
 var _ = pgx.ErrNoRows
+
+// fixedSigner signs every body with one key: kid and a hash of the
+// bytes, so a test can tell which key signed what.
+type fixedSigner struct{ kid string }
+
+func (f fixedSigner) Sign(_ context.Context, body []byte) (string, error) {
+	h := sha256.Sum256(body)
+	return f.kid + "." + hex.EncodeToString(h[:8]), nil
+}
+
+// ResignCurrent signs the current snapshot's stored bytes again under
+// the active key, append-only (S5, Q50): the read path then serves the
+// new signature, snapshots.cisp_signature keeps the one the version was
+// published with, a snapshot_signatures row and an events row record
+// it, and nothing else changes (same ETag, same bytes). A signature
+// recorded for other bytes is never served; a dataset never published
+// is reported and nothing is written (E-01).
+func TestResignCurrent(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t, Options{})
+	fc, body := base(t, "RS")
+	res, err := s.PublishTx(ctx, input(publication.DatasetZones, fc, body), fixedSigner{kid: "cisp-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := s.Snapshot(ctx, publication.DatasetZones, res.Version)
+	if err != nil || !strings.HasPrefix(before.CISPSignature, "cisp-a.") {
+		t.Fatalf("published snapshot %q %v", before.CISPSignature, err)
+	}
+	events := count(t, s.pool, "SELECT count(*) FROM events WHERE event_type = 'snapshot_resigned'")
+	now := time.Now().UTC()
+	rep, err := s.ResignCurrent(ctx, publication.DatasetZones, fixedSigner{kid: "cisp-b"}, "cisp-b", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Version != res.Version || rep.KID != "cisp-b" || !strings.HasPrefix(rep.Signature, "cisp-b.") {
+		t.Errorf("report %+v", rep)
+	}
+	after, err := s.Snapshot(ctx, publication.DatasetZones, res.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.CISPSignature != rep.Signature || after.ETag != before.ETag || !bytes.Equal(after.BodyGz, before.BodyGz) {
+		t.Errorf("served %q (want %q), ETag %q (was %q)", after.CISPSignature, rep.Signature, after.ETag, before.ETag)
+	}
+	var stored string
+	if err := s.pool.QueryRow(ctx, "SELECT cisp_signature FROM snapshots WHERE dataset = 'zones' AND version = $1", res.Version).Scan(&stored); err != nil || stored != before.CISPSignature {
+		t.Errorf("snapshots.cisp_signature %q %v: the published signature was replaced", stored, err)
+	}
+	if n := count(t, s.pool, "SELECT count(*) FROM snapshot_signatures WHERE dataset = 'zones' AND version = $1 AND kid = 'cisp-b'", res.Version); n != 1 {
+		t.Errorf("%d snapshot_signatures rows", n)
+	}
+	if n := count(t, s.pool, "SELECT count(*) FROM events WHERE event_type = 'snapshot_resigned'"); n != events+1 {
+		t.Errorf("events: %d resigned rows, want %d", n, events+1)
+	}
+	// A newer signature of other bytes is never served.
+	if _, err := s.pool.Exec(ctx, `INSERT INTO snapshot_signatures (dataset, version, kid, signature, body_gz_sha256, signed_at)
+		VALUES ('zones', $1, 'cisp-x', 'cisp-x.other', $2, $3)`, res.Version, bytes.Repeat([]byte{1}, 32), now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Snapshot(ctx, publication.DatasetZones, res.Version); got.CISPSignature != rep.Signature {
+		t.Errorf("a signature of other bytes was served: %q", got.CISPSignature)
+	}
+	// Append-only for the application role.
+	for _, stmt := range []string{"UPDATE snapshot_signatures SET kid = kid", "DELETE FROM snapshot_signatures"} {
+		tx, err := s.pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = tx.Exec(ctx, stmt)
+		_ = tx.Rollback(ctx)
+		if sqlState(err) != "42501" {
+			t.Errorf("%s: got %v, want permission denied (42501)", stmt, err)
+		}
+	}
+	if _, err := s.ResignCurrent(ctx, publication.Dataset("nosuch"), fixedSigner{kid: "cisp-b"}, "cisp-b", now); err == nil {
+		t.Error("an unknown dataset was re-signed")
+	}
+}

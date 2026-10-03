@@ -239,6 +239,11 @@ type FailedAttempt struct {
 	// NextRetryAt is when to try again; Expire ends the delivery instead.
 	NextRetryAt *time.Time
 	Expire      bool
+	// Payload says the failure is the payload's, not the subscriber's
+	// (the signed webhook is over the bound receivers verify): the
+	// delivery expires and the subscription's failure run is not
+	// touched, so a change too large to send never suspends anyone.
+	Payload bool
 }
 
 // Failed is the outcome of a failed attempt.
@@ -259,10 +264,15 @@ func (s *Store) FinishFailed(ctx context.Context, f FailedAttempt) (Failed, erro
 	err := s.Tx(ctx, func(q *relational.Queries) error {
 		r, err := q.FinishFailed(ctx, relational.FinishFailedParams{
 			ID: f.DeliveryID, At: f.At, StatusCode: int32Ptr(f.StatusCode), Error: f.Error,
-			NextRetryAt: f.NextRetryAt, Expire: f.Expire,
+			NextRetryAt: f.NextRetryAt, Expire: f.Expire || f.Payload,
 		})
 		if err != nil {
 			return fmt.Errorf("finish failed: %w", err)
+		}
+		if f.Payload {
+			// Not the subscriber's failure: its run is left as it is.
+			out = Failed{Attempts: int(r.Attempts), State: r.State}
+			return nil
 		}
 		sr, err := q.SubscriptionFailed(ctx, relational.SubscriptionFailedParams{ID: f.SubscriptionID, At: f.At})
 		if err != nil {

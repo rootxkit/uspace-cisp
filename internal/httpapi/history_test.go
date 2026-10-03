@@ -3,11 +3,14 @@ package httpapi
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rootxkit/uspace-cisp/internal/applicability"
 	"github.com/rootxkit/uspace-cisp/internal/httpapi/gen"
 	"github.com/rootxkit/uspace-cisp/internal/jws"
 	"github.com/rootxkit/uspace-cisp/internal/obs"
@@ -338,5 +341,108 @@ func TestPublisherStatusRule(t *testing.T) {
 		if p.Stale != c.stale || (p.Stale && c.row.LastHeartbeatAt != nil && (p.StaleSince == nil || !p.StaleSince.Equal(c.row.LastHeartbeatAt.Add(60*time.Second)))) {
 			t.Errorf("%s: %+v", c.name, p)
 		}
+	}
+}
+
+// GET /v1/changes bounds what each record lists: a change of 5 000
+// zones is a summary (empty lists, ids_truncated, the counts, pull_url)
+// that the spec describes; the small change beside it is listed whole
+// with no summary members (Q49, N2).
+func TestReadChangesSummarisesALargeChange(t *testing.T) {
+	h := newPubHarness(t, nil)
+	ids := make([]string, 5000)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("Z%05d", i)
+	}
+	at := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+	h.fake.mu.Lock()
+	h.fake.changes = append(h.fake.changes,
+		publication.Change{ID: 1, Dataset: publication.DatasetZones, Version: 1, FeatureIDs: ids, RemovedIDs: []string{}, Reason: publication.ReasonPublication, At: at},
+		publication.Change{ID: 2, Dataset: publication.DatasetZones, Version: 2, FeatureIDs: []string{"Z00001"}, RemovedIDs: []string{"Z00001"}, Reason: publication.ReasonPublication, At: at})
+	h.fake.mu.Unlock()
+	rec := h.read(http.MethodGet, "/v1/changes")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Changes []map[string]any `json:"changes"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Changes) != 2 {
+		t.Fatalf("%d changes", len(out.Changes))
+	}
+	big, small := out.Changes[0], out.Changes[1]
+	if big["ids_truncated"] != true || big["feature_count"] != float64(5000) || big["removed_count"] != float64(0) ||
+		len(big["feature_ids"].([]any)) != 0 || len(big["removed_ids"].([]any)) != 0 ||
+		big["pull_url"] != "https://uspace-cisp.example.test/v1/zones?since_version=0" {
+		t.Errorf("large change %v", big)
+	}
+	if _, ok := small["ids_truncated"]; ok || len(small["feature_ids"].([]any)) != 1 || len(small["removed_ids"].([]any)) != 1 {
+		t.Errorf("small change %v", small)
+	}
+	if n := rec.Body.Len(); n > 4096 {
+		t.Errorf("the feed answered %d bytes for two changes", n)
+	}
+}
+
+// A filtered read parses each feature of a version once (S3): the same
+// at= read again parses nothing, its body is byte for byte the first
+// one's, and an applies_at= annotation never leaks into a later at= or
+// bbox= answer of the same cached features. A new version is parsed
+// again (E-01).
+func TestFilteredReadsParseAVersionOnce(t *testing.T) {
+	h := newPubHarness(t, nil)
+	h.publishReadZones()
+	at := "/public/v1/zones?at=" + url.QueryEscape("2026-10-03T09:00:00Z")
+	first := h.read(http.MethodGet, at)
+	if first.Code != 200 {
+		t.Fatalf("%d %s", first.Code, first.Body.String())
+	}
+	parsed := h.counter(readsComponent, CounterFeaturesParsed)
+	if parsed == 0 {
+		t.Fatal("the first filtered read parsed nothing")
+	}
+	annotated := h.read(http.MethodGet, "/public/v1/zones?applies_at="+url.QueryEscape("2026-10-03T09:00:00Z"))
+	if !strings.Contains(annotated.Body.String(), applicability.Member) {
+		t.Fatalf("applies_at= carries no %s: %s", applicability.Member, annotated.Body.String())
+	}
+	again := h.read(http.MethodGet, at)
+	if again.Body.String() != first.Body.String() {
+		t.Errorf("the second at= read differs:\n%s\n%s", first.Body.String(), again.Body.String())
+	}
+	if got := h.counter(readsComponent, CounterFeaturesParsed); got != parsed {
+		t.Errorf("parsed %d more features for the same version", got-parsed)
+	}
+	if rec := h.put("zones", []byte(emptyCollection)); rec.Code != 201 {
+		t.Fatal(rec.Code)
+	}
+	h.publishReadZones()
+	h.read(http.MethodGet, at)
+	if got := h.counter(readsComponent, CounterFeaturesParsed); got <= parsed {
+		t.Errorf("a new version was not parsed (%d, was %d)", got, parsed)
+	}
+}
+
+// The anonymous at= read with no box over the national set (5 000
+// zones, more than core's 4 MiB default parse limit as one collection)
+// is answered, not 500: the stored features are parsed in bounded
+// chunks, once (S3).
+func TestFilteredReadOfTheWholeNationalSet(t *testing.T) {
+	h := newPubHarness(t, nil)
+	if rec := h.put("zones", syntheticZones(t, 5000, 20, 1)); rec.Code != 201 {
+		t.Fatalf("PUT = %d", rec.Code)
+	}
+	rec := h.read(http.MethodGet, "/public/v1/zones?at="+url.QueryEscape("2026-10-03T09:00:00Z"))
+	if rec.Code != 200 {
+		t.Fatalf("at= over 5 000 zones = %d %s", rec.Code, rec.Body.String())
+	}
+	if got := h.counter(readsComponent, CounterFeaturesParsed); got != 5000 {
+		t.Errorf("parsed %d features", got)
+	}
+	h.read(http.MethodGet, "/public/v1/zones?at="+url.QueryEscape("2026-10-03T10:00:00Z"))
+	if got := h.counter(readsComponent, CounterFeaturesParsed); got != 5000 {
+		t.Errorf("parsed %d features after a second read", got)
 	}
 }

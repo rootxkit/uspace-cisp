@@ -2,7 +2,7 @@
   "$id": "https://schemas.uspace.ge/cis/change/v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "cis/change/v1: one change record, the body of the change feed,\nof the webhook payload (inside the JWS claims) and of the\nstream's change frames (docs/PLAN.md section 6.7, section 15\nQ28, Q38). msg_id is the change cursor in decimal; pull_url asks\nfor the delta from the previous version on CISP_PUBLIC_BASE_URL;\nbbox is [min lng, min lat, max lng, max lat] of what changed,\nabsent for the whole dataset. producer is uspace-cisp on the bus,\nthe change feed and the stream, and cisp/deliver-<instance> in a\nwebhook (the deliver instance that sent it). A record the ANSP\ndelivers directly to /v1/cis/notifications while the CISP is\nunreachable (cross-plan M1, M5) names the ANSP process,\nansp/<process> or ansp-<n>/<process>-<n> as in the common\nenvelope (ansp/api today); receivers allow-list its issuer.\n\nreason is an open enumeration (spec 04 section 4: values are\nadded within v1). A receiver pulls pull_url only for publication\nand the restriction_* reasons, and only when pull_url's host is\nthe CISP's; it acknowledges subscription_test (the verification\nping of a new or changed subscription), republished (the current\nversion announced again, content unchanged) and any reason it\ndoes not know with 204, without pulling. A subscription_test\nrecord names no change: msg_id is the delivery id (a ULID),\ndataset the first of the subscription's datasets, version and\netag its current version (0 before the first), feature_ids and\nremoved_ids empty, at when the ping was queued.\n",
+  "description": "cis/change/v1: one change record, the body of the change feed,\nof the webhook payload (inside the JWS claims) and of the\nstream's change frames (docs/PLAN.md section 6.7, section 15\nQ28, Q38). msg_id is the change cursor in decimal; pull_url asks\nfor the delta from the previous version on CISP_PUBLIC_BASE_URL;\nbbox is [min lng, min lat, max lng, max lat] of what changed,\nabsent for the whole dataset. producer is uspace-cisp on the bus,\nthe change feed and the stream, and cisp/deliver-<instance> in a\nwebhook (the deliver instance that sent it). A record the ANSP\ndelivers directly to /v1/cis/notifications while the CISP is\nunreachable (cross-plan M1, M5) names the ANSP process,\nansp/<process> or ansp-<n>/<process>-<n> as in the common\nenvelope (ansp/api today); receivers allow-list its issuer.\n\nreason is an open enumeration (spec 04 section 4: values are\nadded within v1). A receiver pulls pull_url only for publication\nand the restriction_* reasons, and only when pull_url's host is\nthe CISP's; it acknowledges subscription_test (the verification\nping of a new or changed subscription), republished (the current\nversion announced again, content unchanged) and any reason it\ndoes not know with 204, without pulling. A subscription_test\nrecord names no change: msg_id is the delivery id (a ULID),\ndataset the first of the subscription's datasets, version and\netag its current version (0 before the first), feature_ids and\nremoved_ids empty, at when the ping was queued.\n\nThe identifier lists are bounded (section 15 Q49): a change that\ntouched more than 200 identifiers, or whose lists would exceed\n3072 bytes encoded, is a summary: feature_ids and removed_ids are\nempty, ids_truncated is true and feature_count and removed_count\nsay how many there were; the delta is at pull_url. The bound\nkeeps a signed webhook under the 8 KiB a receiver on\nuspace-core's defaults verifies. A listed change carries none of\nthe three summary members.\n",
   "properties": {
     "at": {
       "format": "date-time",
@@ -32,12 +32,22 @@
       ],
       "type": "string"
     },
+    "feature_count": {
+      "description": "With ids_truncated, how many identifiers were added, changed or removed.",
+      "minimum": 0,
+      "type": "integer"
+    },
     "feature_ids": {
-      "description": "Every identifier added, changed or removed, sorted.",
+      "description": "Every identifier added, changed or removed, sorted; empty when ids_truncated.",
       "items": {
         "type": "string"
       },
+      "maxItems": 200,
       "type": "array"
+    },
+    "ids_truncated": {
+      "description": "Present and true only on a summary. The change touched more identifiers than a record lists; both lists are empty and the delta is at pull_url.",
+      "type": "boolean"
     },
     "msg_id": {
       "description": "The change cursor in decimal; the delivery id (a ULID) for subscription_test.",
@@ -66,10 +76,17 @@
       ],
       "type": "string"
     },
+    "removed_count": {
+      "description": "With ids_truncated, how many identifiers were removed.",
+      "minimum": 0,
+      "type": "integer"
+    },
     "removed_ids": {
+      "description": "The identifiers removed, sorted; empty when ids_truncated.",
       "items": {
         "type": "string"
       },
+      "maxItems": 200,
       "type": "array"
     },
     "schema": {

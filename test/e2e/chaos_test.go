@@ -843,11 +843,10 @@ func (s *chaosStack) largePublication(t *testing.T) {
 	s.largeChangeWebhook(t, v)
 }
 
-// largeChangeWebhook records what became of the large publication's
-// webhook to subscriber-a: its change names every feature id, and a
-// receiver on core's CompactVerifier refuses a token over its default
-// 8 KiB (docs/PLAN.md section 15 Q49). An observation for the owner,
-// not an assertion: the fix is a cross-system contract.
+// largeChangeWebhook checks what became of the large publication's
+// webhook to subscriber-a: the change is over the id bound, so the
+// webhook is a summary under core's 8 KiB verifier bound and is
+// delivered (docs/PLAN.md section 15 Q49).
 func (s *chaosStack) largeChangeWebhook(t *testing.T, v int64) {
 	t.Helper()
 	var msgID string
@@ -877,8 +876,8 @@ func (s *chaosStack) largeChangeWebhook(t *testing.T, v int64) {
 	line := fmt.Sprintf("change %s (zones:%d) to subscriber-a: delivery %s, %s after %d attempt(s), payload %d bytes, last status %d, last error %q",
 		msgID, v, d.Id, d.State, d.Attempts, payload, deref(d.LastStatusCode), deref(d.LastError))
 	t.Log(line)
-	if d.State != gen.Delivered {
-		line = "FINDING: " + line + ". The webhook carries every feature id of the change; core's CompactVerifier refuses a token over 8192 bytes (auth.DefaultMaxTokenBytes), so a change of a few hundred zones cannot be delivered to any receiver on core's defaults and expires after 24 h (docs/PLAN.md section 15 Q49)."
-	}
 	summary(t, "### Chaos: the webhook of the large change\n\n"+line+"\n")
+	if d.State != gen.Delivered || payload == 0 || payload > 8192 {
+		t.Errorf("the large change's webhook was not delivered under core's 8192-byte bound (Q49): %s", line)
+	}
 }

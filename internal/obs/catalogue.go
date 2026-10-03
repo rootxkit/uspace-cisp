@@ -97,12 +97,14 @@ func buildCatalogue() []Metric {
 
 	// Reads.
 	add(counters("Dataset reads.", "applicability_unknown", "stale_publisher_served", "stale_refused", "stale_served")...)
+	add(counter("filtered_features_parsed", "Stored features parsed for filtered reads (each once per version).", ""))
 	add(counter("integrity_failed", "Stored versions whose body hash did not match when served.", "any increase"))
 	add(counter("signature_cache_evicted", "Version signatures evicted from the bounded cache.", ""))
 	add(counter("outline_failed", "Circles served without cis_display_geometry because no outline could be drawn.", "any increase"))
 	add(counter("ed269_exported", "Versions exported as ED-269 through uspace-core (format=ed269).", ""))
 	add(counter("ed269_not_representable", "ED-269 exports refused 406 because the version holds what ED-269 cannot.", ""))
 	add(counters("Public reads limited per client.", "rate_limited", "rate_limit_clients_evicted", "rate_limit_forwarded_for_unreadable")...)
+	add(counter("rate_limit_proxy_untrusted_forwarded_for", "Requests whose X-Forwarded-For came from a peer outside CISP_TRUSTED_PROXY_CIDR (not believed): the proxy's clients share one bucket.", "any increase in production"))
 
 	// Restrictions.
 	add(counters("Dynamic restrictions.", "restrictions_accepted", "restrictions_refused", "restrictions_replayed", "restrictions_expired")...)
@@ -175,6 +177,7 @@ func buildCatalogue() []Metric {
 	add(counter("intake_failed", "Bus messages deliver could not queue (redelivered).", "any increase for 5 min"))
 	add(counters("Webhook delivery outcomes.", "deliveries_delivered", "deliveries_failed", "subscriptions_verified")...)
 	add(counter("deliveries_expired", "Deliveries given up 24 h after their change.", "any increase"))
+	add(counter("delivery_payload_too_large", "Webhooks not sent because the signed token is over CISP_WEBHOOK_MAX_TOKEN_BYTES (expired; the subscriber is not charged).", "any increase"))
 	add(counter("ssrf_refused", "Callback dials refused by the address policy.", ""))
 	add(counter("subscriptions_suspended_total", "Subscriptions suspended after 50 consecutive failures over 1 h.", ""))
 	add(counters("Delivery bookkeeping failures.", "delivery_log_write_failed", "delivery_record_failed", "delivery_sign_failed", "delivery_claim_failed")...)

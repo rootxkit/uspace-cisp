@@ -49,6 +49,20 @@ func BenchmarkGetZonesBBox(b *testing.B) {
 	b.ReportMetric(float64(len(byID)), "hits")
 }
 
+// BenchmarkGetPublicZonesAt: an anonymous GET /public/v1/zones?at= with
+// no box, the whole set judged at an instant. After the first read the
+// version's features are parsed already (S3): the cost is the scan and
+// the applicability loop.
+func BenchmarkGetPublicZonesAt(b *testing.B) {
+	h := benchZones(b)
+	const target = "/public/v1/zones?at=2026-10-03T09:00:00Z"
+	benchRead(b, h, http.MethodGet, target)
+	b.ResetTimer()
+	for b.Loop() {
+		benchRead(b, h, http.MethodGet, target)
+	}
+}
+
 // BenchmarkHeadDataset: HEAD /v1/zones from the snapshot cache (the
 // subscribers' 60 s reconciliation). Budget: 5 ms p99.
 func BenchmarkHeadDataset(b *testing.B) {

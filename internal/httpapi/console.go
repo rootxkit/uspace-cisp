@@ -979,12 +979,7 @@ func (s *Server) RepublishConsolePublication(ctx context.Context, req gen.Republ
 	c.counter(CounterConsoleActions, "Console actions written (accounts, subscriptions, retries, republications).")
 	c.logger().LogAttrs(ctx, slog.LevelInfo, "console republish", slog.String("account_id", actor.ID),
 		slog.String("dataset", string(ch.Dataset)), slog.Int64("version", ch.Version), slog.Int64("change_id", ch.ID))
-	m := bus.MessageOf(ch, c.PublicBaseURL)
-	return ok(http.StatusAccepted, gen.Change{
-		Schema: gen.ChangeSchema(m.Schema), MsgId: m.MsgID, Producer: m.Producer, Dataset: gen.ChangeDataset(m.Dataset),
-		Version: m.Version, Etag: m.ETag, FeatureIds: m.FeatureIDs, RemovedIds: m.RemovedIDs,
-		Reason: gen.ChangeReason(m.Reason), At: m.At, PullUrl: m.PullURL,
-	}), nil
+	return ok(http.StatusAccepted, genChange(bus.MessageOf(ch, c.PublicBaseURL))), nil
 }
 
 // --- audit and status ----------------------------------------------------------

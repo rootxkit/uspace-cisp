@@ -91,6 +91,7 @@ section 9) where it names one.
 | `cisp_delivery_first_attempt_seconds` | histogram | — | From a change's commit (changes.at) to its first webhook attempt. | p99 above 2 s for 10 min |
 | `cisp_delivery_log_read_failed_total` | counter | `component` | Delivery-log reads that failed (the list says unavailable). | — |
 | `cisp_delivery_log_write_failed_total` | counter | `component` | Delivery bookkeeping failures. | — |
+| `cisp_delivery_payload_too_large_total` | counter | `component` | Webhooks not sent because the signed token is over CISP_WEBHOOK_MAX_TOKEN_BYTES (expired; the subscriber is not charged). | any increase |
 | `cisp_delivery_record_failed_total` | counter | `component` | Delivery bookkeeping failures. | — |
 | `cisp_delivery_result_total` | counter | `code` | Webhook attempts by result code (2xx, 4xx, 5xx, timeout, refused, ...). | — |
 | `cisp_delivery_scan_failed_total` | counter | `component` | Reconciliation scans that failed. | any increase for 1 min |
@@ -101,6 +102,7 @@ section 9) where it names one.
 | `cisp_expiry_last_tick_failures` | gauge | `component` | Restrictions the last expiry tick could not expire. | above 0 |
 | `cisp_expiry_ticks_not_leader_total` | counter | `component` | Expiry ticks. | — |
 | `cisp_expiry_ticks_total` | counter | `component` | Expiry ticks. | — |
+| `cisp_filtered_features_parsed_total` | counter | `component` | Stored features parsed for filtered reads (each once per version). | — |
 | `cisp_handler_panics_total` | counter | `component` | Handler panics turned into 500 responses. | any increase |
 | `cisp_heartbeat_ref_missing_total` | counter | `component` | Active restrictions the ANSP's heartbeat does not declare (shown, never acted on). | — |
 | `cisp_heartbeat_ref_unknown_total` | counter | `component` | ansp_refs the ANSP declares active that the CISP does not hold as active (shown, never acted on). | — |
@@ -123,6 +125,7 @@ section 9) where it names one.
 | `cisp_publisher_stale` | gauge | `component` | Configured publishers whose last heartbeat is older than stale_after_s (or never heard). | above 0 (warning: the publisher is silent; nothing is ended) |
 | `cisp_rate_limit_clients_evicted_total` | counter | `component` | Public reads limited per client. | — |
 | `cisp_rate_limit_forwarded_for_unreadable_total` | counter | `component` | Public reads limited per client. | — |
+| `cisp_rate_limit_proxy_untrusted_forwarded_for_total` | counter | `component` | Requests whose X-Forwarded-For came from a peer outside CISP_TRUSTED_PROXY_CIDR (not believed): the proxy's clients share one bucket. | any increase in production |
 | `cisp_rate_limited_total` | counter | `component` | Public reads limited per client. | — |
 | `cisp_rejected_algorithm_total` | counter | `component` | Bearer tokens refused, by core's reason (component auth). | — |
 | `cisp_rejected_audience_total` | counter | `component` | Bearer tokens refused, by core's reason (component auth). | — |

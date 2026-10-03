@@ -283,6 +283,11 @@ func (f *fakeStore) FinishFailed(ctx context.Context, fa store.FailedAttempt) (s
 	d.attempts++
 	d.lastError, d.lastCode = fa.Error, fa.StatusCode
 	s := f.sub(fa.SubscriptionID)
+	if fa.Payload {
+		// The payload's failure: expired, the subscriber's run untouched.
+		d.state, d.nextRetry = store.DeliveryExpired, nil
+		return store.Failed{Attempts: d.attempts, State: d.state}, nil
+	}
 	if fa.Expire || s.Status == subscription.Deleted {
 		d.state, d.nextRetry = store.DeliveryExpired, nil
 	} else {

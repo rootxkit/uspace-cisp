@@ -76,6 +76,7 @@ const (
 	CounterRecordFailed       = "delivery_record_failed"
 	CounterSignFailed         = "delivery_sign_failed"
 	CounterClaimFailed        = "delivery_claim_failed"
+	CounterPayloadTooLarge    = "delivery_payload_too_large"
 	GaugeQueued               = "deliveries_queued"
 	GaugeDue                  = "deliveries_due"
 	GaugeOldestDueS           = "deliveries_oldest_due_s"
@@ -137,8 +138,13 @@ type Config struct {
 	// across every instance (at most MaxInFlight).
 	MaxPerSubscription int
 	MaxResponseBytes   int64
-	PollInterval       time.Duration
-	ScanInterval       time.Duration
+	// MaxTokenBytes bounds a signed webhook (CISP_WEBHOOK_MAX_TOKEN_BYTES,
+	// default core's auth.DefaultMaxTokenBytes, the bound every receiver
+	// on core's defaults verifies). A larger one is not sent: the
+	// delivery expires as the payload's failure, never the subscriber's.
+	MaxTokenBytes int
+	PollInterval  time.Duration
+	ScanInterval  time.Duration
 	// ScanGrace is how old a change must be before the scan looks at it
 	// (the bus has had its chance); ScanSettle how old before the
 	// watermark passes it.
@@ -191,6 +197,9 @@ func (c *Config) defaults() error {
 	c.MaxPerSubscription = min(c.MaxPerSubscription, c.MaxInFlight)
 	if c.MaxResponseBytes <= 0 {
 		c.MaxResponseBytes = DefaultMaxResponseBytes
+	}
+	if c.MaxTokenBytes <= 0 {
+		c.MaxTokenBytes = coreauth.DefaultMaxTokenBytes
 	}
 	if c.ScanBatch <= 0 {
 		c.ScanBatch = DefaultScanBatch
@@ -270,7 +279,7 @@ func New(cfg Config, st Store, log AttemptLog, signer Signer, opts Options) (*Se
 	})
 	s.results = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: MetricResultTotal,
-		Help: "Delivery attempts by result: the HTTP status code, or timeout, redirect, ssrf_refused, error.",
+		Help: "Delivery attempts by result: the HTTP status code, or timeout, redirect, ssrf_refused, payload_too_large, error.",
 	}, []string{"code"})
 	if opts.Registerer != nil {
 		for _, c := range []prometheus.Collector{s.firstHist, s.results} {
@@ -285,7 +294,7 @@ func New(cfg Config, st Store, log AttemptLog, signer Signer, opts Options) (*Se
 	// Every counter and gauge exists from the start, at zero, so the
 	// healthy line names them (E-09).
 	for _, name := range []string{CounterIntakeDeliveries, CounterScanDeliveries, CounterScans, CounterBusPoison, CounterDelivered,
-		CounterFailed, CounterExpired, CounterSSRFRefused, CounterSuspended, CounterLogWriteFailed} {
+		CounterFailed, CounterExpired, CounterSSRFRefused, CounterSuspended, CounterLogWriteFailed, CounterPayloadTooLarge} {
 		s.counter(name)
 	}
 	for _, name := range []string{GaugeQueued, GaugeDue, GaugeOldestDueS, GaugeInFlight, GaugeSuspended} {

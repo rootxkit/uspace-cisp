@@ -813,3 +813,78 @@ func TestJWSClaimsAreIATAndJTI(t *testing.T) {
 		t.Errorf("iat 6 min old accepted: %v", err)
 	}
 }
+
+// A signed webhook over MaxTokenBytes is the payload's failure, not the
+// subscriber's: it is never posted, the delivery expires at once with
+// the reason, the attempt is logged with its size, and the
+// subscription's failure run does not move, so 49 failures stay 49 and
+// nothing is suspended. Its twin, the same subscription one failure
+// from suspension with a webhook inside the bound answered 502, counts
+// and is suspended (E-01).
+func TestPayloadTooLargeNeverSuspends(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		maxBytes int
+		code     int
+		large    bool
+	}{
+		{"over the bound", 600, http.StatusOK, true},
+		{"inside the bound, 502", 0, http.StatusBadGateway, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, func(c *Config) { c.MaxTokenBytes = tc.maxBytes })
+			r := newReceiver(t, tc.code)
+			h.subscribe("S1", r.url(), subscription.Active)
+			since := time.Now().Add(-2 * time.Hour).UTC()
+			h.st.mu.Lock()
+			s := h.st.sub("S1")
+			s.ConsecutiveFailures, s.FailingSince = 49, &since
+			h.st.mu.Unlock()
+			did := h.queueChange(t, "S1", 1, time.Now())
+			h.send(t)
+			d := h.st.delivery(did)
+			h.st.mu.Lock()
+			failures := h.st.sub("S1").ConsecutiveFailures
+			h.st.mu.Unlock()
+			_, suspended := h.st.suspended["S1"]
+			logged := h.log.all()
+			if len(logged) != 1 {
+				t.Fatalf("logged %d attempts", len(logged))
+			}
+			if !tc.large {
+				if r.hits.Load() != 1 || failures != 50 || !suspended || d.state != store.DeliveryFailed {
+					t.Errorf("hits %d, failures %d, suspended %v, delivery %+v", r.hits.Load(), failures, suspended, d)
+				}
+				if h.counter(CounterPayloadTooLarge) != 0 {
+					t.Error("a 502 counted as too large")
+				}
+				return
+			}
+			if r.hits.Load() != 0 {
+				t.Errorf("posted %d times", r.hits.Load())
+			}
+			if d.state != store.DeliveryExpired || d.nextRetry != nil || !strings.Contains(d.lastError, "over the 600-byte bound") {
+				t.Errorf("delivery %+v", d)
+			}
+			if failures != 49 || suspended {
+				t.Errorf("failures %d, suspended %v: the payload's failure counted against the subscriber", failures, suspended)
+			}
+			if logged[0].PayloadBytes <= 600 || logged[0].StatusCode != nil || logged[0].Error == nil {
+				t.Errorf("log %+v", logged[0])
+			}
+			if h.counter(CounterPayloadTooLarge) != 1 || h.counter(CounterExpired) != 1 ||
+				testutilCount(t, h.s.results.WithLabelValues("payload_too_large")) != 1 {
+				t.Errorf("counted: too large %d, expired %d", h.counter(CounterPayloadTooLarge), h.counter(CounterExpired))
+			}
+		})
+	}
+}
+
+// The bound defaults to core's DefaultMaxTokenBytes, the bound a
+// receiver on core's defaults verifies.
+func TestMaxTokenBytesDefault(t *testing.T) {
+	h := newHarness(t, nil)
+	if h.s.cfg.MaxTokenBytes != coreauth.DefaultMaxTokenBytes {
+		t.Errorf("MaxTokenBytes %d", h.s.cfg.MaxTokenBytes)
+	}
+}

@@ -12,7 +12,13 @@ import (
 
 const getSnapshotForRead = `-- name: GetSnapshotForRead :one
 
-SELECT s.dataset, s.version, s.etag, s.body_gz, s.cisp_signature, s.built_at,
+SELECT s.dataset, s.version, s.etag, s.body_gz,
+       COALESCE((SELECT ss.signature FROM snapshot_signatures ss
+                 WHERE ss.dataset = s.dataset AND ss.version = s.version
+                   AND ss.body_gz_sha256 = sha256(s.body_gz)
+                 ORDER BY ss.signed_at DESC, ss.id DESC LIMIT 1),
+                s.cisp_signature)::text AS cisp_signature,
+       s.built_at,
        p.received_at, p.publisher_client_id
 FROM snapshots s
 JOIN publications p ON p.dataset = s.dataset AND p.version = s.version
@@ -40,7 +46,9 @@ type GetSnapshotForReadRow struct {
 // the features of a past version for since_version, and the publishers
 // for GET /v1/status.
 // One stored snapshot with the received_at (metadata.issued and
-// Last-Modified) and the publisher of its version.
+// Last-Modified) and the publisher of its version. cisp_signature is
+// the newest re-signature of these exact bytes (cispctl resign-current,
+// 0014), or the one the snapshot was built with.
 func (q *Queries) GetSnapshotForRead(ctx context.Context, arg GetSnapshotForReadParams) (GetSnapshotForReadRow, error) {
 	row := q.db.QueryRow(ctx, getSnapshotForRead, arg.Dataset, arg.Version)
 	var i GetSnapshotForReadRow

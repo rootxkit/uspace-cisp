@@ -67,6 +67,7 @@ const (
 	EnvDeliveryLogRetentionDays  = "CISP_DELIVERY_LOG_RETENTION_DAYS"
 	EnvAllowPrivateCallbacks     = "CISP_ALLOW_PRIVATE_CALLBACKS"
 	EnvAllowInsecureCallbacks    = "CISP_ALLOW_INSECURE_CALLBACKS"
+	EnvWebhookMaxTokenBytes      = "CISP_WEBHOOK_MAX_TOKEN_BYTES" //nolint:gosec // G101: a variable name, not a credential
 	EnvBrandingFile              = "CISP_BRANDING_FILE"
 	EnvMaxRestrictionBytes       = "CISP_MAX_RESTRICTION_BYTES"
 	EnvExpiryIntervalS           = "CISP_RESTRICTION_EXPIRY_INTERVAL_S"
@@ -146,6 +147,7 @@ var Catalogue = []Var{
 	{Name: EnvDeliveryLogRetentionDays, Default: "90"},
 	{Name: EnvAllowPrivateCallbacks, Default: "false"},
 	{Name: EnvAllowInsecureCallbacks, Default: "false"},
+	{Name: EnvWebhookMaxTokenBytes, Default: "8192"},
 }
 
 // MTLS modes (CISP_MTLS_MODE).

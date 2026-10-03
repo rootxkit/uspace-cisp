@@ -7,6 +7,38 @@ additively within `/v1`.
 
 ## [Unreleased]
 
+Retro-audit fixes (cisp B1, B2, S1-S6, N1-N4; system F-1; CI B1, S1,
+S7, N13).
+
+### Added
+
+- `cis/change/v1` summary members `ids_truncated`, `feature_count`,
+  `removed_count` (optional, additive): a change over 200 identifiers or
+  3072 encoded bytes is a summary with empty lists and `pull_url`, so a
+  webhook always fits core's 8 KiB verifier bound (Q49).
+- `CISP_WEBHOOK_MAX_TOKEN_BYTES` (8192): a signed webhook over it is not
+  sent, expires as `delivery_payload_too_large` and never counts towards
+  suspending the subscriber.
+- `cispctl resign-current --dataset D|all` and migration 0014
+  `snapshot_signatures` (append-only): re-sign the current snapshots
+  after a key rotation without a publication (Q50).
+- Counters `rate_limit_proxy_untrusted_forwarded_for`,
+  `filtered_features_parsed`, `delivery_payload_too_large`; component
+  `ratelimit_proxy` degraded when an https deployment trusts no proxy.
+
+### Changed
+
+- The public limiter keys an IPv6 client by its /64 (Q34 (7)).
+- Filtered reads parse a version's features once, in 2 MiB chunks; a
+  no-box `at=` read of the national set no longer fails with 500.
+- `HEAD /v1/restrictions` answers as `GET` while the ANSP is stale
+  (`no-store`, no stored signature).
+- The login limiter's 429 names its own limit.
+- CI: every action pinned to a commit SHA; SBOMs generated apart from
+  the push and signing credentials; gitleaks as a checksummed binary;
+  the lab conformance suite at a pinned commit; path filters cover every
+  file the Go tests read.
+
 ## [1.0.0] (C-M3: hardening)
 
 `/v1` declared stable: additive changes only from here

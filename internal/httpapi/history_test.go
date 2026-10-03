@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -338,5 +339,48 @@ func TestPublisherStatusRule(t *testing.T) {
 		if p.Stale != c.stale || (p.Stale && c.row.LastHeartbeatAt != nil && (p.StaleSince == nil || !p.StaleSince.Equal(c.row.LastHeartbeatAt.Add(60*time.Second)))) {
 			t.Errorf("%s: %+v", c.name, p)
 		}
+	}
+}
+
+// GET /v1/changes bounds what each record lists: a change of 5 000
+// zones is a summary (empty lists, ids_truncated, the counts, pull_url)
+// that the spec describes; the small change beside it is listed whole
+// with no summary members (Q49, N2).
+func TestReadChangesSummarisesALargeChange(t *testing.T) {
+	h := newPubHarness(t, nil)
+	ids := make([]string, 5000)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("Z%05d", i)
+	}
+	at := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+	h.fake.mu.Lock()
+	h.fake.changes = append(h.fake.changes,
+		publication.Change{ID: 1, Dataset: publication.DatasetZones, Version: 1, FeatureIDs: ids, RemovedIDs: []string{}, Reason: publication.ReasonPublication, At: at},
+		publication.Change{ID: 2, Dataset: publication.DatasetZones, Version: 2, FeatureIDs: []string{"Z00001"}, RemovedIDs: []string{"Z00001"}, Reason: publication.ReasonPublication, At: at})
+	h.fake.mu.Unlock()
+	rec := h.read(http.MethodGet, "/v1/changes")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Changes []map[string]any `json:"changes"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Changes) != 2 {
+		t.Fatalf("%d changes", len(out.Changes))
+	}
+	big, small := out.Changes[0], out.Changes[1]
+	if big["ids_truncated"] != true || big["feature_count"] != float64(5000) || big["removed_count"] != float64(0) ||
+		len(big["feature_ids"].([]any)) != 0 || len(big["removed_ids"].([]any)) != 0 ||
+		big["pull_url"] != "https://uspace-cisp.example.test/v1/zones?since_version=0" {
+		t.Errorf("large change %v", big)
+	}
+	if _, ok := small["ids_truncated"]; ok || len(small["feature_ids"].([]any)) != 1 || len(small["removed_ids"].([]any)) != 1 {
+		t.Errorf("small change %v", small)
+	}
+	if n := rec.Body.Len(); n > 4096 {
+		t.Errorf("the feed answered %d bytes for two changes", n)
 	}
 }

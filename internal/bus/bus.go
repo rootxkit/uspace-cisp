@@ -243,7 +243,26 @@ type ChangeMessage struct {
 	// BBox is [min longitude, min latitude, max longitude, max latitude]
 	// (GeoJSON order); absent for the whole dataset.
 	BBox []float64 `json:"bbox,omitempty"`
+	// IDsTruncated says the change touched more than the record lists
+	// (over MaxListedIDs or MaxListedIDBytes): feature_ids and removed_ids
+	// are then empty, FeatureCount and RemovedCount say how many there
+	// were, and the delta is at pull_url. Absent on a listed change.
+	IDsTruncated bool `json:"ids_truncated,omitempty"`
+	FeatureCount *int `json:"feature_count,omitempty"`
+	RemovedCount *int `json:"removed_count,omitempty"`
 }
+
+// The bound of the identifier lists one cis/change/v1 record carries
+// (docs/PLAN.md section 15 Q49): at most MaxListedIDs identifiers in
+// feature_ids and removed_ids together, and at most MaxListedIDBytes of
+// them JSON-encoded. A larger change is a summary (IDsTruncated). The
+// bytes bound keeps the signed webhook of the largest listed change
+// under core's 8 KiB verifier bound with a 4096-bit key and long
+// issuer, audience and pull_url values; a test signs it to show so.
+const (
+	MaxListedIDs     = 200
+	MaxListedIDBytes = 3072
+)
 
 // Message is the cis/change/v1 body of a change (MessageOf on the
 // bus's CISP_PUBLIC_BASE_URL).
@@ -271,7 +290,37 @@ func MessageOf(c publication.Change, publicBaseURL string) ChangeMessage {
 	if c.BBox != nil {
 		m.BBox = []float64{c.BBox.MinLon, c.BBox.MinLat, c.BBox.MaxLon, c.BBox.MaxLat}
 	}
+	if !listable(m.FeatureIDs, m.RemovedIDs) {
+		// A summary: the counts, the box and pull_url, never the lists
+		// (receivers pull the delta; the lists are a hint).
+		features, removed := len(m.FeatureIDs), len(m.RemovedIDs)
+		m.FeatureIDs, m.RemovedIDs = []string{}, []string{}
+		m.IDsTruncated, m.FeatureCount, m.RemovedCount = true, &features, &removed
+	}
 	return m
+}
+
+// listable reports whether the two lists fit the bound: MaxListedIDs
+// identifiers together and MaxListedIDBytes JSON-encoded (the count is
+// judged first, so a large change is never encoded to be refused).
+func listable(features, removed []string) bool {
+	if len(features)+len(removed) > MaxListedIDs {
+		return false
+	}
+	n := 4 // the two lists' brackets
+	for _, list := range [][]string{features, removed} {
+		for _, id := range list {
+			enc, err := json.Marshal(id)
+			if err != nil {
+				return false
+			}
+			n += len(enc) + 1 // and its comma
+			if n > MaxListedIDBytes {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func nonNil(s []string) []string {

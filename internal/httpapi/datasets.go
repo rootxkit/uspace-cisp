@@ -1251,20 +1251,30 @@ func (r *Reads) changes(ctx context.Context, req gen.ListChangesRequestObject) (
 	out := gen.ListChanges200JSONResponse{Changes: make([]gen.Change, 0, len(rows)), Next: since}
 	for i := range rows {
 		c := &rows[i]
-		m := bus.MessageOf(*c, r.PublicBaseURL)
-		item := gen.Change{
-			Schema: gen.ChangeSchema(m.Schema), MsgId: m.MsgID, Producer: m.Producer, Dataset: gen.ChangeDataset(m.Dataset),
-			Version: m.Version, Etag: m.ETag, FeatureIds: m.FeatureIDs, RemovedIds: m.RemovedIDs,
-			Reason: gen.ChangeReason(m.Reason), At: m.At, PullUrl: m.PullURL,
-		}
-		if m.BBox != nil {
-			b := append([]float64{}, m.BBox...)
-			item.Bbox = &b
-		}
-		out.Changes = append(out.Changes, item)
+		out.Changes = append(out.Changes, genChange(bus.MessageOf(*c, r.PublicBaseURL)))
 		out.Next = c.ID
 	}
 	return out, nil
+}
+
+// genChange is the cis/change/v1 record as the API answers it: the same
+// members MessageOf wrote, the summary ones (Q49) included.
+func genChange(m bus.ChangeMessage) gen.Change {
+	item := gen.Change{
+		Schema: gen.ChangeSchema(m.Schema), MsgId: m.MsgID, Producer: m.Producer, Dataset: gen.ChangeDataset(m.Dataset),
+		Version: m.Version, Etag: m.ETag, FeatureIds: m.FeatureIDs, RemovedIds: m.RemovedIDs,
+		Reason: gen.ChangeReason(m.Reason), At: m.At, PullUrl: m.PullURL,
+		FeatureCount: m.FeatureCount, RemovedCount: m.RemovedCount,
+	}
+	if m.IDsTruncated {
+		truncated := true
+		item.IdsTruncated = &truncated
+	}
+	if m.BBox != nil {
+		b := append([]float64{}, m.BBox...)
+		item.Bbox = &b
+	}
+	return item
 }
 
 func sha256Sum(b []byte) []byte {

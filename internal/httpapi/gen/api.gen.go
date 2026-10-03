@@ -1632,6 +1632,15 @@ type AirspaceConstraints struct {
 // dataset the first of the subscription's datasets, version and
 // etag its current version (0 before the first), feature_ids and
 // removed_ids empty, at when the ping was queued.
+//
+// The identifier lists are bounded (section 15 Q49): a change that
+// touched more than 200 identifiers, or whose lists would exceed
+// 3072 bytes encoded, is a summary: feature_ids and removed_ids are
+// empty, ids_truncated is true and feature_count and removed_count
+// say how many there were; the delta is at pull_url. The bound
+// keeps a signed webhook under the 8 KiB a receiver on
+// uspace-core's defaults verifies. A listed change carries none of
+// the three summary members.
 type Change struct {
 	At      time.Time     `json:"at"`
 	Bbox    *[]float64    `json:"bbox,omitempty"`
@@ -1640,14 +1649,25 @@ type Change struct {
 	// Etag Examples: "zones:5"
 	Etag string `json:"etag"`
 
-	// FeatureIds Every identifier added, changed or removed, sorted.
+	// FeatureCount With ids_truncated, how many identifiers were added, changed or removed.
+	FeatureCount *int `json:"feature_count,omitempty"`
+
+	// FeatureIds Every identifier added, changed or removed, sorted; empty when ids_truncated.
 	FeatureIds []string `json:"feature_ids"`
 
+	// IdsTruncated Present and true only on a summary. The change touched more identifiers than a record lists; both lists are empty and the delta is at pull_url.
+	IdsTruncated *bool `json:"ids_truncated,omitempty"`
+
 	// MsgId The change cursor in decimal; the delivery id (a ULID) for subscription_test.
-	MsgId      string       `json:"msg_id"`
-	Producer   string       `json:"producer"`
-	PullUrl    string       `json:"pull_url"`
-	Reason     ChangeReason `json:"reason"`
+	MsgId    string       `json:"msg_id"`
+	Producer string       `json:"producer"`
+	PullUrl  string       `json:"pull_url"`
+	Reason   ChangeReason `json:"reason"`
+
+	// RemovedCount With ids_truncated, how many identifiers were removed.
+	RemovedCount *int `json:"removed_count,omitempty"`
+
+	// RemovedIds The identifiers removed, sorted; empty when ids_truncated.
 	RemovedIds []string     `json:"removed_ids"`
 	Schema     ChangeSchema `json:"schema"`
 

@@ -7,6 +7,175 @@ additively within `/v1`.
 
 ## [Unreleased]
 
+## [1.0.0] (C-M3: hardening)
+
+`/v1` declared stable: additive changes only from here
+(`docs/RELEASING.md`).
+
+### Added
+
+- WP-8 console accounts, sessions and the console API: local accounts
+  (argon2id in PHC form, 64 MiB / 3 / 4, re-hashed on login when the
+  parameters change; TOTP for every admin with a code never accepted
+  twice, `accounts.totp_last_step`; secrets sealed with AES-256-GCM
+  under the keys of `CISP_SECRETS_KEY_FILE`, one per line, the first
+  sealing and every one opening, each sealed value carrying its key id,
+  so the key rotates); `POST /v1/console/session` issues the
+  ecosystem's session token through core `Issuer.IssueSession` (scope
+  `session`, `roles[]`, realm `console`, 12 h), five failures lock 15
+  minutes on the database's clock, 20 attempts per address per 15
+  minutes; `RequireRole` on the shared verifier with the console issuer
+  allow-listed (`CISP_CONSOLE_ISSUER`, `CISP_SESSION_KEY_FILE`), a
+  bounded revocation cache refreshed every 10 s; accounts (admin, the
+  last active admin kept under row locks), publications with per-feature
+  JSON Pointer diffs (200 paths), restrictions, subscriptions with
+  delivery summaries, deliveries, audit and status; suspend, resume,
+  retry and republish (a change record of the current version, no
+  content) as audited actions with a reason. No console route reaches
+  content (a test reads the handlers). `cispctl create-account`,
+  `export-audit` (signed JSON lines), `verify-audit` and `partitions`.
+  Migration `0010_console`. Sessions end for good after 30 minutes
+  unused: `sessions.last_seen_at` (migration `0011_session_idle`),
+  written at most once a minute per session and replica.
+- WP-11 operator console: `/[locale]/console/login` (the kit's form
+  through the BFF, the TOTP step when the API asks for it, the API's
+  refusals worded in `ka`/`en`, a lockout with the minutes left); the
+  signed-in shell with the status strip (dataset versions, publishers'
+  heartbeat age and stale flag on the API's clock, degraded components,
+  mTLS off, a stale expiry job, the stream), navigation by role and the
+  account menu; publications per dataset with the version page's diff
+  (bounded path lists, truncation said) and a map preview of the current
+  version; restriction heads with their events, the ANSP's staleness and
+  the expiry job's age, "not available" on a 404; every client's
+  subscriptions with the deliveries and attempt log; suspend, resume,
+  retry and republish confirmed with their consequence and a reason;
+  accounts (one-time password and enrolment URL shown once) and the
+  audit log. Times in the viewer's zone with UTC on hover. A test fails
+  on any API path in the console's source other than `/v1/console/*`,
+  `/v1/stream` and the GET-only `/public/v1/{dataset}`. The kit's form
+  peers `react-hook-form` and `zod` are added; the fixture server
+  answers the whole console API (`test/mock-console.mjs`) (§15 Q44).
+- WP-13 hardening and release: the chaos suite (`test/e2e/chaos_*`,
+  `make chaos`, the `chaos` workflow on `main` and on the `chaos`
+  label) drives the built image in compose and prints what it saw:
+  PostgreSQL stopped 60 s (reads served with `X-CIS-Stale`, `PUT` 503
+  with `Retry-After`, nothing lost), NATS stopped 60 s (delivered by the
+  scan, once), `api` killed mid-publication (never a partial or a second
+  version; the retry with the same `If-Match` publishes or gets 412),
+  `deliver` killed mid-batch (one delivery id per change), a subscriber
+  down 30 minutes (every retry against `NextAttempt`), a publication at
+  the cap under 50 public readers (HEAD p99, the api's heap peak); the
+  Caddy profile (`make caddy`, its own CI job) runs the reference
+  snippet in front of the image (`/metrics` 404, `/basemap/` ranges and
+  a day's cache, the ANSP route without a certificate refused by api,
+  a forged `X-Client-Cert-Subject` never reaching the upstream, the
+  public rate limit behind the edge); `make conformance` and its job on
+  `main` (the lab's `conformance/cisp/run` against the chaos stack, or a
+  visible "skipped" line); the `Deprecation` and `Sunset` headers
+  (RFC 9745, RFC 8594) for operations in `httpapi.Deprecated` (none
+  yet); a syft SPDX SBOM attached to both images as a signed
+  attestation, cosign keyless signing by digest, `deploy/deploy.sh`
+  (resolve to digest, verify the signature, pull, `compose up`; refuses
+  an unsigned image, `latest` and other repositories) and Dependabot for
+  Go, npm, Actions and the base images; `deploy/backup/` (daily dumps
+  with 14-day rotation, the weekly restore test) and
+  `cispctl verify-backup` (restores the newest dump into a scratch
+  database and checks every `current_version`, every body hash and the
+  events chain); `cispctl migrate all`; `docs/RELEASING.md` and the
+  runbooks for deploy, backup and restore, key rotation, a stale
+  publisher and a subscriber storm.
+
+### Changed
+
+- `cis/change/v1` takes the ANSP's degraded direct deliveries: the
+  `producer` pattern admits `ansp/<process>` and `ansp-<n>/<process>-<n>`
+  (the common envelope's forms; uspace-ansp sends `ansp/api`) besides
+  `uspace-cisp` and `cisp/deliver-<instance>`, as the one receiver path
+  `POST /v1/cis/notifications` with the CISP and the ANSP as allow-listed
+  issuers needs (cross-plan M1, M5). Any other system is still refused.
+  Additive within v1.
+- **The default publication cap is 8 MiB** (`CISP_MAX_PUBLICATION_BYTES`,
+  was 32 MiB): a PUT peaks at about 14 to 30 times its body, so 32 MiB
+  could take the api far past its 256 MiB limit; compose sets
+  `GOMEMLIMIT` on `api` and `deliver` (`docs/PLAN.md` section 15 Q46).
+  `cispctl sign`, `verify-signature` and `ed269 convert` default to the
+  same.
+- `deploy/compose.yml` runs the images by digest (`CISP_GO_IMAGE`,
+  `CISP_WEB_IMAGE`, set by `deploy/deploy.sh`) instead of
+  `CISP_IMAGE_TAG`.
+- `api/openapi.yaml` is `1.0.0`: `/v1` is stable, and changes within it
+  are additive only (`docs/RELEASING.md`).
+
+### Fixed
+
+- `deploy/compose.yml`'s migrate service ran `cispctl migrate`, a usage
+  error since WP-1: the stack could not start. It runs
+  `cispctl migrate all`.
+- `deploy/caddy/Caddyfile.snippet` forwarded the literal
+  `{http.request.tls.client.subject}` as `X-Client-Cert-Subject` on the
+  ANSP routes when no client certificate was presented (the placeholder
+  is null in CEL, and `null != ""` held); api refused it, but for the
+  wrong reason. The matcher now tests for null.
+
+## [0.2.0] (C-M2: restrictions; never tagged, recorded here)
+
+### Added
+
+- WP-5 dynamic restrictions from the ANSP (F2): `POST /v1/restrictions`
+  and `PATCH /v1/restrictions/{id}` (`?by=ansp_ref`) behind the ANSP's
+  publish scope, client id, client certificate subject and detached
+  signature verified with the ANSP's own JWKS (256 KiB,
+  `CISP_MAX_RESTRICTION_BYTES`); the idempotency key is the body pair
+  `(ansp_ref, ansp_version)` (a replay is 200 and no version; a lower
+  version 409 `ansp_version`; `Idempotency-Key` ignored); the lifecycle
+  state machine of `internal/restriction` (planned, active, ended,
+  cancelled; the F3548 `Cstr*` window limits imported from core; zero
+  limits refuse); the DAR rules of `internal/dataset` (strict one-feature
+  parse, DAR reason, restricting types, one period equal to the window,
+  no daylight events, 1000 vertices, 10 000 km2 and intersection with a
+  current U-space airspace measured by PostGIS, identifiers checked for
+  length and uniqueness only); every accepted op a version of the
+  `restrictions` dataset with its reason and change record in the same
+  transaction as the head (`PublishTx` takes a `Before` hook); the
+  served feature stamped with `extendedProperties.cis_restriction`;
+  `GET /v1/restrictions/heads` and `GET /v1/restrictions/{id}` with
+  events; the expiry ticker (`CISP_RESTRICTION_EXPIRY_INTERVAL_S`,
+  leader-elected per run, `restrictions_expired`, `restrictions_active`,
+  last run in `job_runs` and `/v1/status`, an error line after
+  `CISP_RESTRICTION_EXPIRY_STALE_AFTER_S`); the ANSP's staleness as
+  `cis_publisher_stale_since` on the heads and the dataset and a
+  warning-level status line, and its heartbeat `active_refs` compared
+  with the active heads (counted and listed, never acted on);
+  migration `0008_restriction_jobs`; `schemas/cis/restriction/v1.json`;
+  a warning tier in the status line.
+- WP-7 the WS change stream, bus resilience and observability, on
+  `uspace-core` v1.2.0: `WS /v1/stream?datasets=` (`internal/stream`):
+  every frame the lab's common envelope (`envelope/v1`) around
+  `console/status/v1` (on connect, every 2 s and at once after the bus
+  returns, with `nats`, `degraded[]`, dataset versions, `cis_age_s`,
+  publishers and `resync_since`) or `cis/change/v1`; at most
+  `CISP_STREAM_MAX_CLIENTS` per instance (503 `stream_full`), a
+  64-frame queue per client (`dropped_frames`, 1013 when it stays
+  full), the per-IP limiter on the upgrade, an `Origin` allow-list
+  (403 `origin`), the `uspace_session` cookie verified by the shared
+  verifier and 4401 on a non-public stream (`CISP_STREAM_PUBLIC`).
+  `internal/bus`: `Connect` returns within `CISP_NATS_CONNECT_TIMEOUT_S`
+  with the broker absent (`never connected`), `State` with since-times,
+  `Watch`, `Subscribe` for the hub with a resync on every return of the
+  connection, slow-consumer errors counted and never fatal; `deliver`
+  under the same policy. `internal/obs`: the metrics catalogue
+  (`docs/RUNBOOKS/observability.md`, tested both ways and against the
+  code), `obs.Once`, the status line's counters since the previous
+  line and its `start` line, uncatalogued metrics warned, the store's
+  counters mirrored, `cisp_publication_seconds`,
+  `restriction_expiry_job_age_s`, `publisher_stale`, `nats_degraded_s`;
+  spans `validate`, `publish_tx`, `bus_publish` and `delivery_attempt`
+  (`claim`, `sign`, `post`) with the change id, only with
+  `CISP_OTEL_ENDPOINT`. Integration tests stop and start a real broker
+  (`internal/natstest`, docker).
+
+## [0.1.0] (C-M1: publish and read; never tagged, recorded here)
+
 ### Added
 
 - WP-0 scaffold: the Go module pinned to `uspace-core` v1.0.0; the `api`
@@ -93,33 +262,6 @@ additively within `/v1`.
   `internal/applicability` (`ed318.Applies` at the feature's centroid,
   unknown kept); the dataset-first routes registered per dataset;
   `golang.org/x/time` for the token buckets.
-- WP-5 dynamic restrictions from the ANSP (F2): `POST /v1/restrictions`
-  and `PATCH /v1/restrictions/{id}` (`?by=ansp_ref`) behind the ANSP's
-  publish scope, client id, client certificate subject and detached
-  signature verified with the ANSP's own JWKS (256 KiB,
-  `CISP_MAX_RESTRICTION_BYTES`); the idempotency key is the body pair
-  `(ansp_ref, ansp_version)` (a replay is 200 and no version; a lower
-  version 409 `ansp_version`; `Idempotency-Key` ignored); the lifecycle
-  state machine of `internal/restriction` (planned, active, ended,
-  cancelled; the F3548 `Cstr*` window limits imported from core; zero
-  limits refuse); the DAR rules of `internal/dataset` (strict one-feature
-  parse, DAR reason, restricting types, one period equal to the window,
-  no daylight events, 1000 vertices, 10 000 km2 and intersection with a
-  current U-space airspace measured by PostGIS, identifiers checked for
-  length and uniqueness only); every accepted op a version of the
-  `restrictions` dataset with its reason and change record in the same
-  transaction as the head (`PublishTx` takes a `Before` hook); the
-  served feature stamped with `extendedProperties.cis_restriction`;
-  `GET /v1/restrictions/heads` and `GET /v1/restrictions/{id}` with
-  events; the expiry ticker (`CISP_RESTRICTION_EXPIRY_INTERVAL_S`,
-  leader-elected per run, `restrictions_expired`, `restrictions_active`,
-  last run in `job_runs` and `/v1/status`, an error line after
-  `CISP_RESTRICTION_EXPIRY_STALE_AFTER_S`); the ANSP's staleness as
-  `cis_publisher_stale_since` on the heads and the dataset and a
-  warning-level status line, and its heartbeat `active_refs` compared
-  with the active heads (counted and listed, never acted on);
-  migration `0008_restriction_jobs`; `schemas/cis/restriction/v1.json`;
-  a warning tier in the status line.
 - WP-6 subscriptions and signed webhook delivery (F3 push):
   `POST|GET /v1/subscriptions`, `GET|PATCH|DELETE /v1/subscriptions/{id}`,
   `GET /v1/subscriptions/{id}/deliveries` (with the delivery log read
@@ -144,54 +286,6 @@ additively within `/v1`.
   `CISP_ALLOW_INSECURE_CALLBACKS` and `CISP_TIMESERIES_URL`; deliver
   needs `CISP_SIGNING_KEY_FILE`, `CISP_SIGNING_KID`, `CISP_ISSUER_URL`
   and `CISP_PUBLIC_BASE_URL` with a database.
-- WP-7 the WS change stream, bus resilience and observability, on
-  `uspace-core` v1.2.0: `WS /v1/stream?datasets=` (`internal/stream`):
-  every frame the lab's common envelope (`envelope/v1`) around
-  `console/status/v1` (on connect, every 2 s and at once after the bus
-  returns, with `nats`, `degraded[]`, dataset versions, `cis_age_s`,
-  publishers and `resync_since`) or `cis/change/v1`; at most
-  `CISP_STREAM_MAX_CLIENTS` per instance (503 `stream_full`), a
-  64-frame queue per client (`dropped_frames`, 1013 when it stays
-  full), the per-IP limiter on the upgrade, an `Origin` allow-list
-  (403 `origin`), the `uspace_session` cookie verified by the shared
-  verifier and 4401 on a non-public stream (`CISP_STREAM_PUBLIC`).
-  `internal/bus`: `Connect` returns within `CISP_NATS_CONNECT_TIMEOUT_S`
-  with the broker absent (`never connected`), `State` with since-times,
-  `Watch`, `Subscribe` for the hub with a resync on every return of the
-  connection, slow-consumer errors counted and never fatal; `deliver`
-  under the same policy. `internal/obs`: the metrics catalogue
-  (`docs/RUNBOOKS/observability.md`, tested both ways and against the
-  code), `obs.Once`, the status line's counters since the previous
-  line and its `start` line, uncatalogued metrics warned, the store's
-  counters mirrored, `cisp_publication_seconds`,
-  `restriction_expiry_job_age_s`, `publisher_stale`, `nats_degraded_s`;
-  spans `validate`, `publish_tx`, `bus_publish` and `delivery_attempt`
-  (`claim`, `sign`, `post`) with the change id, only with
-  `CISP_OTEL_ENDPOINT`. Integration tests stop and start a real broker
-  (`internal/natstest`, docker).
-- WP-8 console accounts, sessions and the console API: local accounts
-  (argon2id in PHC form, 64 MiB / 3 / 4, re-hashed on login when the
-  parameters change; TOTP for every admin with a code never accepted
-  twice, `accounts.totp_last_step`; secrets sealed with AES-256-GCM
-  under the keys of `CISP_SECRETS_KEY_FILE`, one per line, the first
-  sealing and every one opening, each sealed value carrying its key id,
-  so the key rotates); `POST /v1/console/session` issues the
-  ecosystem's session token through core `Issuer.IssueSession` (scope
-  `session`, `roles[]`, realm `console`, 12 h), five failures lock 15
-  minutes on the database's clock, 20 attempts per address per 15
-  minutes; `RequireRole` on the shared verifier with the console issuer
-  allow-listed (`CISP_CONSOLE_ISSUER`, `CISP_SESSION_KEY_FILE`), a
-  bounded revocation cache refreshed every 10 s; accounts (admin, the
-  last active admin kept under row locks), publications with per-feature
-  JSON Pointer diffs (200 paths), restrictions, subscriptions with
-  delivery summaries, deliveries, audit and status; suspend, resume,
-  retry and republish (a change record of the current version, no
-  content) as audited actions with a reason. No console route reaches
-  content (a test reads the handlers). `cispctl create-account`,
-  `export-audit` (signed JSON lines), `verify-audit` and `partitions`.
-  Migration `0010_console`. Sessions end for good after 30 minutes
-  unused: `sessions.last_seen_at` (migration `0011_session_idle`),
-  written at most once a minute per session and replica.
 - WP-9 web scaffold: `web/` on Next.js 16 (App Router, standalone) and
   `uspace-ui` `0.1.0-rc.1` from its GitHub Release tarball; `ka`/`en`
   routing and catalogues; the kit's theme, Noto Sans Georgian through
@@ -235,24 +329,6 @@ additively within `/v1`.
   `CISP_WEB_MFA_CHALLENGE_SECRET` (`WEB_MFA_CHALLENGE_SECRET` in
   compose; at least 32 bytes; without it every `/_bff/*` route answers
   503 naming it); a Playwright test signs in in two steps.
-- WP-11 operator console: `/[locale]/console/login` (the kit's form
-  through the BFF, the TOTP step when the API asks for it, the API's
-  refusals worded in `ka`/`en`, a lockout with the minutes left); the
-  signed-in shell with the status strip (dataset versions, publishers'
-  heartbeat age and stale flag on the API's clock, degraded components,
-  mTLS off, a stale expiry job, the stream), navigation by role and the
-  account menu; publications per dataset with the version page's diff
-  (bounded path lists, truncation said) and a map preview of the current
-  version; restriction heads with their events, the ANSP's staleness and
-  the expiry job's age, "not available" on a 404; every client's
-  subscriptions with the deliveries and attempt log; suspend, resume,
-  retry and republish confirmed with their consequence and a reason;
-  accounts (one-time password and enrolment URL shown once) and the
-  audit log. Times in the viewer's zone with UTC on hover. A test fails
-  on any API path in the console's source other than `/v1/console/*`,
-  `/v1/stream` and the GET-only `/public/v1/{dataset}`. The kit's form
-  peers `react-hook-form` and `zod` are added; the fixture server
-  answers the whole console API (`test/mock-console.mjs`) (§15 Q44).
 - WP-12 ED-269 bridge: `PUT /v1/publications/zones` takes
   `application/vnd.ed269+json` (the signature over the ED-269 bytes,
   checked first), read by `uspace-core/ed269` and mapped by
@@ -266,13 +342,3 @@ additively within `/v1`.
   the ED-269 bytes with the publisher's signature. `cispctl ed269
   convert --to ed318|ed269`. The circle outline places its vertices
   with core `v1.3.0`'s `geodesy.Destination` (§15 Q43, Q45).
-
-### Changed
-
-- `cis/change/v1` takes the ANSP's degraded direct deliveries: the
-  `producer` pattern admits `ansp/<process>` and `ansp-<n>/<process>-<n>`
-  (the common envelope's forms; uspace-ansp sends `ansp/api`) besides
-  `uspace-cisp` and `cisp/deliver-<instance>`, as the one receiver path
-  `POST /v1/cis/notifications` with the CISP and the ANSP as allow-listed
-  issuers needs (cross-plan M1, M5). Any other system is still refused.
-  Additive within v1.

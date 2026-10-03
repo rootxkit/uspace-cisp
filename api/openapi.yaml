@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: uspace-cisp national CIS publication API
-  version: 0.1.0
+  version: 1.0.0
   description: |
     The Common Information Service of the Georgian U-space
     system-of-systems (Reg. (EU) 2021/664 Art. 5). This file is the

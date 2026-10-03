@@ -15,7 +15,7 @@ import (
 // maxConvertBytes is the default largest input of ed269 convert: the
 // CISP_MAX_PUBLICATION_BYTES default, so a file convert accepts is one
 // PUT accepts by size.
-const maxConvertBytes = 32 << 20
+const maxConvertBytes = 8 << 20
 
 // ed269Convert maps one document between ED-269 and ED-318 offline,
 // through the same uspace-core mapping the api runs (WP-12): --to ed318

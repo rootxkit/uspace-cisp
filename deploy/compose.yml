@@ -76,6 +76,12 @@ services:
   api:
     <<: *go-image
     command: ["api"]
+    environment:
+      # The Go runtime's soft limit under the container's 256M: the GC
+      # works harder near it instead of growing past the limit. With the
+      # 8 MiB publication cap a PUT peaks near 170 MB of heap
+      # (docs/PLAN.md section 15 Q46).
+      GOMEMLIMIT: 200MiB
     depends_on:
       migrate: {condition: service_completed_successfully}
       nats: {condition: service_started}
@@ -92,6 +98,8 @@ services:
   deliver:
     <<: *go-image
     command: ["deliver"]
+    environment:
+      GOMEMLIMIT: 48MiB
     depends_on:
       migrate: {condition: service_completed_successfully}
       nats: {condition: service_started}

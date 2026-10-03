@@ -28,7 +28,7 @@ const keyDir = "local"
 
 // maxSignBytes is the default bound on a body sign and verify-signature
 // read: the default publication cap (CISP_MAX_PUBLICATION_BYTES).
-const maxSignBytes = 32 << 20
+const maxSignBytes = 8 << 20
 
 // rotateKey generates an RSA-3072 key, writes it as signing-<kid>.pem
 // (0600) and prints the environment lines that make it the signing key,

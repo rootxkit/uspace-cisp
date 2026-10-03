@@ -78,7 +78,7 @@ func verifyBackup(ctx context.Context, args, environ []string, stdout, stderr io
 	defer admin.Close()
 	scratch := fmt.Sprintf("cisp_verify_%d", now.UnixNano())
 	ident := pgx.Identifier{scratch}.Sanitize() //nolint:misspell // pgx's method name
-	if _, err := admin.Exec(ctx, "CREATE DATABASE "+ident); err != nil {
+	if _, err := admin.Exec(ctx, "CREATE DATABASE "+ident+" TEMPLATE template0"); err != nil {
 		_, _ = fmt.Fprintf(stderr, "cispctl: verify-backup: create %s: %v\n", scratch, err)
 		return exitFailed
 	}
@@ -97,17 +97,37 @@ func verifyBackup(ctx context.Context, args, environ []string, stdout, stderr io
 		_, _ = fmt.Fprintf(stderr, "cispctl: verify-backup: %v\n", err)
 		return exitConfig
 	}
-	if err := restore(ctx, strings.Fields(*pgRestore), restoreURL, file, stderr); err != nil {
-		_, _ = fmt.Fprintf(stdout, "verify-backup: FAILED: the dump does not restore: %v\n", err)
-		return exitFailed
-	}
-	_, _ = fmt.Fprintf(stdout, "verify-backup: restored into %s\n", scratch)
 	pool, err := pgxpool.New(ctx, scratchURL)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cispctl: verify-backup: %v\n", err)
 		return exitFailed
 	}
 	defer pool.Close()
+	// TimescaleDB's catalogue rows travel in a dump of a database that has
+	// the extension (the timescaledb-ha image puts it in every database);
+	// restoring them over a fresh extension's needs its restoring mode.
+	// Without the extension on the server there is nothing to prepare.
+	timescale := false
+	if _, err := pool.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS timescaledb"); err == nil {
+		if _, err := pool.Exec(ctx, "SELECT timescaledb_pre_restore()"); err != nil {
+			_, _ = fmt.Fprintf(stderr, "cispctl: verify-backup: timescaledb_pre_restore: %v\n", err)
+			return exitFailed
+		}
+		timescale = true
+	}
+	pool.Reset() // the restoring mode applies to new sessions
+	if err := restore(ctx, strings.Fields(*pgRestore), restoreURL, file, stderr); err != nil {
+		_, _ = fmt.Fprintf(stdout, "verify-backup: FAILED: the dump does not restore: %v\n", err)
+		return exitFailed
+	}
+	if timescale {
+		if _, err := pool.Exec(ctx, "SELECT timescaledb_post_restore()"); err != nil {
+			_, _ = fmt.Fprintf(stderr, "cispctl: verify-backup: timescaledb_post_restore: %v\n", err)
+			return exitFailed
+		}
+		pool.Reset()
+	}
+	_, _ = fmt.Fprintf(stdout, "verify-backup: restored into %s\n", scratch)
 	if afterRestore != nil {
 		if err := afterRestore(ctx, pool); err != nil {
 			_, _ = fmt.Fprintf(stderr, "cispctl: verify-backup: %v\n", err)

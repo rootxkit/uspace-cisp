@@ -102,6 +102,7 @@ section 9) where it names one.
 | `cisp_expiry_last_tick_failures` | gauge | `component` | Restrictions the last expiry tick could not expire. | above 0 |
 | `cisp_expiry_ticks_not_leader_total` | counter | `component` | Expiry ticks. | — |
 | `cisp_expiry_ticks_total` | counter | `component` | Expiry ticks. | — |
+| `cisp_filtered_features_parsed_total` | counter | `component` | Stored features parsed for filtered reads (each once per version). | — |
 | `cisp_handler_panics_total` | counter | `component` | Handler panics turned into 500 responses. | any increase |
 | `cisp_heartbeat_ref_missing_total` | counter | `component` | Active restrictions the ANSP's heartbeat does not declare (shown, never acted on). | — |
 | `cisp_heartbeat_ref_unknown_total` | counter | `component` | ansp_refs the ANSP declares active that the CISP does not hold as active (shown, never acted on). | — |

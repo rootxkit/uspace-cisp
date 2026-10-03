@@ -75,6 +75,9 @@ const (
 	CounterOutlineFailed         = "outline_failed"
 	CounterED269Exported         = "ed269_exported"
 	CounterED269NotRepresentable = "ed269_not_representable"
+	// CounterFeaturesParsed counts stored features parsed for filtered
+	// reads; a version's features are parsed once (S3).
+	CounterFeaturesParsed = "filtered_features_parsed"
 )
 
 // MemberPublisherStaleSince is the top-level member of a restrictions
@@ -157,6 +160,19 @@ type Reads struct {
 	statusOnce sync.Once
 	sigsOnce   sync.Once
 	sigs       *signatureCache
+
+	// parsed holds, per dataset, the features of one version (the newest
+	// a filtered read has seen) as ed318.Parse made them, so a filtered
+	// read costs a box scan and the applicability loop, not a parse
+	// (S3). Bounded by the four datasets' current versions.
+	parsedMu sync.Mutex
+	parsed   map[publication.Dataset]*parsedVersion
+}
+
+// parsedVersion is one dataset version's parsed features by identifier.
+type parsedVersion struct {
+	version int64
+	byID    map[string]ed318.Feature
 }
 
 func (r *Reads) now() time.Time {
@@ -743,7 +759,7 @@ func (r *Reads) filtered(ctx context.Context, ds publication.Dataset, f filter, 
 	if q.ifNoneMatch != nil && etagMatches(*q.ifNoneMatch, h["ETag"]) {
 		return notModified(h, q.head), nil
 	}
-	fc, err := collectionOf(cur.Features)
+	fc, err := r.parsedCollection(ds, cur.Version, cur.Features)
 	if err != nil {
 		return r.failure(ctx, ds, err)
 	}
@@ -830,23 +846,93 @@ func annotate(f *ed318.Feature, v applicability.Verdict) {
 	setExtended(f, applicability.Member, json.RawMessage(strconv.Quote(v.Annotation())))
 }
 
-// collectionOf parses stored features back into one collection, through
-// ed318.Parse: the same code as a publication.
-func collectionOf(features []store.StoredFeature) (*ed318.FeatureCollection, error) {
-	var b bytes.Buffer
-	b.WriteString(`{"type":"FeatureCollection","features":[`)
-	for i := range features {
-		if i > 0 {
-			b.WriteByte(',')
+// parsedCollection is the collection of the given stored features of a
+// version, each parsed once per version: the cached ones are copied
+// (setExtended replaces a copy's map, so an annotation never reaches the
+// cache), the others parsed and kept when the version is the newest
+// seen. The order is the store's.
+func (r *Reads) parsedCollection(ds publication.Dataset, version int64, features []store.StoredFeature) (*ed318.FeatureCollection, error) {
+	r.parsedMu.Lock()
+	pv := r.parsed[ds]
+	if pv == nil || pv.version < version {
+		pv = &parsedVersion{version: version, byID: map[string]ed318.Feature{}}
+		if r.parsed == nil {
+			r.parsed = map[publication.Dataset]*parsedVersion{}
 		}
-		b.Write(features[i].Feature)
+		r.parsed[ds] = pv
 	}
-	b.WriteString(`]}`)
-	fc, probs := ed318.Parse(b.Bytes(), ed318.Limits{})
-	if probs != nil {
-		return nil, errors.New("stored features do not parse: " + probs.Error())
+	cacheable := pv.version == version
+	var missing []store.StoredFeature
+	for i := range features {
+		if _, ok := pv.byID[features[i].ID]; !ok || !cacheable {
+			missing = append(missing, features[i])
+		}
 	}
-	return fc, nil
+	r.parsedMu.Unlock()
+
+	fresh := map[string]ed318.Feature{}
+	if len(missing) > 0 {
+		fc, err := collectionOf(missing)
+		if err != nil {
+			return nil, err
+		}
+		if len(fc.Features) != len(missing) {
+			return nil, errors.New("stored features: " + strconv.Itoa(len(fc.Features)) + " parsed from " + strconv.Itoa(len(missing)))
+		}
+		r.component().Counter(CounterFeaturesParsed, "Stored features parsed for filtered reads (each once per version).").Add(uint64(len(missing)))
+		for i := range missing {
+			fresh[missing[i].ID] = fc.Features[i]
+		}
+	}
+	out := &ed318.FeatureCollection{Type: "FeatureCollection", Features: make([]ed318.Feature, 0, len(features))}
+	r.parsedMu.Lock()
+	defer r.parsedMu.Unlock()
+	if cacheable {
+		for i := range missing {
+			pv.byID[missing[i].ID] = fresh[missing[i].ID]
+		}
+	}
+	for i := range features {
+		f, ok := fresh[features[i].ID]
+		if !ok {
+			f = pv.byID[features[i].ID]
+		}
+		out.Features = append(out.Features, f)
+	}
+	return out, nil
+}
+
+// parseChunkBytes bounds one ed318.Parse of stored features, well
+// inside core's default byte limit, so the whole national set parses
+// in chunks rather than being refused as one 4 MiB+ collection.
+const parseChunkBytes = 2 << 20
+
+// collectionOf parses stored features back into one collection, through
+// ed318.Parse: the same code as a publication, in chunks of at most
+// parseChunkBytes (a stored feature was valid when published, alone or
+// with the others).
+func collectionOf(features []store.StoredFeature) (*ed318.FeatureCollection, error) {
+	out := &ed318.FeatureCollection{Type: "FeatureCollection", Features: make([]ed318.Feature, 0, len(features))}
+	for start := 0; start < len(features); {
+		var b bytes.Buffer
+		b.WriteString(`{"type":"FeatureCollection","features":[`)
+		end := start
+		for end < len(features) && (end == start || b.Len()+len(features[end].Feature) < parseChunkBytes) {
+			if end > start {
+				b.WriteByte(',')
+			}
+			b.Write(features[end].Feature)
+			end++
+		}
+		b.WriteString(`]}`)
+		fc, probs := ed318.Parse(b.Bytes(), ed318.Limits{})
+		if probs != nil {
+			return nil, errors.New("stored features do not parse: " + probs.Error())
+		}
+		out.Features = append(out.Features, fc.Features...)
+		start = end
+	}
+	return out, nil
 }
 
 // deltaBody is the DatasetDelta schema.

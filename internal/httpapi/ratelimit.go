@@ -148,6 +148,24 @@ func (l *RateLimiter) bucketFor(addr netip.Addr) *bucket {
 	return b
 }
 
+// IPv6PrefixBits is the IPv6 prefix one client is limited by: a
+// residential allocation is a /64, so a client rotating addresses inside
+// it is still one client and cannot flush the bounded map (S1).
+const IPv6PrefixBits = 64
+
+// LimitKey is the bucket key of a client address: an IPv4 address whole,
+// an IPv6 address by its /64.
+func LimitKey(a netip.Addr) netip.Addr {
+	if !a.Is6() || a.Is4In6() {
+		return a
+	}
+	p, err := a.Prefix(IPv6PrefixBits)
+	if err != nil {
+		return a
+	}
+	return p.Addr()
+}
+
 // ClientAddr is the address a request is limited by: the peer address,
 // or, when the peer is a trusted proxy, the rightmost X-Forwarded-For
 // entry that is not itself a trusted proxy (what the proxy saw).
@@ -219,7 +237,7 @@ func (l *RateLimiter) trusted(a netip.Addr) bool {
 // none.
 func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b := l.bucketFor(l.ClientAddr(r))
+		b := l.bucketFor(LimitKey(l.ClientAddr(r)))
 		lim := b.full
 		if r.Method == http.MethodHead || (l.cfg.Cheap != nil && l.cfg.Cheap(r)) {
 			lim = b.cheap

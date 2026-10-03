@@ -104,3 +104,57 @@ func TestReportTrustedProxies(t *testing.T) {
 		}
 	}
 }
+
+// IPv6 clients are limited by their /64 (S1): 10 001 addresses in one
+// /64 are one client, share one bucket (the 11th full read is refused
+// whichever address sends it) and evict nobody; 10 001 distinct /64s
+// are 10 001 clients and the bound evicts and counts (E-10). IPv4 stays
+// per address.
+func TestRateLimitIPv6ByPrefix(t *testing.T) {
+	l := NewRateLimiter(RateLimiterConfig{RPM: 60})
+	pass := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }))
+	do := func(addr netip.Addr) int {
+		req := httptest.NewRequest(http.MethodGet, "/public/v1/zones", http.NoBody)
+		req.RemoteAddr = netip.AddrPortFrom(addr, 1).String()
+		rec := httptest.NewRecorder()
+		pass.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	in64 := func(i int) netip.Addr {
+		return netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 0, 1, 0, 0, 0, 0, 0, 0, 0, byte(i >> 16), byte(i >> 8), byte(i)})
+	}
+	codes := map[int]int{}
+	for i := range DefaultRateLimitClients + 1 {
+		codes[do(in64(i))]++
+	}
+	if codes[204] != DefaultPublicBurst || l.Len() != 1 {
+		t.Errorf("one /64: %v served, %d clients tracked", codes, l.Len())
+	}
+	if got := l.cfg.Component.Counter(CounterRateLimitEvicted, "").Value(); got != 0 {
+		t.Errorf("one /64 evicted %d", got)
+	}
+
+	l = NewRateLimiter(RateLimiterConfig{RPM: 60})
+	pass = l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }))
+	for i := range DefaultRateLimitClients + 1 {
+		a := netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, byte(i >> 16), byte(i >> 8), byte(i), 0, 0, 0, 0, 0, 0, 0, 0, 1})
+		if code := do(a); code != 204 {
+			t.Fatalf("/64 %d = %d", i, code)
+		}
+	}
+	if got := l.cfg.Component.Counter(CounterRateLimitEvicted, "").Value(); got != 1 || l.Len() != DefaultRateLimitClients {
+		t.Errorf("distinct /64s: evicted %d, %d tracked", got, l.Len())
+	}
+
+	// IPv4 neighbours are separate clients.
+	l = NewRateLimiter(RateLimiterConfig{RPM: 60})
+	pass = l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }))
+	for i := range 20 {
+		if code := do(netip.AddrFrom4([4]byte{198, 51, 100, byte(i)})); code != 204 {
+			t.Errorf("IPv4 %d = %d", i, code)
+		}
+	}
+	if l.Len() != 20 {
+		t.Errorf("IPv4: %d clients", l.Len())
+	}
+}

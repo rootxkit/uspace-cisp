@@ -543,7 +543,10 @@ jobs:
           else
             range="$GITHUB_SHA"
           fi
-          echo "gitleaks commits: $range ($(git rev-list --count "$range") commits)"
+          # An empty range would scan nothing and pass: refuse it.
+          n=$(git rev-list --count "$range")
+          [ "$n" -gt 0 ] || { echo "empty scan range: $range"; exit 1; }
+          echo "gitleaks commits: $range ($n commits)"
           make secrets GITLEAKS_LOG_OPTS="$range"
 
   # main and v* tags only, after every gate passed: the images, tagged by

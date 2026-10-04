@@ -39,6 +39,17 @@ S7, N13).
   the lab conformance suite at a pinned commit; path filters cover every
   file the Go tests read.
 
+### Fixed
+
+- Every problem body carries `errors`, an empty array when no field is
+  at fault (bug fix: `schemas/common/problem/v1` and M28 require it).
+  The `503 console_unavailable` answer of an unconfigured console had
+  none, which the lab conformance suite reported as finding C1
+  (uspace-lab `docs/decisions/2026-10-05-conformance-findings.md`).
+  `api/openapi.yaml` now lists `errors` as required in `Problem`, as the
+  server always sends it; a client that already read it as optional is
+  unaffected.
+
 ## [1.0.0] (C-M3: hardening)
 
 `/v1` declared stable: additive changes only from here

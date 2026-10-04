@@ -528,8 +528,23 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bin"
           tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP/bin" gitleaks
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      # Which commits: on a pull request only its own (base..head), so a
+      # finding on another branch never fails it; on main, a tag or a
+      # manual run the whole history of the commit checked out, which
+      # holds the pushed range. Never every fetched branch (gitleaks'
+      # default --all): the checkout fetches them all.
       - name: make secrets (history and working tree)
-        run: make secrets
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            range="origin/$BASE_REF..$HEAD_SHA"
+          else
+            range="$GITHUB_SHA"
+          fi
+          echo "gitleaks commits: $range ($(git rev-list --count "$range") commits)"
+          make secrets GITLEAKS_LOG_OPTS="$range"
 
   # main and v* tags only, after every gate passed: the images, tagged by
   # short SHA (and by the git tag on a tag). `latest` is never pushed.

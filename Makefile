@@ -190,8 +190,11 @@ jws-smoke:
 # (tracked or untracked, not git-ignored), with .gitleaks.toml. Ignored
 # files such as local/dev.env hold local secrets on purpose and cannot
 # be committed without -f; the history scan still covers every commit.
+# GITLEAKS_LOG_OPTS: the commits to scan, as git log arguments (CI passes
+# a pull request's base..head). Empty, gitleaks scans every local ref.
+GITLEAKS_LOG_OPTS ?=
 secrets:
-	gitleaks detect --no-banner --redact
+	gitleaks detect --no-banner --redact $(if $(GITLEAKS_LOG_OPTS),--log-opts="$(GITLEAKS_LOG_OPTS)")
 	@tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT; \
 	git ls-files -z -co --exclude-standard | tar --null -T - -cf - | tar -xf - -C "$$tmp"; \
 	gitleaks detect --no-banner --redact --no-git --source "$$tmp"

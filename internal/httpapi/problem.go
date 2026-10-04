@@ -28,30 +28,29 @@ const (
 	SlugInternal         = "internal"
 )
 
-// NewProblem builds the problem body. errors[] lists at most
-// MaxProblemErrors of fields, with truncated set when there were more.
+// NewProblem builds the problem body. errors[] is always present, empty
+// when no field is at fault (problem/v1 requires it, M28), and lists at
+// most MaxProblemErrors of fields, with truncated set when there were
+// more.
 func NewProblem(status int, slug, title, detail, instance string, fields ...*core.FieldError) gen.Problem {
-	p := gen.Problem{Type: ProblemTypeBase + slug, Title: title, Status: status}
+	n := min(len(fields), MaxProblemErrors)
+	errs := make([]gen.FieldProblem, 0, n)
+	for _, fe := range fields[:n] {
+		if fe == nil {
+			continue
+		}
+		errs = append(errs, gen.FieldProblem{Field: fe.Field, Reason: fe.Reason})
+	}
+	p := gen.Problem{Type: ProblemTypeBase + slug, Title: title, Status: status, Errors: errs}
 	if detail != "" {
 		p.Detail = &detail
 	}
 	if instance != "" {
 		p.Instance = &instance
 	}
-	if len(fields) > 0 {
-		n := min(len(fields), MaxProblemErrors)
-		errs := make([]gen.FieldProblem, 0, n)
-		for _, fe := range fields[:n] {
-			if fe == nil {
-				continue
-			}
-			errs = append(errs, gen.FieldProblem{Field: fe.Field, Reason: fe.Reason})
-		}
-		p.Errors = &errs
-		if len(fields) > MaxProblemErrors {
-			t := true
-			p.Truncated = &t
-		}
+	if len(fields) > MaxProblemErrors {
+		t := true
+		p.Truncated = &t
 	}
 	return p
 }

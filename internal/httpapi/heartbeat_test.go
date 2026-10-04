@@ -195,7 +195,7 @@ func TestListPublications(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/publications/zones"+q, http.NoBody)
 		req.Header.Set("Authorization", "Bearer "+h.token(usspID, auth.ScopeRead))
 		rec := h.do(req)
-		if p := decodeProblem(t, rec); rec.Code != 400 || p.Errors == nil {
+		if p := decodeProblem(t, rec); rec.Code != 400 || len(p.Errors) == 0 {
 			t.Errorf("%s = %d %s", q, rec.Code, rec.Body.String())
 		}
 		conformResponse(t, req, rec)

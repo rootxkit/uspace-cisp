@@ -2121,12 +2121,13 @@ type JWKS struct {
 }
 
 // Problem The ecosystem-wide error body (RFC 9457), the same shape as
-// uspace-lab schemas/common/problem/v1.
+// uspace-lab schemas/common/problem/v1. errors is always present:
+// empty when no field is at fault (M28).
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
 
 	// Errors Field problems, at most 100; truncated says when more existed.
-	Errors *[]FieldProblem `json:"errors,omitempty"`
+	Errors []FieldProblem `json:"errors"`
 
 	// Instance The request path, or the request id.
 	Instance  *string `json:"instance,omitempty"`
@@ -2871,11 +2872,13 @@ type DatasetApplicationGeoPlusJSON = DatasetCollection
 type DatasetApplicationJSON = DatasetDocument
 
 // Locked The ecosystem-wide error body (RFC 9457), the same shape as
-// uspace-lab schemas/common/problem/v1.
+// uspace-lab schemas/common/problem/v1. errors is always present:
+// empty when no field is at fault (M28).
 type Locked = Problem
 
 // PreconditionFailed The ecosystem-wide error body (RFC 9457), the same shape as
-// uspace-lab schemas/common/problem/v1.
+// uspace-lab schemas/common/problem/v1. errors is always present:
+// empty when no field is at fault (M28).
 type PreconditionFailed = Problem
 
 // PublicDatasetApplicationGeoPlusJSON An ED-318 FeatureCollection as the CISP serves it: the features
@@ -2893,14 +2896,16 @@ type PublicDatasetApplicationGeoPlusJSON = DatasetCollection
 type PublicDatasetApplicationJSON = PublicUsspList
 
 // RateLimited The ecosystem-wide error body (RFC 9457), the same shape as
-// uspace-lab schemas/common/problem/v1.
+// uspace-lab schemas/common/problem/v1. errors is always present:
+// empty when no field is at fault (M28).
 type RateLimited = Problem
 
 // RestrictionReplay An accepted op (replay false, a new version) or a replay of the same pair (replay true, the current version).
 type RestrictionReplay = RestrictionResult
 
 // Unavailable The ecosystem-wide error body (RFC 9457), the same shape as
-// uspace-lab schemas/common/problem/v1.
+// uspace-lab schemas/common/problem/v1. errors is always present:
+// empty when no field is at fault (M28).
 type Unavailable = Problem
 
 // GetJWKSParams defines parameters for GetJWKS.

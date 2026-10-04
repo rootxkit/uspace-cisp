@@ -59,7 +59,7 @@ func TestConsoleLoginTwoSteps(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized || p.Type != ProblemTypeBase+console.SlugChallengeInvalid {
 		t.Errorf("reused challenge: %d %s", rec.Code, rec.Body.String())
 	}
-	if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Field != "mfa_token" {
+	if len(p.Errors) != 1 || p.Errors[0].Field != "mfa_token" {
 		t.Errorf("problem errors %+v", p.Errors)
 	}
 	// An unknown challenge, the same.

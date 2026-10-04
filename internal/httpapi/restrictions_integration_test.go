@@ -248,11 +248,11 @@ func TestRestrictionPlacementOnPostgres(t *testing.T) {
 			}
 			p := decodeProblem(t, rec)
 			found := false
-			for _, e := range *p.Errors {
+			for _, e := range p.Errors {
 				found = found || (strings.HasPrefix(e.Field, c.field) && strings.Contains(e.Reason, c.phrase))
 			}
 			if !found {
-				t.Errorf("problems %+v", *p.Errors)
+				t.Errorf("problems %+v", p.Errors)
 			}
 		})
 	}

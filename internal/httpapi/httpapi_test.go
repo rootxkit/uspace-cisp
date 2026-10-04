@@ -197,6 +197,14 @@ func decodeProblem(t testing.TB, rec *httptest.ResponseRecorder) gen.Problem {
 	if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
 		t.Fatal(err)
 	}
+	// problem/v1 requires errors on every problem body (M28, lab C1).
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &members); err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := members["errors"]; !ok || len(e) == 0 || e[0] != '[' {
+		t.Errorf("problem body without an errors array: %s", rec.Body.String())
+	}
 	if p.Status != rec.Code {
 		t.Errorf("problem status %d, response %d", p.Status, rec.Code)
 	}
@@ -443,7 +451,7 @@ func TestBodyCapOnGeneratedRoute(t *testing.T) {
 		t.Fatalf("code = %d", rec.Code)
 	}
 	p := decodeProblem(t, rec)
-	if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Field != "body" {
+	if len(p.Errors) != 1 || p.Errors[0].Field != "body" {
 		t.Errorf("errors = %+v", p.Errors)
 	}
 }
@@ -513,16 +521,37 @@ func TestProblemErrorsCapped(t *testing.T) {
 		fields[i] = core.Fieldf("features["+string(rune('a'+i%26))+"]", "bad")
 	}
 	p := NewProblem(400, "x", "t", "", "", fields...)
-	if p.Errors == nil || len(*p.Errors) != MaxProblemErrors || p.Truncated == nil || !*p.Truncated {
-		t.Errorf("errors %d truncated %v", len(*p.Errors), p.Truncated)
+	if len(p.Errors) != MaxProblemErrors || p.Truncated == nil || !*p.Truncated {
+		t.Errorf("errors %d truncated %v", len(p.Errors), p.Truncated)
 	}
 	p = NewProblem(400, "x", "t", "", "", fields[:MaxProblemErrors]...)
-	if len(*p.Errors) != MaxProblemErrors || p.Truncated != nil {
-		t.Errorf("at the cap: errors %d truncated %v", len(*p.Errors), p.Truncated)
+	if len(p.Errors) != MaxProblemErrors || p.Truncated != nil {
+		t.Errorf("at the cap: errors %d truncated %v", len(p.Errors), p.Truncated)
 	}
 	p = NewProblem(400, "x", "t", "", "", nil, core.Fieldf("a", "b"))
-	if len(*p.Errors) != 1 {
-		t.Errorf("nil field kept: %v", *p.Errors)
+	if len(p.Errors) != 1 {
+		t.Errorf("nil field kept: %v", p.Errors)
+	}
+}
+
+// Every problem body carries errors (problem/v1, M28; lab finding C1):
+// an empty array when no field is at fault, the fields when some are.
+func TestProblemErrorsAlwaysPresent(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		fields []*core.FieldError
+		want   string
+	}{
+		{"no field", nil, `"errors":[]`},
+		{"only a nil field", []*core.FieldError{nil}, `"errors":[]`},
+		{"a field", []*core.FieldError{core.Fieldf("username", "required")}, `"errors":[{"field":"username","reason":"required"}]`},
+	} {
+		rec := httptest.NewRecorder()
+		WriteProblem(rec, http.StatusServiceUnavailable, SlugConsoleUnavailable, "Console unavailable", "off", tc.fields...)
+		if !strings.Contains(rec.Body.String(), tc.want) {
+			t.Errorf("%s: body %s, want %s", tc.name, rec.Body.String(), tc.want)
+		}
+		decodeProblem(t, rec)
 	}
 }
 

@@ -68,7 +68,7 @@ func TestRunConsoleNotConfigured(t *testing.T) {
 		t.Errorf("console component %v", comp)
 	}
 	code, body := do(t, http.MethodPost, r.base+"/v1/console/session", "", map[string]any{"username": "a", "password": "b"})
-	if code != http.StatusServiceUnavailable || !strings.Contains(body, "console_unavailable") {
+	if code != http.StatusServiceUnavailable || !strings.Contains(body, "console_unavailable") || !strings.Contains(body, `"errors":[]`) {
 		t.Errorf("login = %d %s", code, body)
 	}
 	if c := r.stop(t); c != 0 {

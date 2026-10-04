@@ -708,8 +708,9 @@ func TestConsoleOff(t *testing.T) {
 	for _, op := range consoleOps(t) {
 		path := strings.NewReplacer("{id}", "X", "{delivery_id}", "Y").Replace(op.path)
 		rec := f.do(httptest.NewRequest(op.method, path, http.NoBody))
-		if rec.Code != http.StatusServiceUnavailable || decodeProblem(t, rec).Type != ProblemTypeBase+SlugConsoleUnavailable {
-			t.Errorf("%s %s: %d", op.method, op.path, rec.Code)
+		if p := decodeProblem(t, rec); rec.Code != http.StatusServiceUnavailable || p.Type != ProblemTypeBase+SlugConsoleUnavailable ||
+			p.Errors == nil || len(p.Errors) != 0 || !strings.Contains(rec.Body.String(), `"errors":[]`) {
+			t.Errorf("%s %s: %d %s", op.method, op.path, rec.Code, rec.Body.String())
 		}
 	}
 	// And a server without its console behind open routes says so too.

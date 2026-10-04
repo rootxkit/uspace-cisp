@@ -185,22 +185,22 @@ func ed269Refusal(t *testing.T, h *pubHarness, body []byte) gen.Problem {
 	attempts := len(h.fake.refused())
 	rec := h.putED269(body, "")
 	p := decodeProblem(t, rec)
-	if rec.Code != http.StatusBadRequest || p.Type != ProblemTypeBase+SlugPublicationRefused || p.Errors == nil {
+	if rec.Code != http.StatusBadRequest || p.Type != ProblemTypeBase+SlugPublicationRefused || len(p.Errors) == 0 {
 		t.Fatalf("PUT = %d %s", rec.Code, rec.Body.String())
 	}
 	if currentOf(t, h, publication.DatasetZones) != before {
 		t.Error("a refused publication made a version")
 	}
 	refused := h.fake.refused()
-	if len(refused) != attempts+1 || len(refused[attempts].Problems) != len(*p.Errors) {
-		t.Errorf("the refusal is not recorded with its %d problems", len(*p.Errors))
+	if len(refused) != attempts+1 || len(refused[attempts].Problems) != len(p.Errors) {
+		t.Errorf("the refusal is not recorded with its %d problems", len(p.Errors))
 	}
 	return p
 }
 
 func requireProblem(t *testing.T, p gen.Problem, field func(string) bool, phrase string) {
 	t.Helper()
-	for _, e := range *p.Errors {
+	for _, e := range p.Errors {
 		if field(e.Field) && strings.Contains(e.Reason, phrase) {
 			return
 		}
@@ -641,7 +641,7 @@ func TestED269ExportParameters(t *testing.T) {
 		"?format=ed269&lang=x_y": "lang",
 	} {
 		rec := h.read(http.MethodGet, target+query)
-		if p := decodeProblem(t, rec); rec.Code != http.StatusBadRequest || p.Errors == nil || (*p.Errors)[0].Field != field {
+		if p := decodeProblem(t, rec); rec.Code != http.StatusBadRequest || len(p.Errors) == 0 || p.Errors[0].Field != field {
 			t.Errorf("%s = %d %s", query, rec.Code, rec.Body.String())
 		}
 	}

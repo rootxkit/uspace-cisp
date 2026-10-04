@@ -622,7 +622,7 @@ func usspListBody(t testing.TB) []byte {
 func problemFields(p gen.Problem) []string {
 	var out []string
 	if p.Errors != nil {
-		for _, e := range *p.Errors {
+		for _, e := range p.Errors {
 			out = append(out, e.Field+": "+e.Reason)
 		}
 	}
@@ -631,10 +631,10 @@ func problemFields(p gen.Problem) []string {
 
 // hasProblem reports whether a problem names field with phrase.
 func hasProblem(p gen.Problem, field, phrase string) bool {
-	if p.Errors == nil {
+	if len(p.Errors) == 0 {
 		return false
 	}
-	for _, e := range *p.Errors {
+	for _, e := range p.Errors {
 		if e.Field == field && strings.Contains(e.Reason, phrase) {
 			return true
 		}

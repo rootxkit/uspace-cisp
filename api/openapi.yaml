@@ -2601,8 +2601,9 @@ components:
       type: object
       description: |
         The ecosystem-wide error body (RFC 9457), the same shape as
-        uspace-lab schemas/common/problem/v1.
-      required: [type, title, status]
+        uspace-lab schemas/common/problem/v1. errors is always present:
+        empty when no field is at fault (M28).
+      required: [type, title, status, errors]
       properties:
         type:
           type: string

@@ -131,10 +131,10 @@ func vectorRefusal(t *testing.T, h *pubHarness, body []byte, fieldSuffix, phrase
 	before := currentOf(t, h, publication.DatasetZones)
 	rec := h.put("zones", body)
 	p := decodeProblem(t, rec)
-	if rec.Code != http.StatusBadRequest || p.Type != ProblemTypeBase+SlugPublicationRefused || p.Errors == nil {
+	if rec.Code != http.StatusBadRequest || p.Type != ProblemTypeBase+SlugPublicationRefused || len(p.Errors) == 0 {
 		t.Fatalf("PUT = %d %s", rec.Code, rec.Body.String())
 	}
-	for _, e := range *p.Errors {
+	for _, e := range p.Errors {
 		if strings.HasSuffix(e.Field, fieldSuffix) && strings.Contains(e.Reason, phrase) {
 			if currentOf(t, h, publication.DatasetZones) != before {
 				t.Error("a refused publication made a version")

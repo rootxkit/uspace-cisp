@@ -149,10 +149,10 @@ func TestPutPublicationSignatureFirst(t *testing.T) {
 			rec := h.do(req)
 			conformResponse(t, req, rec)
 			p := decodeProblem(t, rec)
-			if rec.Code != http.StatusForbidden || p.Type != ProblemTypeBase+jws.SlugSignature || p.Errors == nil || len(*p.Errors) != 1 {
+			if rec.Code != http.StatusForbidden || p.Type != ProblemTypeBase+jws.SlugSignature || len(p.Errors) != 1 {
 				t.Fatalf("= %d %s", rec.Code, rec.Body.String())
 			}
-			if f := (*p.Errors)[0].Field; strings.Contains(f, "features") || strings.HasPrefix(f, "$") {
+			if f := p.Errors[0].Field; strings.Contains(f, "features") || strings.HasPrefix(f, "$") {
 				t.Errorf("the refusal names the body: %s", f)
 			}
 		})
@@ -430,7 +430,7 @@ func TestPutPublicationProblemsTruncated(t *testing.T) {
 	d["features"] = list
 	rec := h.put("zones", jsonBytes(t, d))
 	p := decodeProblem(t, rec)
-	if rec.Code != 400 || p.Errors == nil || len(*p.Errors) != 100 || p.Truncated == nil || !*p.Truncated || !strings.Contains(*p.Detail, "130 problems") || !strings.Contains(*p.Detail, "30 not listed") {
+	if rec.Code != 400 || len(p.Errors) != 100 || p.Truncated == nil || !*p.Truncated || !strings.Contains(*p.Detail, "130 problems") || !strings.Contains(*p.Detail, "30 not listed") {
 		t.Fatalf("= %d errors %d %v %s", rec.Code, len(problemFields(p)), p.Truncated, *p.Detail)
 	}
 	if a := h.fake.refused()[0]; len(a.Problems) != 100 || a.Truncated != 30 {

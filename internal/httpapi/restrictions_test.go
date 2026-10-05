@@ -200,7 +200,7 @@ func TestRestrictionConflicts(t *testing.T) {
 		}
 		if status >= 400 {
 			p := decodeProblem(t, rec)
-			if !strings.HasSuffix(p.Type, "/"+slug) || p.Errors == nil || (*p.Errors)[0].Field != field {
+			if !strings.HasSuffix(p.Type, "/"+slug) || len(p.Errors) == 0 || p.Errors[0].Field != field {
 				t.Errorf("problem %+v", p)
 			}
 		}
@@ -327,10 +327,10 @@ func TestRestrictionRefusals(t *testing.T) {
 }
 
 func hasProblemPrefix(p gen.Problem, field string) bool {
-	if p.Errors == nil {
+	if len(p.Errors) == 0 {
 		return false
 	}
-	for _, e := range *p.Errors {
+	for _, e := range p.Errors {
 		if strings.HasPrefix(e.Field, field) {
 			return true
 		}

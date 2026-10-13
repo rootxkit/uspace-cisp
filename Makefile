@@ -14,7 +14,7 @@ PKGS    ?= ./...
 # Tool versions, pinned here and mirrored in .github/workflows/ci.yml;
 # change both in one `ci:` commit. The linters equal uspace-core's.
 GOLANGCI_LINT_VERSION      ?= v2.14.0
-STATICCHECK_VERSION        ?= v0.8.1
+STATICCHECK_VERSION        ?= v0.8.2
 # The gitleaks version gitleaks-action runs in CI (GITLEAKS_VERSION there).
 GITLEAKS_VERSION           ?= v8.24.3
 GOVULNCHECK_VERSION        ?= v1.8.0

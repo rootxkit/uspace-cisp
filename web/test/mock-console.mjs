@@ -384,6 +384,12 @@ export function createConsole({ json, problem, readJson }) {
   }
 
   function mfa(res, body) {
+    // The API's own bound (internal/httpapi CreateConsoleSessionMfa),
+    // checked before the challenge: its English detail is what the
+    // console must not show.
+    if (typeof body.code !== "string" || !/^[0-9]{6}$/.test(body.code)) {
+      return problem(res, 400, "bad_request", "Bad request", {}, "code: six digits", [{ field: "code", reason: "six digits" }]);
+    }
     const ch = s.challenges.get(body.mfa_token);
     if (ch === undefined || ch.used || ch.expiresAt.getTime() <= Date.now()) return problem(res, 401, "challenge_invalid", "Unauthorized");
     const a = s.accounts.get(ch.username);

@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@rootxkit/uspace-ui/form";
 import { Button } from "@rootxkit/uspace-ui/ui";
 import { TONE_CLASS, type BadgeSpec } from "./badges";
 import { failureOf, type CallFailure } from "./client";
+import { fieldMessages } from "./validation";
 
 function noSubscribe(): () => void {
   return () => undefined;
@@ -74,12 +75,17 @@ export function StateBadge({ spec, value }: { spec: BadgeSpec; value: string }) 
 
 /**
  * A refused or failed call, visibly: the status, what it means for the
- * operator (a 403 names the role), and the API's title and detail with
- * its field problems. Never a silent empty table.
+ * operator (a 403 names the role), each refused field worded in the
+ * viewer's language, or else the API's title and detail. Never a silent
+ * empty table.
  */
 export function ProblemNotice({ failure }: { failure: CallFailure }) {
   const t = useT();
   const p = failure.problem;
+  // A refused form (a 400, or a problem naming its fields) is worded by
+  // the catalogue; the API's own title, detail and reasons are English
+  // and are not shown in its place (src/console/validation.ts).
+  const fields = failure.status === 0 ? null : fieldMessages(t, failure.status, failure.slug, p);
   const lead =
     failure.status === 0
       ? t("cisp.console.problem.unreachable")
@@ -91,18 +97,19 @@ export function ProblemNotice({ failure }: { failure: CallFailure }) {
   return (
     <div role="alert" data-status={failure.status} className="rounded border border-[var(--us-danger)] p-3 text-sm">
       <p className="m-0 font-semibold text-[var(--us-danger)]">{lead}</p>
-      {p !== null && (
+      {p !== null && fields === null && (
         <p className="m-0 mt-1">
           <span>{p.title}</span>
           {p.detail !== null && p.detail !== "" && <span>: {p.detail}</span>}
           <span className="ms-2 text-xs text-[var(--us-text-muted)]">({failure.status})</span>
         </p>
       )}
-      {p !== null && p.errors.length > 0 && (
-        <ul className="m-0 mt-1 ps-5">
-          {p.errors.map((e, i) => (
-            <li key={`${e.field}-${i}`}>
-              <code>{e.field}</code>: {e.reason}
+      {fields !== null && (
+        <ul className="m-0 mt-1 ps-5" data-testid="field-problems">
+          {fields.map((m, i) => (
+            <li key={`${m.field}-${i}`} data-field={m.field}>
+              {m.text}
+              {m.field !== "" && <code className="ms-2 text-xs text-[var(--us-text-muted)]">{m.field}</code>}
             </li>
           ))}
         </ul>

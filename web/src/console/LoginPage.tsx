@@ -5,12 +5,15 @@
 // challenge and the form asks for the code (docs/PLAN.md §15 Q41 (3)).
 // The API's refusals are worded here in the viewer's language by their
 // slug, a lockout with the time left from Retry-After (the form also
-// counts it down and keeps the button disabled until it ends).
+// counts it down and keeps the button disabled until it ends), a refused
+// field by what it takes (src/console/validation.ts), and anything else
+// by its status: the API's English never reaches the form.
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { BFF_LOGIN_PATH, LoginForm } from "@rootxkit/uspace-ui/auth/client";
 import { retryAfterSOf, parseProblem, problemSlug } from "@rootxkit/uspace-ui/api";
 import { useLang, useT, type Translate } from "@rootxkit/uspace-ui/i18n";
+import { fieldMessages, fieldSentence } from "./validation";
 
 /** The login refusals the console words itself (the API's slugs). */
 export const LOGIN_SLUGS = [
@@ -34,7 +37,8 @@ export function minutesLeft(retryAfterS: number): number {
 /**
  * A fetch for the form that rewrites the problem body's `detail` into the
  * viewer's language: the lockout with its time left, the known slugs by
- * name; anything else passes as the API sent it.
+ * name, a refused field (400) by what the field takes, and any other
+ * refusal by its status. Only a success passes untouched.
  */
 export function localisingFetch(t: Translate, base: typeof fetch = fetch): typeof fetch {
   return async (input, init) => {
@@ -52,8 +56,10 @@ export function localisingFetch(t: Translate, base: typeof fetch = fetch): typeo
           : t("cisp.console.login.locked_for", { minutes: minutesLeft(wait) });
     } else if (slug !== null && (LOGIN_SLUGS as readonly string[]).includes(slug)) {
       detail = t(`cisp.console.login.problem.${slug}`);
+    } else {
+      const fields = fieldMessages(t, res.status, slug, problem);
+      detail = fields === null ? t("cisp.console.problem.refused", { status: res.status }) : fieldSentence(fields);
     }
-    if (detail === null) return res;
     const headers = new Headers(res.headers);
     headers.delete("Content-Length");
     return new Response(JSON.stringify({ ...problem, detail }), { status: res.status, statusText: res.statusText, headers });

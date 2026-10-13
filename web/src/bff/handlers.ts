@@ -51,8 +51,13 @@ export interface BffConfig {
   sessionMaxAgeS: number;
   /** The upstream timeout of every call, ms (CISP_WEB_UPSTREAM_TIMEOUT_MS). */
   timeoutMs: number;
-  /** Reverse proxies in front of Next.js (CISP_WEB_TRUSTED_PROXY_HOPS). */
-  trustedProxyHops?: number;
+  /**
+   * Reverse proxies in front of Next.js that append to X-Forwarded-For
+   * (CISP_WEB_TRUSTED_PROXY_HOPS, required; 1 behind Caddy). 0 says there
+   * is none: the kit's `noTrustedProxy`, and the API gets no client
+   * address. A secure session never builds without one or the other.
+   */
+  trustedProxyHops: number;
   /**
    * Seals the MFA challenge cookie between the two sign-in steps
    * (CISP_WEB_MFA_CHALLENGE_SECRET, at least 32 bytes; a secret, never
@@ -85,7 +90,7 @@ export function createBff(cfg: BffConfig): Bff {
   const session: SessionCookieOptions = { secure: true, maxAgeS: cfg.sessionMaxAgeS };
   const common = {
     timeoutMs: cfg.timeoutMs,
-    ...(cfg.trustedProxyHops === undefined ? {} : { trustedProxyHops: cfg.trustedProxyHops }),
+    ...(cfg.trustedProxyHops === 0 ? { noTrustedProxy: true as const } : { trustedProxyHops: cfg.trustedProxyHops }),
     ...(cfg.fetch === undefined ? {} : { fetch: cfg.fetch }),
   };
   const kit: BffHandlers = bffHandlers({
@@ -123,6 +128,20 @@ export function createBff(cfg: BffConfig): Bff {
   return { login: kit.login, logout, proxy: kit.proxy };
 }
 
+/** The largest CISP_WEB_TRUSTED_PROXY_HOPS taken (a bound on a malformed value, not a policy). */
+export const MAX_TRUSTED_PROXY_HOPS = 8;
+
+/**
+ * CISP_WEB_TRUSTED_PROXY_HOPS as a whole number 0..MAX_TRUSTED_PROXY_HOPS,
+ * or null when it is unset or malformed: never a default, because a
+ * wrong count lets a client choose the address the API rate-limits.
+ */
+export function trustedProxyHopsOf(raw: string | undefined): number | null {
+  if (raw === undefined || !/^[0-9]{1,2}$/.test(raw)) return null;
+  const n = Number(raw);
+  return n <= MAX_TRUSTED_PROXY_HOPS ? n : null;
+}
+
 function positiveInt(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw === "") return fallback;
@@ -134,7 +153,8 @@ function positiveInt(name: string, fallback: number): number {
 /**
  * What the environment lacks for the BFF, naming the variable, or null
  * when it is complete. Without it every BFF route answers 503 naming it
- * (fail closed: no sign-in path without the MFA step).
+ * (fail closed: no sign-in path without the MFA step, and no client
+ * address the API rate-limits on taken from a header a client wrote).
  */
 export function configProblem(): string | null {
   const apiBase = process.env["CISP_API_INTERNAL_URL"];
@@ -143,6 +163,9 @@ export function configProblem(): string | null {
   if (new TextEncoder().encode(secret).length < MIN_CHALLENGE_SECRET_BYTES) {
     return `CISP_WEB_MFA_CHALLENGE_SECRET is not set or shorter than ${MIN_CHALLENGE_SECRET_BYTES} bytes`;
   }
+  if (trustedProxyHopsOf(process.env["CISP_WEB_TRUSTED_PROXY_HOPS"]) === null) {
+    return `CISP_WEB_TRUSTED_PROXY_HOPS is not set or not a whole number 0 to ${MAX_TRUSTED_PROXY_HOPS} (1 behind Caddy, 0 with no proxy)`;
+  }
   return null;
 }
 
@@ -150,7 +173,8 @@ export function configProblem(): string | null {
 export function configFromEnv(): BffConfig | null {
   if (configProblem() !== null) return null;
   const apiBase = process.env["CISP_API_INTERNAL_URL"] ?? "";
-  const hops = process.env["CISP_WEB_TRUSTED_PROXY_HOPS"];
+  const hops = trustedProxyHopsOf(process.env["CISP_WEB_TRUSTED_PROXY_HOPS"]);
+  if (hops === null) return null;
   return {
     apiBase,
     mfaChallengeSecret: process.env["CISP_WEB_MFA_CHALLENGE_SECRET"] ?? "",
@@ -158,7 +182,7 @@ export function configFromEnv(): BffConfig | null {
     // shortens it through expires_at.
     sessionMaxAgeS: positiveInt("CISP_WEB_SESSION_MAX_AGE_S", 12 * 3600),
     timeoutMs: positiveInt("CISP_WEB_UPSTREAM_TIMEOUT_MS", 10_000),
-    ...(hops === undefined || hops === "" ? {} : { trustedProxyHops: positiveInt("CISP_WEB_TRUSTED_PROXY_HOPS", 1) }),
+    trustedProxyHops: hops,
   };
 }
 

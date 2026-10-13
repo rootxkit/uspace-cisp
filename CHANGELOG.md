@@ -28,6 +28,10 @@ S7, N13).
 
 ### Changed
 
+- `web/`: `@rootxkit/uspace-ui` `1.0.0` (from `0.1.0-rc.1`), its release
+  tarball checked against `SHA256SUMS` and its provenance attestation;
+  `CISP_WEB_TRUSTED_PROXY_HOPS` is required (0: no proxy), unset the
+  BFF answers 503 naming it.
 - The public limiter keys an IPv6 client by its /64 (Q34 (7)).
 - Filtered reads parse a version's features once, in 2 MiB chunks; a
   no-box `at=` read of the national set no longer fails with 500.

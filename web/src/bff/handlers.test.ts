@@ -35,8 +35,8 @@ function mockApi(answer: (c: Call) => Response) {
   return { calls, fetch: fetchMock as unknown as typeof fetch };
 }
 
-function bffWith(f: typeof fetch) {
-  const cfg: BffConfig = { apiBase: API, sessionMaxAgeS: 43200, timeoutMs: 2000, mfaChallengeSecret: MFA_SECRET, fetch: f };
+function bffWith(f: typeof fetch, trustedProxyHops = 1) {
+  const cfg: BffConfig = { apiBase: API, sessionMaxAgeS: 43200, timeoutMs: 2000, mfaChallengeSecret: MFA_SECRET, trustedProxyHops, fetch: f };
   return createBff(cfg);
 }
 
@@ -179,7 +179,7 @@ describe("two-step sign-in (MFA)", () => {
 });
 
 describe("configuration", () => {
-  const keys = ["CISP_API_INTERNAL_URL", "CISP_WEB_MFA_CHALLENGE_SECRET"] as const;
+  const keys = ["CISP_API_INTERNAL_URL", "CISP_WEB_MFA_CHALLENGE_SECRET", "CISP_WEB_TRUSTED_PROXY_HOPS"] as const;
   function withEnv(env: Partial<Record<(typeof keys)[number], string>>, run: () => void) {
     try {
       for (const k of keys) vi.stubEnv(k, env[k]);
@@ -197,13 +197,70 @@ describe("configuration", () => {
     withEnv({ CISP_API_INTERNAL_URL: API, CISP_WEB_MFA_CHALLENGE_SECRET: "t".repeat(31) }, () => {
       expect(configProblem()).toMatch(/CISP_WEB_MFA_CHALLENGE_SECRET/);
     });
-    withEnv({ CISP_API_INTERNAL_URL: API, CISP_WEB_MFA_CHALLENGE_SECRET: MFA_SECRET }, () => {
+    withEnv({ CISP_API_INTERNAL_URL: API, CISP_WEB_MFA_CHALLENGE_SECRET: MFA_SECRET, CISP_WEB_TRUSTED_PROXY_HOPS: "1" }, () => {
       expect(configProblem()).toBeNull();
       expect(configFromEnv()?.mfaChallengeSecret).toBe(MFA_SECRET);
     });
     withEnv({ CISP_WEB_MFA_CHALLENGE_SECRET: MFA_SECRET }, () => {
       expect(configProblem()).toMatch(/CISP_API_INTERNAL_URL/);
     });
+  });
+});
+
+describe("trusted proxy hops", () => {
+  const complete = { CISP_API_INTERNAL_URL: API, CISP_WEB_MFA_CHALLENGE_SECRET: MFA_SECRET };
+  function withEnv(hops: string | undefined, run: () => void) {
+    try {
+      vi.stubEnv("CISP_API_INTERNAL_URL", complete.CISP_API_INTERNAL_URL);
+      vi.stubEnv("CISP_WEB_MFA_CHALLENGE_SECRET", complete.CISP_WEB_MFA_CHALLENGE_SECRET);
+      vi.stubEnv("CISP_WEB_TRUSTED_PROXY_HOPS", hops);
+      run();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  }
+
+  it("is required: unset, empty or malformed, the BFF is not configured and names it", () => {
+    for (const hops of [undefined, "", "-1", "1.5", "one", "9", "100"]) {
+      withEnv(hops, () => {
+        expect(configProblem(), String(hops)).toMatch(/CISP_WEB_TRUSTED_PROXY_HOPS/);
+        expect(configFromEnv(), String(hops)).toBeNull();
+      });
+    }
+  });
+
+  it("takes 0 to 8, 1 behind Caddy", () => {
+    for (const [raw, n] of [["0", 0], ["1", 1], ["8", 8]] as const) {
+      withEnv(raw, () => {
+        expect(configProblem()).toBeNull();
+        expect(configFromEnv()?.trustedProxyHops).toBe(n);
+      });
+    }
+  });
+
+  const login = (xff: string) =>
+    req("/_bff/login", {
+      method: "POST",
+      headers: { origin: ORIGIN, "content-type": "application/json", "x-forwarded-for": xff, "x-forwarded-proto": "https", "x-forwarded-host": "cisp.test" },
+      body: JSON.stringify({ username: "admin1", password: "pw" }),
+    });
+
+  it("with one hop the API gets the address Caddy appended, never the client's own", async () => {
+    const api = mockApi(() => Response.json({ access_token: "t", expires_at: new Date(Date.now() + 3_600_000).toISOString() }, { status: 201 }));
+    await bffWith(api.fetch, 1).login(login("6.6.6.6, 203.0.113.7"));
+    expect(api.calls).toHaveLength(1);
+    expect(api.calls[0]?.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+  });
+
+  it("with 0 the API gets no client address at all", async () => {
+    const api = mockApi(() => Response.json({ access_token: "t", expires_at: new Date(Date.now() + 3_600_000).toISOString() }, { status: 201 }));
+    await bffWith(api.fetch, 0).login(req("/_bff/login", {
+      method: "POST",
+      headers: { origin: ORIGIN, host: "cisp.test", "content-type": "application/json", "x-forwarded-for": "6.6.6.6" },
+      body: JSON.stringify({ username: "admin1", password: "pw" }),
+    }));
+    expect(api.calls).toHaveLength(1);
+    expect(api.calls[0]?.headers.get("x-forwarded-for")).toBeNull();
   });
 });
 

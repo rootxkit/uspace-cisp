@@ -28,6 +28,10 @@ S7, N13).
 
 ### Changed
 
+- `web/`: `@rootxkit/uspace-ui` `1.0.0` (from `0.1.0-rc.1`), its release
+  tarball checked against `SHA256SUMS` and its provenance attestation;
+  `CISP_WEB_TRUSTED_PROXY_HOPS` is required (0: no proxy), unset the
+  BFF answers 503 naming it.
 - The public limiter keys an IPv6 client by its /64 (Q34 (7)).
 - Filtered reads parse a version's features once, in 2 MiB chunks; a
   no-box `at=` read of the national set no longer fails with 500.
@@ -41,6 +45,11 @@ S7, N13).
 
 ### Fixed
 
+- `web/`: a refused form is worded in the viewer's language. The ka
+  sign-in page showed the API's "code: six digits"; the sign-in and
+  `ProblemNotice` now word each refused field from the catalogues
+  (`src/console/validation.ts`), a 400 without a field and any other
+  unknown refusal by its status, never with the API's English.
 - Every problem body carries `errors`, an empty array when no field is
   at fault (bug fix: `schemas/common/problem/v1` and M28 require it).
   The `503 console_unavailable` answer of an unconfigured console had

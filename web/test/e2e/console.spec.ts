@@ -292,6 +292,26 @@ test.describe("locales", () => {
     await expect(page.getByRole("heading", { name: "პუბლიკაციები" })).toBeVisible();
   });
 
+  // Live use: the ka sign-in showed the API's "code: six digits". The mock
+  // refuses a malformed code with the API's 400 and English detail.
+  test("a code that is not six digits is refused in Georgian on the ka page, and in English on en", async ({ page }) => {
+    for (const [lang, text] of [
+      ["ka", "კოდი ექვსი ციფრისგან შედგება."],
+      ["en", "The code is six digits."],
+    ] as const) {
+      await page.context().clearCookies();
+      await page.goto(`/${lang}/console/login`);
+      await page.locator('input[name="username"]').fill(ADMIN.username);
+      await page.locator('input[name="password"]').fill(ADMIN.password);
+      await page.locator('form button[type="submit"]').click();
+      await page.locator('input[name="otp"]').fill("12");
+      await page.locator('form button[type="submit"]').click();
+      const alert = page.locator("form").getByRole("alert");
+      await expect(alert).toHaveText(text);
+      if (lang === "ka") await expect(alert).not.toContainText("six digits");
+    }
+  });
+
   test("the same page renders in English", async ({ page }) => {
     await signIn(page, VIEWER);
     await page.goto("/en/console/publications");

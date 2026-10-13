@@ -36,11 +36,13 @@ describe("the login's wording", () => {
     expect(await detailOf(await f("/_bff/login"))).toBe("cisp.console.login.locked");
   });
 
-  it("a known refusal is worded by its slug; an unknown one passes as the API sent it", async () => {
+  it("a known refusal is worded by its slug; an unknown one by the catalogue, never as the API sent it", async () => {
     const known = localisingFetch(t, () => Promise.resolve(problemResponse(401, "invalid_totp")));
     expect(await detailOf(await known("/_bff/login"))).toBe("cisp.console.login.problem.invalid_totp");
-    const unknown = localisingFetch(t, () => Promise.resolve(problemResponse(400, "bad_request")));
-    expect(await detailOf(await unknown("/_bff/login"))).toBe("API text");
+    const malformed = localisingFetch(t, () => Promise.resolve(problemResponse(400, "bad_request")));
+    expect(await detailOf(await malformed("/_bff/login"))).toBe("cisp.console.validation.refused");
+    const unknown = localisingFetch(t, () => Promise.resolve(problemResponse(500, "internal")));
+    expect(await detailOf(await unknown("/_bff/login"))).toBe('cisp.console.problem.refused {"status":500}');
   });
 
   it("a success passes untouched", async () => {

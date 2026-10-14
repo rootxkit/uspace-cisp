@@ -159,7 +159,7 @@ var goList = func() ([]string, error) {
 	for _, s := range Scopes {
 		args = append(args, "./"+s+"...")
 	}
-	out, err := exec.Command("go", args...).Output()
+	out, err := exec.Command("go", args...).Output() //nolint:gosec // the arguments are the package scopes above, constants
 	if err != nil {
 		return nil, fmt.Errorf("go list: %w", err)
 	}

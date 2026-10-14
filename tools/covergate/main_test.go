@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +22,11 @@ github.com/rootxkit/uspace-cisp/cmd/deliver/main.go:3.1,4.2 2 0
 github.com/rootxkit/uspace-cisp/internal/store/relational/q.go:1.1,9.2 50 0
 github.com/rootxkit/uspace-cisp/tools/covergate/main.go:1.1,2.2 5 0
 `
+
+// listed stands in for go list: the profile's two packages.
+func listed() ([]string, error) {
+	return []string{Module + "/cmd/deliver", Module + "/internal/store", Module + "/internal/store/relational"}, nil
+}
 
 func TestMeasure(t *testing.T) {
 	pkgs, err := Measure(strings.NewReader(profile), []string{"internal/store/relational"})
@@ -55,6 +61,8 @@ func TestMeasureRefusesWhatIsNotAProfile(t *testing.T) {
 // package, at one a package does not; a profile that measures nothing
 // fails rather than passing (E-01, E-02).
 func TestRun(t *testing.T) {
+	defer func(old func() ([]string, error)) { goList = old }(goList)
+	goList = listed
 	dir := t.TempDir()
 	file := filepath.Join(dir, "coverage.out")
 	if err := os.WriteFile(file, []byte(profile), 0o600); err != nil {
@@ -90,5 +98,45 @@ func TestRun(t *testing.T) {
 				t.Errorf("out %q, err %q; want %q and %q", out.String(), errOut.String(), c.out, c.err)
 			}
 		})
+	}
+}
+
+// A package with no test file is not in the profile; the gate names it
+// unless it is excluded, and passes once it is measured or excluded
+// (presence and absence both run).
+func TestMissingPackage(t *testing.T) {
+	defer func(old func() ([]string, error)) { goList = old }(goList)
+	pkgs, err := Measure(strings.NewReader(profile), []string{"internal/store/relational"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := []string{Module + "/cmd/deliver", Module + "/internal/store", Module + "/internal/untested", Module + "/internal/gen", Module + "/tools/other"}
+	if got := Missing(pkgs, all, []string{"internal/gen"}); len(got) != 1 || got[0] != "internal/untested" {
+		t.Errorf("Missing = %v, want [internal/untested]", got)
+	}
+	if got := Missing(pkgs, all[:2], nil); len(got) != 0 {
+		t.Errorf("Missing with every package measured = %v", got)
+	}
+
+	file := filepath.Join(t.TempDir(), "coverage.out")
+	if err := os.WriteFile(file, []byte(profile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"-min=50", "-profile=" + file, "-exclude=internal/store/relational"}
+	goList = func() ([]string, error) { return all, nil }
+	var out, errOut bytes.Buffer
+	if code := run(args, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "internal/untested") {
+		t.Errorf("exit %d, err %q: want 1 naming internal/untested", code, errOut.String())
+	}
+	out.Reset()
+	errOut.Reset()
+	if code := run(append(args, "-exclude=internal/store/relational,internal/untested,internal/gen"), &out, &errOut); code != 0 {
+		t.Errorf("with the package excluded: exit %d, err %q", code, errOut.String())
+	}
+	goList = func() ([]string, error) { return nil, errors.New("no go") }
+	out.Reset()
+	errOut.Reset()
+	if code := run(args, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "no go") {
+		t.Errorf("go list failing: exit %d, err %q", code, errOut.String())
 	}
 }

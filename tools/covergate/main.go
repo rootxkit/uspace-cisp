@@ -10,7 +10,10 @@
 //
 // Excluded packages are generated code and test helpers, named one by
 // one: a new package without tests fails the gate rather than passing
-// unmeasured. A profile that measures no package fails too.
+// unmeasured: a package with no test file is absent from the profile, so
+// the packages `go list ./internal/... ./cmd/...` names are compared with
+// the profile and any that is neither measured nor excluded fails. A
+// profile that measures no package fails too.
 package main
 
 import (
@@ -20,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"sort"
 	"strconv"
@@ -125,6 +129,43 @@ func inScope(rel string) bool {
 	return false
 }
 
+// Missing is the listed packages (import paths) that are in scope, not
+// excluded and not in the profile's packages: they were never measured.
+func Missing(pkgs []Package, listed, exclude []string) []string {
+	have := map[string]bool{}
+	for _, p := range pkgs {
+		have[p.Path] = true
+	}
+	for _, e := range exclude {
+		if e = strings.Trim(strings.TrimSpace(e), "/"); e != "" {
+			have[e] = true
+		}
+	}
+	var out []string
+	for _, l := range listed {
+		rel, ok := strings.CutPrefix(strings.TrimSpace(l), Module+"/")
+		if ok && inScope(rel) && !have[rel] {
+			out = append(out, rel)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// goList names the packages of the scopes, as `go list` sees them. It is
+// a variable so the tests can stand in for the go command.
+var goList = func() ([]string, error) {
+	args := []string{"list"}
+	for _, s := range Scopes {
+		args = append(args, "./"+s+"...")
+	}
+	out, err := exec.Command("go", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("go list: %w", err)
+	}
+	return strings.Fields(string(out)), nil
+}
+
 // Below is the packages under min percent.
 func Below(pkgs []Package, minPercent float64) []Package {
 	var out []Package
@@ -164,7 +205,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "covergate: %v\n", err)
 		return 2
 	}
-	if err := report(stdout, pkgs, *minPercent); err != nil {
+	excluded := strings.Split(*exclude, ",")
+	listed, err := goList()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "covergate: %v\n", err)
+		return 2
+	}
+	if err := report(stdout, pkgs, *minPercent, Missing(pkgs, listed, excluded)); err != nil {
 		_, _ = fmt.Fprintf(stderr, "covergate: %v\n", err)
 		return 1
 	}
@@ -174,8 +221,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 // errBelow is a gate that does not hold.
 var errBelow = errors.New("below the bound")
 
-// report prints every package and says whether the gate holds.
-func report(w io.Writer, pkgs []Package, minPercent float64) error {
+// errMissing is a package that was never measured.
+var errMissing = errors.New("unmeasured package")
+
+// report prints every package and says whether the gate holds. missing
+// are packages the profile does not measure at all.
+func report(w io.Writer, pkgs []Package, minPercent float64, missing []string) error {
 	if len(pkgs) == 0 {
 		return errors.New("the profile measures no package of internal/ or cmd/: nothing was checked")
 	}
@@ -186,6 +237,9 @@ func report(w io.Writer, pkgs []Package, minPercent float64) error {
 			mark = "  BELOW"
 		}
 		_, _ = fmt.Fprintf(w, "%-40s %5.1f%% (%d of %d statements)%s\n", p.Path, p.Percent(), p.Covered, p.Statements, mark)
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("%w: not in the profile (no test file?), neither measured nor excluded: %s", errMissing, strings.Join(missing, ", "))
 	}
 	if len(below) > 0 {
 		names := make([]string, 0, len(below))

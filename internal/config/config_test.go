@@ -547,6 +547,43 @@ func TestEnvExampleMatchesCatalogue(t *testing.T) {
 	}
 }
 
+// A variable whose value is policy GCAA has not answered says "pending
+// GCAA" in the comment above it in deploy/.env.example, and no other
+// variable says so (both directions, E-01).
+func TestEnvExampleMarksPendingGCAA(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "deploy", ".env.example"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	marked := map[string]bool{}
+	var comment strings.Builder
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "#"):
+			comment.WriteString(line + " ")
+		case strings.HasPrefix(line, "CISP_"):
+			name, _, _ := strings.Cut(line, "=")
+			marked[name] = strings.Contains(comment.String(), "pending GCAA")
+			comment.Reset()
+		default:
+			comment.Reset()
+		}
+	}
+	n := 0
+	for _, v := range Catalogue {
+		if v.PendingGCAA {
+			n++
+		}
+		if marked[v.Name] != v.PendingGCAA {
+			t.Errorf("%s: pending GCAA in the catalogue %v, in .env.example %v", v.Name, v.PendingGCAA, marked[v.Name])
+		}
+	}
+	if n == 0 {
+		t.Fatal("no variable is pending GCAA: the check above compared nothing")
+	}
+}
+
 // The expiry's staleness is above its tick: one that is not would read
 // every healthy tick as a dead ticker; the interval past a minute is
 // refused too. Each beside the accepted value (E-01).

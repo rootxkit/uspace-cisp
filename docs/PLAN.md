@@ -956,6 +956,18 @@ and the kit's CSP (M38, §11).
 
 ### 15.2 Open (owner-only; the plan builds on the demo default)
 
+GCAA has not answered its questions; `v1.0.0` ships the spec's
+defaults below. Each one that is a value is configuration, flagged
+`PendingGCAA` in `internal/config` and marked "pending GCAA" in
+`deploy/.env.example` (a test keeps the two equal):
+`CISP_PUBLIC_BASE_URL` and `CISP_ISSUER_URL` (Q27),
+`CISP_DELIVERY_LOG_RETENTION_DAYS` (Q15; `cispctl migrate all` applies
+it on every deploy) and `CISP_BRANDING_FILE` (spec `08` Q15). Q10's
+public subset is not a value but the published shape `PublicUssp` of
+`/public/v1/ussp_list` (no `base_url`, no `certificate_id`): GCAA's
+answer changes it in `api/openapi.yaml`, additively, through the
+cross-plan reconciliation. Q4 has no code.
+
 | # | Gap | Demo default until answered | Who answers, and why only they can |
 |---|---|---|---|
 | Q4 | ATS.OR.127 operational data items (`02 F2`, `01` C2) have no format or scope. | Reserve the dataset name `ats_operational_data` and the scope `cis.publish:ats_data` (in the authority's catalogue, M23); **no code** until the SLA names the items; a later WP after C-M2, so nothing assumes it. | GCAA and Sakaeronavigatsia: the Annex V SLA. |

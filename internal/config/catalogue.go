@@ -11,6 +11,10 @@ type Var struct {
 	// SecretURL: a URL whose userinfo (password or token) and credential
 	// query parameters are printed as "***"; the rest stays readable.
 	SecretURL bool
+	// PendingGCAA: the value is policy GCAA has not answered
+	// (docs/PLAN.md section 15.2); the default or the demo value is the
+	// spec's placeholder, and deploy/.env.example says "pending GCAA".
+	PendingGCAA bool
 }
 
 // TestPrefix is the namespace of the variables the integration tests
@@ -123,14 +127,14 @@ var Catalogue = []Var{
 	{Name: EnvSessionKeyFile, Default: ""},
 	{Name: EnvSecretsKeyFile, Default: ""},
 	{Name: EnvConsoleIssuer, Default: ""},
-	{Name: EnvPublicBaseURL, Default: ""},
-	{Name: EnvIssuerURL, Default: ""},
+	{Name: EnvPublicBaseURL, Default: "", PendingGCAA: true},
+	{Name: EnvIssuerURL, Default: "", PendingGCAA: true},
 	{Name: EnvReadMaxAgeS, Default: "60"},
 	{Name: EnvPublicRPM, Default: "60"},
 	{Name: EnvTrustedProxyCIDR, Default: ""},
 	{Name: EnvMaxPublicationBytes, Default: "8388608"},
 	{Name: EnvMaxSubscriptionsPerClient, Default: "20"},
-	{Name: EnvBrandingFile, Default: ""},
+	{Name: EnvBrandingFile, Default: "", PendingGCAA: true},
 	{Name: EnvMaxRestrictionBytes, Default: "262144"},
 	{Name: EnvExpiryIntervalS, Default: "5"},
 	{Name: EnvExpiryStaleAfterS, Default: "30"},
@@ -144,7 +148,7 @@ var Catalogue = []Var{
 
 	// deliver.
 	{Name: EnvDeliverHTTPAddr, Default: ":8081"},
-	{Name: EnvDeliveryLogRetentionDays, Default: "90"},
+	{Name: EnvDeliveryLogRetentionDays, Default: "90", PendingGCAA: true},
 	{Name: EnvAllowPrivateCallbacks, Default: "false"},
 	{Name: EnvAllowInsecureCallbacks, Default: "false"},
 	{Name: EnvWebhookMaxTokenBytes, Default: "8192"},

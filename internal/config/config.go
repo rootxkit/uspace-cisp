@@ -167,6 +167,10 @@ type Ctl struct {
 	SigningKIDPrev     string
 	SessionKeyFile     string
 	SecretsKeyFile     string
+
+	// DeliveryLogRetentionDays is applied to the delivery log by
+	// cispctl migrate all (docs/PLAN.md section 15 Q15, pending GCAA).
+	DeliveryLogRetentionDays int64
 }
 
 func loadCommon(e *env) Common {
@@ -291,6 +295,8 @@ func LoadCtl(environ []string) (*Ctl, error) {
 		SigningKIDPrev:     e.str(EnvSigningKIDPrev),
 		SessionKeyFile:     e.str(EnvSessionKeyFile),
 		SecretsKeyFile:     e.str(EnvSecretsKeyFile),
+
+		DeliveryLogRetentionDays: e.integer(EnvDeliveryLogRetentionDays),
 	}
 	return c, finish(e, &c.Common, c.Validate)
 }
@@ -578,6 +584,7 @@ func (c *Ctl) Validate() error {
 	p = intIn(p, EnvDatabaseMaxConns, c.DatabaseMaxConns, 1, 1000)
 	p = intIn(p, EnvTimeseriesMaxConns, c.TimeseriesMaxConns, 1, 1000)
 	p = signingKeysOK(p, c.SigningKeyFile, c.SigningKID, c.SigningKeyPrevFile, c.SigningKIDPrev)
+	p = intIn(p, EnvDeliveryLogRetentionDays, c.DeliveryLogRetentionDays, 1, 3650)
 	return orNil(p)
 }
 

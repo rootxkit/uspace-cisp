@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Exercises tools/conformance.sh in each state and checks the line it
 # prints and its exit status (WP-13 tests): the suite absent (skipped,
-# exit 0), present without an entry point (failed, exit 1), present and
+# exit 0; failed, exit 1, when CONFORMANCE_REQUIRE_SUITE=1), present without an entry point (failed, exit 1), present and
 # passing (passed, exit 0, CISP_BASE_URL and the report directory handed
 # over), present and failing (failed, the suite's exit status). The
 # suites are fakes in a scratch LAB_DIR, run against a given base URL,
@@ -28,6 +28,8 @@ expect() {
 
 expect "absent" 0 "lab conformance suite not present at $scratch/none/conformance/cisp: skipped" \
   LAB_DIR="$scratch/none"
+expect "absent but required" 1 "lab conformance suite not present at $scratch/none/conformance/cisp: failed (CONFORMANCE_REQUIRE_SUITE=1)" \
+  LAB_DIR="$scratch/none" CONFORMANCE_REQUIRE_SUITE=1
 
 mkdir -p "$scratch/norun/conformance/cisp"
 expect "present without run" 1 "has no executable run: failed" LAB_DIR="$scratch/norun"
@@ -52,5 +54,24 @@ chmod +x "$scratch/fail/conformance/cisp/run"
 expect "present and failing" 7 "failed (exit 7)" \
   LAB_DIR="$scratch/fail" CISP_CONFORMANCE_BASE_URL=http://cisp.selftest.invalid CONFORMANCE_REPORT="$scratch/report2"
 
+# The chaos path: with no base URL set, conformance.sh runs go test in
+# test/e2e with LAB_CONFORMANCE_SUITE. A fake go (GO=) plays that test:
+# from its working directory it must find the suite's run through the
+# variable, which a relative LAB_DIR broke.
+rel="$(mktemp -d -p "$PWD" .conformance-selftest.XXXXXX)"
+trap 'rm -rf "$scratch" "$rel"' EXIT
+mkdir -p "$rel/lab/conformance/cisp"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$rel/lab/conformance/cisp/run"
+chmod +x "$rel/lab/conformance/cisp/run"
+cat > "$scratch/fakego" <<'EOF'
+#!/usr/bin/env bash
+case "$LAB_CONFORMANCE_SUITE" in /* | [A-Za-z]:*) ;; *) echo "LAB_CONFORMANCE_SUITE is not absolute: $LAB_CONFORMANCE_SUITE"; exit 4 ;; esac
+[ "$(basename "$PWD")" = e2e ] || { echo "not run in test/e2e: $PWD"; exit 5; }
+[ -x "$LAB_CONFORMANCE_SUITE/run" ] || { echo "fork/exec $LAB_CONFORMANCE_SUITE/run: no such file"; exit 6; }
+EOF
+chmod +x "$scratch/fakego"
+expect "chaos path with a relative LAB_DIR" 0 "passed, report in $scratch/report3" \
+  GO="$scratch/fakego" LAB_DIR="$(basename "$rel")/lab" CONFORMANCE_REPORT="$scratch/report3"
+
 if [ "$fails" -ne 0 ]; then echo "conformance self-test: $fails failed"; exit 1; fi
-echo "conformance self-test: 5 checks passed"
+echo "conformance self-test: 7 checks passed"

@@ -129,14 +129,20 @@ type fakeConn struct {
 	closed chan websocket.StatusCode
 	block  chan struct{}
 	fail   error
+	// writing, when set, is sent the write's context as each Write
+	// starts.
+	writing chan context.Context
 }
 
 func newFakeConn() *fakeConn { return &fakeConn{closed: make(chan websocket.StatusCode, 1)} }
 
 func (f *fakeConn) Write(ctx context.Context, frame []byte) error {
 	f.mu.Lock()
-	block, fail := f.block, f.fail
+	block, fail, writing := f.block, f.fail, f.writing
 	f.mu.Unlock()
+	if writing != nil {
+		writing <- ctx
+	}
 	if fail != nil {
 		return fail
 	}

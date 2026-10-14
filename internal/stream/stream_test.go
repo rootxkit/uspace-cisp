@@ -485,6 +485,57 @@ func TestWriteFailureDetaches(t *testing.T) {
 	waitFor(t, "the client to go", func() bool { return hub.Len() == 0 })
 }
 
+// A frame being written when the client is detached is written to the
+// end: its context ends at WriteTimeout, never at the detach. A
+// coder/websocket write whose context ends closes the connection at
+// once, so a detach that cancelled it dropped the close frame and the
+// peer read EOF instead of 1001 (TestCloseGoingAway, flaky on main).
+func TestDetachLetsTheWriteInFlightFinish(t *testing.T) {
+	hub := NewHub(Config{Source: healthyParts, WriteTimeout: time.Minute})
+	c := newFakeConn()
+	c.block = make(chan struct{})
+	c.writing = make(chan context.Context, 1)
+	hub.reserve()
+	hub.attach(c, nil, false, nil)
+	wctx := <-c.writing // the status frame on attach is being written
+	hub.Close()
+	select {
+	case code := <-c.closed:
+		if code != CloseGoingAway {
+			t.Errorf("closed with %d, want 1001", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the client was not closed")
+	}
+	if err := wctx.Err(); err != nil {
+		t.Fatalf("the detach ended the write in flight: %v", err)
+	}
+	close(c.block)
+	waitFor(t, "the write in flight to finish", func() bool { return c.count() == 1 })
+}
+
+// The twin: a write that does not finish within WriteTimeout is ended
+// by it, and the client goes.
+func TestWriteTimeoutEndsTheWrite(t *testing.T) {
+	hub := NewHub(Config{Source: healthyParts, WriteTimeout: 20 * time.Millisecond})
+	defer hub.Close()
+	c := newFakeConn()
+	c.block = make(chan struct{})
+	defer close(c.block)
+	c.writing = make(chan context.Context, 1)
+	hub.reserve()
+	hub.attach(c, nil, false, nil)
+	wctx := <-c.writing
+	<-wctx.Done()
+	if !errors.Is(wctx.Err(), context.DeadlineExceeded) {
+		t.Errorf("the write ended with %v, want its deadline", wctx.Err())
+	}
+	waitFor(t, "the client to go", func() bool { return hub.Len() == 0 })
+	if c.count() != 0 {
+		t.Errorf("frames written = %d", c.count())
+	}
+}
+
 // Close ends every client with 1001 and refuses the next.
 func TestCloseGoingAway(t *testing.T) {
 	r := newRig(t, Config{}, HandlerConfig{Public: true})

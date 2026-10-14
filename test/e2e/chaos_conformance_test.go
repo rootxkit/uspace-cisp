@@ -39,7 +39,13 @@ func TestLabConformance(t *testing.T) {
 		report = t.TempDir()
 	}
 	cmd := exec.Command(filepath.Join(suite, "run"))
-	cmd.Env = append(os.Environ(), "CISP_BASE_URL="+s.apiURL, "CONFORMANCE_ENV="+envFile, "CONFORMANCE_REPORT="+report)
+	// The chaos stack is disposable, so the suite may publish its
+	// fixture over the zones dataset: without CONFORMANCE_PUBLISH the
+	// ED-318 publication half (schema, vertical references, versions,
+	// the change feed, the heartbeat) is reported not applicable and
+	// the lab's baseline counts each one as a regression.
+	cmd.Env = append(os.Environ(), "CISP_BASE_URL="+s.apiURL, "CONFORMANCE_ENV="+envFile, "CONFORMANCE_REPORT="+report,
+		"CONFORMANCE_PUBLISH=true")
 	out, err := cmd.CombinedOutput()
 	t.Logf("lab conformance suite %s against %s:\n%s", suite, s.apiURL, tail(string(out), 60))
 	if err != nil {

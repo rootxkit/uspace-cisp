@@ -7,62 +7,28 @@ additively within `/v1`.
 
 ## [Unreleased]
 
-Retro-audit fixes (cisp B1, B2, S1-S6, N1-N4; system F-1; CI B1, S1,
-S7, N13).
-
-### Added
-
-- `cis/change/v1` summary members `ids_truncated`, `feature_count`,
-  `removed_count` (optional, additive): a change over 200 identifiers or
-  3072 encoded bytes is a summary with empty lists and `pull_url`, so a
-  webhook always fits core's 8 KiB verifier bound (Q49).
-- `CISP_WEBHOOK_MAX_TOKEN_BYTES` (8192): a signed webhook over it is not
-  sent, expires as `delivery_payload_too_large` and never counts towards
-  suspending the subscriber.
-- `cispctl resign-current --dataset D|all` and migration 0014
-  `snapshot_signatures` (append-only): re-sign the current snapshots
-  after a key rotation without a publication (Q50).
-- Counters `rate_limit_proxy_untrusted_forwarded_for`,
-  `filtered_features_parsed`, `delivery_payload_too_large`; component
-  `ratelimit_proxy` degraded when an https deployment trusts no proxy.
-
-### Changed
-
-- `web/`: `@rootxkit/uspace-ui` `1.0.0` (from `0.1.0-rc.1`), its release
-  tarball checked against `SHA256SUMS` and its provenance attestation;
-  `CISP_WEB_TRUSTED_PROXY_HOPS` is required (0: no proxy), unset the
-  BFF answers 503 naming it.
-- The public limiter keys an IPv6 client by its /64 (Q34 (7)).
-- Filtered reads parse a version's features once, in 2 MiB chunks; a
-  no-box `at=` read of the national set no longer fails with 500.
-- `HEAD /v1/restrictions` answers as `GET` while the ANSP is stale
-  (`no-store`, no stored signature).
-- The login limiter's 429 names its own limit.
-- CI: every action pinned to a commit SHA; SBOMs generated apart from
-  the push and signing credentials; gitleaks as a checksummed binary;
-  the lab conformance suite at a pinned commit; path filters cover every
-  file the Go tests read.
-
-### Fixed
-
-- `web/`: a refused form is worded in the viewer's language. The ka
-  sign-in page showed the API's "code: six digits"; the sign-in and
-  `ProblemNotice` now word each refused field from the catalogues
-  (`src/console/validation.ts`), a 400 without a field and any other
-  unknown refusal by its status, never with the API's English.
-- Every problem body carries `errors`, an empty array when no field is
-  at fault (bug fix: `schemas/common/problem/v1` and M28 require it).
-  The `503 console_unavailable` answer of an unconfigured console had
-  none, which the lab conformance suite reported as finding C1
-  (uspace-lab `docs/decisions/2026-10-05-conformance-findings.md`).
-  `api/openapi.yaml` now lists `errors` as required in `Problem`, as the
-  server always sends it; a client that already read it as optional is
-  unaffected.
-
 ## [1.0.0] (C-M3: hardening)
 
 `/v1` declared stable: additive changes only from here
 (`docs/RELEASING.md`).
+
+With the retro-audit fixes (cisp B1, B2, S1-S6, N1-N4; system F-1;
+CI B1, S1, S7, N13), the lab conformance finding C1 and the release
+checks.
+
+### Contract
+
+- The public subset of the USSP list is part of the `/v1` contract as
+  1.0.0 ships it, on the demo default of `docs/PLAN.md` section 15 Q10,
+  pending GCAA: `GET /public/v1/ussp_list` gives each USSP the members
+  `ussp_id`, `name`, `contact`, `services`,
+  `certification_limitations`, `valid_from`, `valid_until`,
+  `terms_url` and `status` (`PublicUssp`, each required) and withholds
+  `base_url` and `certificate_id`. GCAA's answer changes it within
+  `/v1` only if it adds: publishing a withheld member is a new response
+  member (a minor). An answer that withholds any member above is a
+  breaking change, served as `/public/v2` beside `/public/v1`
+  (`docs/RELEASING.md` section 4), never by changing `/public/v1`.
 
 ### Added
 
@@ -136,6 +102,19 @@ S7, N13).
   events chain); `cispctl migrate all`; `docs/RELEASING.md` and the
   runbooks for deploy, backup and restore, key rotation, a stale
   publisher and a subscriber storm.
+- `cis/change/v1` summary members `ids_truncated`, `feature_count`,
+  `removed_count` (optional, additive): a change over 200 identifiers or
+  3072 encoded bytes is a summary with empty lists and `pull_url`, so a
+  webhook always fits core's 8 KiB verifier bound (Q49).
+- `CISP_WEBHOOK_MAX_TOKEN_BYTES` (8192): a signed webhook over it is not
+  sent, expires as `delivery_payload_too_large` and never counts towards
+  suspending the subscriber.
+- `cispctl resign-current --dataset D|all` and migration 0014
+  `snapshot_signatures` (append-only): re-sign the current snapshots
+  after a key rotation without a publication (Q50).
+- Counters `rate_limit_proxy_untrusted_forwarded_for`,
+  `filtered_features_parsed`, `delivery_payload_too_large`; component
+  `ratelimit_proxy` degraded when an https deployment trusts no proxy.
 
 ### Changed
 
@@ -157,6 +136,41 @@ S7, N13).
   `CISP_IMAGE_TAG`.
 - `api/openapi.yaml` is `1.0.0`: `/v1` is stable, and changes within it
   are additive only (`docs/RELEASING.md`).
+- `web/`: `@rootxkit/uspace-ui` `1.0.0` (from `0.1.0-rc.1`), its release
+  tarball checked against `SHA256SUMS` and its provenance attestation;
+  `CISP_WEB_TRUSTED_PROXY_HOPS` is required (0: no proxy), unset the
+  BFF answers 503 naming it.
+- The public limiter keys an IPv6 client by its /64 (Q34 (7)).
+- Filtered reads parse a version's features once, in 2 MiB chunks; a
+  no-box `at=` read of the national set no longer fails with 500.
+- `HEAD /v1/restrictions` answers as `GET` while the ANSP is stale
+  (`no-store`, no stored signature).
+- The login limiter's 429 names its own limit.
+- CI: every action pinned to a commit SHA; SBOMs generated apart from
+  the push and signing credentials; gitleaks as a checksummed binary;
+  the lab conformance suite at a pinned commit; path filters cover every
+  file the Go tests read.
+- The variables whose value is GCAA's unanswered policy
+  (`CISP_PUBLIC_BASE_URL`, `CISP_ISSUER_URL`,
+  `CISP_DELIVERY_LOG_RETENTION_DAYS`, `CISP_BRANDING_FILE`) say "pending
+  GCAA" in `deploy/.env.example`; `docs/PLAN.md` section 15.2 lists the
+  defaults v1.0.0 ships.
+- CI: the lab conformance job runs the suite at uspace-lab's main
+  (`conformance/cisp/run`; the old pin predated it, so the job printed
+  "skipped" and passed) with publishing on the disposable chaos stack,
+  and fails when the suite is absent (`CONFORMANCE_REQUIRE_SUITE=1`).
+  It runs on main and on the release pull request (a `release/` branch
+  or the `release` label), so a release commit is proven before it is
+  tagged; `test/workflows` evaluates the job's condition per event.
+- CI: `make coverage-gate` in the integration job fails when a package
+  of `internal/` or `cmd/` has less than 85 % statement coverage, unit
+  and integration together (`docs/PLAN.md` sections 10.1 and 13;
+  generated code and test helpers named as exclusions). `internal/store`
+  was at 52.3 % and `cmd/deliver` at 80.6 %; PostgreSQL tests of the
+  subscriptions, the delivery queue as `cisp_deliver`, the restriction
+  heads, the console's rows and an outage that never reads as an
+  absence, and the deliver process's refusals, degraded starts and run
+  with the broker, bring them to 87.7 % and 91.1 %.
 
 ### Fixed
 
@@ -168,6 +182,28 @@ S7, N13).
   ANSP routes when no client certificate was presented (the placeholder
   is null in CEL, and `null != ""` held); api refused it, but for the
   wrong reason. The matcher now tests for null.
+- `web/`: a refused form is worded in the viewer's language. The ka
+  sign-in page showed the API's "code: six digits"; the sign-in and
+  `ProblemNotice` now word each refused field from the catalogues
+  (`src/console/validation.ts`), a 400 without a field and any other
+  unknown refusal by its status, never with the API's English.
+- Every problem body carries `errors`, an empty array when no field is
+  at fault (bug fix: `schemas/common/problem/v1` and M28 require it).
+  The `503 console_unavailable` answer of an unconfigured console had
+  none, which the lab conformance suite reported as finding C1
+  (uspace-lab `docs/decisions/2026-10-05-conformance-findings.md`).
+  `api/openapi.yaml` now lists `errors` as required in `Problem`, as the
+  server always sends it; a client that already read it as optional is
+  unaffected.
+- WS `/v1/stream` closes with 1001 when the instance stops, also when
+  a frame is being written: a detach no longer ends the write in flight
+  (coder/websocket closes the connection when a write's context ends,
+  so the peer read EOF; `TestCloseGoingAway` failed on main).
+- `CISP_DELIVERY_LOG_RETENTION_DAYS` is applied: `cispctl migrate all`
+  (the compose migrate service, on every deploy) reads it before
+  migrating and sets the delivery log's retention after the timeseries
+  tree. It was validated and then ignored. The figure is the demo
+  default, pending GCAA (`docs/PLAN.md` section 15 Q15).
 
 ## [0.2.0] (C-M2: restrictions; never tagged, recorded here)
 

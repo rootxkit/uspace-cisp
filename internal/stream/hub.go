@@ -285,14 +285,17 @@ func (h *Hub) detach(c *client, code websocket.StatusCode, reason string) {
 }
 
 // write sends c's queued frames, each within WriteTimeout; a write that
-// fails or times out ends the client.
+// fails or times out ends the client. A write in flight is bounded by
+// WriteTimeout alone, never ended by a detach: a websocket write whose
+// context ends closes the connection at once, and the close frame the
+// detach sends after it would never reach the peer.
 func (h *Hub) write(ctx context.Context, c *client) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case frame := <-c.send:
-			wctx, cancel := context.WithTimeout(ctx, h.cfg.WriteTimeout)
+			wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), h.cfg.WriteTimeout)
 			err := c.conn.Write(wctx, frame)
 			cancel()
 			if err != nil {

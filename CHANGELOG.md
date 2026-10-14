@@ -145,6 +145,15 @@ checks.
   (`conformance/cisp/run`; the old pin predated it, so the job printed
   "skipped" and passed) with publishing on the disposable chaos stack,
   and fails when the suite is absent (`CONFORMANCE_REQUIRE_SUITE=1`).
+- CI: `make coverage-gate` in the integration job fails when a package
+  of `internal/` or `cmd/` has less than 85 % statement coverage, unit
+  and integration together (`docs/PLAN.md` sections 10.1 and 13;
+  generated code and test helpers named as exclusions). `internal/store`
+  was at 52.3 % and `cmd/deliver` at 80.6 %; PostgreSQL tests of the
+  subscriptions, the delivery queue as `cisp_deliver`, the restriction
+  heads, the console's rows and an outage that never reads as an
+  absence, and the deliver process's refusals, degraded starts and run
+  with the broker, bring them to 87.7 % and 91.1 %.
 
 ### Fixed
 

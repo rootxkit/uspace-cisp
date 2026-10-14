@@ -255,6 +255,14 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: make integration (fails when zero tests ran)
         run: make integration
+      - name: make coverage-gate (85 % of each package, unit and integration)
+        run: |
+          echo '### Coverage per package (unit and integration)' >> "$GITHUB_STEP_SUMMARY"
+          rc=0
+          make coverage-gate > coverage-gate.txt 2>&1 || rc=$?
+          cat coverage-gate.txt
+          { echo '```'; cat coverage-gate.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

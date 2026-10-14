@@ -32,7 +32,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 .PHONY: all build vet fmt fmt-check lint tools staticcheck tidy test race cover \
         generate generate-check integration vectors secrets vulncheck \
         dev-deps dev-deps-down image ci clean jws-smoke e2e chaos caddy \
-        conformance conformance-selftest deploy-selftest
+        conformance conformance-selftest deploy-selftest coverage-gate
 
 all: ci
 
@@ -103,7 +103,8 @@ generate-check: generate
 # The integration tests live in test/integration and beside the packages
 # they exercise (internal/store, internal/bus, cmd/*), all behind the
 # `integration` tag; -p 1 because they share the two databases (some
-# migrate them down and up).
+# migrate them down and up). The run writes the coverage profile
+# coverage-gate reads: unit and integration together, per package.
 INTEGRATION_PKGS ?= ./test/integration/... ./internal/... ./cmd/...
 integration:
 	@set -a; if [ -f $(DEV_ENV) ]; then . ./$(DEV_ENV); fi; set +a; \
@@ -113,12 +114,22 @@ integration:
 	export CISP_TEST_ADMIN_URL="$${CISP_TEST_ADMIN_URL:-postgres://postgres:$${POSTGRES_PASSWORD}@127.0.0.1:$${DEV_PG_PORT:-5432}/postgres?sslmode=disable}"; \
 	export CISP_TEST_PG_CONTAINER="$${CISP_TEST_PG_CONTAINER:-$$($(COMPOSE_DEV) ps -q postgres 2>/dev/null)}"; \
 	rc=0; \
-	$(GO) test -tags integration -count=1 -p 1 -v $(INTEGRATION_PKGS) 2>&1 | tee integration.log || rc=$$?; \
+	$(GO) test -tags integration -count=1 -p 1 -v -coverprofile=coverage-integration.out $(INTEGRATION_PKGS) 2>&1 | tee integration.log || rc=$$?; \
 	n=$$(grep -c '^--- PASS' integration.log || true); \
 	f=$$(grep -c '^--- FAIL' integration.log || true); \
 	echo "integration: $$n top-level tests passed, $$f failed"; \
 	if [ "$$rc" -ne 0 ]; then echo "integration: go test exited $$rc"; exit "$$rc"; fi; \
 	if [ "$$n" -eq 0 ]; then echo "integration: zero tests ran"; exit 1; fi
+
+# Statement coverage of every package of internal/ and cmd/, unit and
+# integration together, from the profile `make integration` wrote: at
+# least COVER_MIN percent each (docs/PLAN.md sections 10.1 and 13).
+# Excluded are generated code (sqlc, oapi-codegen) and test helpers,
+# named one by one, so a new package without tests fails here.
+COVER_MIN     ?= 85
+COVER_EXCLUDE ?= internal/store/relational,internal/store/timeseries,internal/httpapi/gen,internal/authtest,internal/natstest,internal/console/consoletest
+coverage-gate:
+	$(GO) run ./tools/covergate -min $(COVER_MIN) -profile coverage-integration.out -exclude $(COVER_EXCLUDE)
 
 # The compose-driven end to end tests (test/e2e, WP-6): PostgreSQL +
 # TimescaleDB, NATS and the reference subscriber container in compose,
@@ -223,8 +234,8 @@ image:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) .
 	docker build -f deploy/Dockerfile.web -t $(IMAGE)-web:$(VERSION) web
 
-ci: build vet lint race jws-smoke generate-check vectors vulncheck secrets integration
+ci: build vet lint race jws-smoke generate-check vectors vulncheck secrets integration coverage-gate
 
 clean:
-	rm -f coverage.out integration.log e2e.log chaos.log caddy.log
+	rm -f coverage.out coverage-integration.out integration.log e2e.log chaos.log caddy.log
 	rm -rf conformance-report

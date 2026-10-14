@@ -964,9 +964,12 @@ defaults below. Each one that is a value is configuration, flagged
 `CISP_DELIVERY_LOG_RETENTION_DAYS` (Q15; `cispctl migrate all` applies
 it on every deploy) and `CISP_BRANDING_FILE` (spec `08` Q15). Q10's
 public subset is not a value but the published shape `PublicUssp` of
-`/public/v1/ussp_list` (no `base_url`, no `certificate_id`): GCAA's
-answer changes it in `api/openapi.yaml`, additively, through the
-cross-plan reconciliation. Q4 has no code.
+`/public/v1/ussp_list` (no `base_url`, no `certificate_id`), recorded
+as a 1.0.0 contract item in `CHANGELOG.md`: an answer that publishes a
+withheld member changes `api/openapi.yaml` additively within `/v1`,
+through the cross-plan reconciliation; one that withholds a member
+`PublicUssp` carries is breaking and goes to `/public/v2`
+(`docs/RELEASING.md` section 4). Q4 has no code.
 
 | # | Gap | Demo default until answered | Who answers, and why only they can |
 |---|---|---|---|

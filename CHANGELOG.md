@@ -16,6 +16,20 @@ With the retro-audit fixes (cisp B1, B2, S1-S6, N1-N4; system F-1;
 CI B1, S1, S7, N13), the lab conformance finding C1 and the release
 checks.
 
+### Contract
+
+- The public subset of the USSP list is part of the `/v1` contract as
+  1.0.0 ships it, on the demo default of `docs/PLAN.md` section 15 Q10,
+  pending GCAA: `GET /public/v1/ussp_list` gives each USSP the members
+  `ussp_id`, `name`, `contact`, `services`,
+  `certification_limitations`, `valid_from`, `valid_until`,
+  `terms_url` and `status` (`PublicUssp`, each required) and withholds
+  `base_url` and `certificate_id`. GCAA's answer changes it within
+  `/v1` only if it adds: publishing a withheld member is a new response
+  member (a minor). An answer that withholds any member above is a
+  breaking change, served as `/public/v2` beside `/public/v1`
+  (`docs/RELEASING.md` section 4), never by changing `/public/v1`.
+
 ### Added
 
 - WP-8 console accounts, sessions and the console API: local accounts

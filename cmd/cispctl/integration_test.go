@@ -68,6 +68,30 @@ func TestMigrateAll(t *testing.T) {
 	}
 }
 
+// migrate all applies CISP_DELIVERY_LOG_RETENTION_DAYS to the delivery
+// log (the figure is configuration, pending GCAA); unset, it applies the
+// default, 90 days (E-01 twin). The variable was validated and then
+// ignored: the policy stayed whatever the migration or the last
+// set-retention left.
+func TestMigrateAllAppliesTheRetention(t *testing.T) {
+	env := testEnv(t)
+	code, out, errOut := runCtl([]string{"migrate", "all"}, append(env, "CISP_DELIVERY_LOG_RETENTION_DAYS=30"))
+	if code != exitOK || !strings.Contains(out, `delivery_attempts: retention 30 days (CISP_DELIVERY_LOG_RETENTION_DAYS)`) {
+		t.Fatalf("migrate all with 30 days = %d %q %q", code, out, errOut)
+	}
+	if !strings.Contains(out, "policy_retention") || !strings.Contains(out, `"30 days"`) {
+		t.Fatalf("the policy after migrate all is not 30 days: %q", out)
+	}
+	code, out, errOut = runCtl([]string{"migrate", "all"}, env)
+	if code != exitOK || !strings.Contains(out, `delivery_attempts: retention 90 days (CISP_DELIVERY_LOG_RETENTION_DAYS)`) || !strings.Contains(out, `"90 days"`) {
+		t.Fatalf("migrate all with the default = %d %q %q", code, out, errOut)
+	}
+	code, _, errOut = runCtl([]string{"migrate", "all"}, append(env, "CISP_DELIVERY_LOG_RETENTION_DAYS=0"))
+	if code != exitConfig || !strings.Contains(errOut, "CISP_DELIVERY_LOG_RETENTION_DAYS") {
+		t.Fatalf("migrate all with 0 days = %d %q", code, errOut)
+	}
+}
+
 // The relational tree against the timeseries database is refused.
 func TestMigrateRefusesTheWrongDatabase(t *testing.T) {
 	env := testEnv(t)

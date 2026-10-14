@@ -51,8 +51,9 @@ commands:
   migrate relational|timeseries [--down-to N]
                   apply the tree's pending migrations (or roll back to
                   version N) and print the applied versions
-  migrate all     apply both trees, relational first (the compose
-                  migrate service)
+  migrate all     apply both trees, relational first, then the delivery
+                  log's retention from CISP_DELIVERY_LOG_RETENTION_DAYS
+                  (the compose migrate service)
   migrate status relational|timeseries
                   print every migration of the tree and whether it is applied
   rebuild-current --dataset zones|uspace_airspace|ussp_list
@@ -63,7 +64,8 @@ commands:
                   active key (after a key compromise); append-only, the
                   bytes and the ETag unchanged; restart api afterwards
   set-retention --days N
-                  replace the delivery log's retention policy (default 90)
+                  replace the delivery log's retention policy (default 90);
+                  the next migrate all sets CISP_DELIVERY_LOG_RETENTION_DAYS again
   rotate-key [--out local/] [--kid K] [--force]
                   generate an RSA-3072 signing key, write signing-<kid>.pem
                   (0600) and print the CISP_SIGNING_* lines to set; refuses
@@ -296,14 +298,27 @@ func migrate(ctx context.Context, args, environ []string, stdout, stderr io.Writ
 
 // migrateAll applies both trees, relational first, and stops at the
 // first that fails: the one-shot compose service (deploy/compose.yml),
-// which has no shell to run two commands.
+// which has no shell to run two commands. Then it applies the delivery
+// log's retention from CISP_DELIVERY_LOG_RETENTION_DAYS: the service
+// runs on every deploy, so the configured figure is the one in force.
+// The configuration is read before anything is migrated.
 func migrateAll(ctx context.Context, environ []string, stdout, stderr io.Writer) int {
+	cfg, err := config.LoadCtl(environ)
+	if printProblems(stderr, "cispctl", err) {
+		return exitConfig
+	}
 	for _, tree := range []string{"relational", "timeseries"} {
 		if code := migrate(ctx, []string{tree}, environ, stdout, stderr); code != exitOK {
 			return code
 		}
 	}
-	return exitOK
+	pool, code := openTree(ctx, store.TreeTimeseries, environ, stderr)
+	if code != exitOK {
+		return code
+	}
+	defer pool.Close()
+	_, _ = fmt.Fprintf(stdout, "delivery_attempts: retention %d days (%s)\n", cfg.DeliveryLogRetentionDays, config.EnvDeliveryLogRetentionDays)
+	return applyRetention(ctx, pool, int(cfg.DeliveryLogRetentionDays), stdout, stderr)
 }
 
 func migrateStatus(ctx context.Context, name string, environ []string, stdout, stderr io.Writer) int {
@@ -388,7 +403,13 @@ func setRetention(ctx context.Context, args, environ []string, stdout, stderr io
 		return code
 	}
 	defer pool.Close()
-	if err := store.SetRetention(ctx, pool, *days); err != nil {
+	return applyRetention(ctx, pool, *days, stdout, stderr)
+}
+
+// applyRetention replaces the delivery log's retention policy with days
+// and prints the jobs on the table as they now are.
+func applyRetention(ctx context.Context, pool *pgxpool.Pool, days int, stdout, stderr io.Writer) int {
+	if err := store.SetRetention(ctx, pool, days); err != nil {
 		_, _ = fmt.Fprintf(stderr, "cispctl: %v\n", err)
 		return exitFailed
 	}

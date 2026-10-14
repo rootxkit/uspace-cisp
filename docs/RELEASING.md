@@ -34,7 +34,10 @@ Only the owner, or whoever the owner delegates to, creates a `v*` tag.
    carry the spec's hash). Every entry names its work package and says
    what a client or an operator sees. Merge with every required check
    green, the `chaos` workflow included (it runs on `main`; label the
-   release pull request `chaos` to see it before the merge).
+   release pull request `chaos` to see it before the merge). The lab
+   conformance job runs on the release pull request itself (a
+   `release/` branch, or a pull request labelled `release`), so the
+   commit to be tagged has passed the lab's suite before the merge.
 2. **Tag the merge commit** with an annotated tag and push it:
 
    ```sh

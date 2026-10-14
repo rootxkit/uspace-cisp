@@ -145,6 +145,9 @@ checks.
   (`conformance/cisp/run`; the old pin predated it, so the job printed
   "skipped" and passed) with publishing on the disposable chaos stack,
   and fails when the suite is absent (`CONFORMANCE_REQUIRE_SUITE=1`).
+  It runs on main and on the release pull request (a `release/` branch
+  or the `release` label), so a release commit is proven before it is
+  tagged; `test/workflows` evaluates the job's condition per event.
 - CI: `make coverage-gate` in the integration job fails when a package
   of `internal/` or `cmd/` has less than 85 % statement coverage, unit
   and integration together (`docs/PLAN.md` sections 10.1 and 13;

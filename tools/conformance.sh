@@ -49,6 +49,9 @@ fi
 mkdir -p "$report"
 if [ -z "${CISP_CONFORMANCE_BASE_URL:-}" ]; then
   say "lab conformance suite at $suite: starting the chaos stack from this checkout"
+  # go test below runs in test/e2e, where a relative suite path (from a
+  # relative LAB_DIR) no longer resolves.
+  suite="$(cd "$suite" && pwd)"
   export LAB_CONFORMANCE_SUITE="$suite" CONFORMANCE_REPORT="$report"
   rc=0
   (cd test/e2e && "$GO" test -tags chaos -count=1 -v -timeout 30m -run '^TestLabConformance$' .) || rc=$?

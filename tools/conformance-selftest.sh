@@ -54,5 +54,24 @@ chmod +x "$scratch/fail/conformance/cisp/run"
 expect "present and failing" 7 "failed (exit 7)" \
   LAB_DIR="$scratch/fail" CISP_CONFORMANCE_BASE_URL=http://cisp.selftest.invalid CONFORMANCE_REPORT="$scratch/report2"
 
+# The chaos path: with no base URL set, conformance.sh runs go test in
+# test/e2e with LAB_CONFORMANCE_SUITE. A fake go (GO=) plays that test:
+# from its working directory it must find the suite's run through the
+# variable, which a relative LAB_DIR broke.
+rel="$(mktemp -d -p "$PWD" .conformance-selftest.XXXXXX)"
+trap 'rm -rf "$scratch" "$rel"' EXIT
+mkdir -p "$rel/lab/conformance/cisp"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$rel/lab/conformance/cisp/run"
+chmod +x "$rel/lab/conformance/cisp/run"
+cat > "$scratch/fakego" <<'EOF'
+#!/usr/bin/env bash
+case "$LAB_CONFORMANCE_SUITE" in /* | [A-Za-z]:*) ;; *) echo "LAB_CONFORMANCE_SUITE is not absolute: $LAB_CONFORMANCE_SUITE"; exit 4 ;; esac
+[ "$(basename "$PWD")" = e2e ] || { echo "not run in test/e2e: $PWD"; exit 5; }
+[ -x "$LAB_CONFORMANCE_SUITE/run" ] || { echo "fork/exec $LAB_CONFORMANCE_SUITE/run: no such file"; exit 6; }
+EOF
+chmod +x "$scratch/fakego"
+expect "chaos path with a relative LAB_DIR" 0 "passed, report in $scratch/report3" \
+  GO="$scratch/fakego" LAB_DIR="$(basename "$rel")/lab" CONFORMANCE_REPORT="$scratch/report3"
+
 if [ "$fails" -ne 0 ]; then echo "conformance self-test: $fails failed"; exit 1; fi
-echo "conformance self-test: 6 checks passed"
+echo "conformance self-test: 7 checks passed"

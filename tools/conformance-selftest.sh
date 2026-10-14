@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Exercises tools/conformance.sh in each state and checks the line it
 # prints and its exit status (WP-13 tests): the suite absent (skipped,
-# exit 0), present without an entry point (failed, exit 1), present and
+# exit 0; failed, exit 1, when CONFORMANCE_REQUIRE_SUITE=1), present without an entry point (failed, exit 1), present and
 # passing (passed, exit 0, CISP_BASE_URL and the report directory handed
 # over), present and failing (failed, the suite's exit status). The
 # suites are fakes in a scratch LAB_DIR, run against a given base URL,
@@ -28,6 +28,8 @@ expect() {
 
 expect "absent" 0 "lab conformance suite not present at $scratch/none/conformance/cisp: skipped" \
   LAB_DIR="$scratch/none"
+expect "absent but required" 1 "lab conformance suite not present at $scratch/none/conformance/cisp: failed (CONFORMANCE_REQUIRE_SUITE=1)" \
+  LAB_DIR="$scratch/none" CONFORMANCE_REQUIRE_SUITE=1
 
 mkdir -p "$scratch/norun/conformance/cisp"
 expect "present without run" 1 "has no executable run: failed" LAB_DIR="$scratch/norun"
@@ -53,4 +55,4 @@ expect "present and failing" 7 "failed (exit 7)" \
   LAB_DIR="$scratch/fail" CISP_CONFORMANCE_BASE_URL=http://cisp.selftest.invalid CONFORMANCE_REPORT="$scratch/report2"
 
 if [ "$fails" -ne 0 ]; then echo "conformance self-test: $fails failed"; exit 1; fi
-echo "conformance self-test: 5 checks passed"
+echo "conformance self-test: 6 checks passed"

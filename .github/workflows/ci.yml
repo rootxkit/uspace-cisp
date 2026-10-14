@@ -434,7 +434,10 @@ jobs:
       # job only through a reviewed `ci:` commit here, so a run is
       # reproducible and lab code is not run unreviewed (core-ui-ci audit
       # S7). Bump it with the lab's main SHA when the suite changes.
-      LAB_REF: 9be1c13e72a94ceda56acd55eff245717385e9bc
+      LAB_REF: 23ef6c77bf99a9114fac31b610034c09ca7d64ef
+      # The pinned commit has conformance/cisp/: a missing suite is a
+      # failure here, never a green "skipped".
+      CONFORMANCE_REQUIRE_SUITE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

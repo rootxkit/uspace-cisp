@@ -17,6 +17,7 @@
 # CISP_CONFORMANCE_BASE_URL when set (with CISP_CONFORMANCE_ENV); unset,
 # the chaos stack of test/e2e is started from this checkout's images and
 # the suite runs against it (TestLabConformance), then the stack stops.
+# CONFORMANCE_REQUIRE_SUITE=1 makes an absent suite a failure.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -31,6 +32,12 @@ say() {
 }
 
 if [ ! -d "$suite" ]; then
+  # CI sets CONFORMANCE_REQUIRE_SUITE=1 once the pinned lab commit has
+  # the suite: a skip there would be a green job that tested nothing.
+  if [ "${CONFORMANCE_REQUIRE_SUITE:-}" = 1 ]; then
+    say "lab conformance suite not present at $suite: failed (CONFORMANCE_REQUIRE_SUITE=1)"
+    exit 1
+  fi
   say "lab conformance suite not present at $suite: skipped"
   exit 0
 fi

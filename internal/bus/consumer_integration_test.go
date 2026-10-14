@@ -101,7 +101,9 @@ func TestSlowConsumerIsReportedAndResyncs(t *testing.T) {
 	var once sync.Once
 	defer once.Do(func() { close(release) })
 	resynced := make(chan time.Time, 4)
-	subject := SubjectPrefix + "wp7slow" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	// A subject outside the change stream's cis.v1.change.*: the client's
+	// buffer overflows the same way, and nothing is stored.
+	subject := "cisp-test.wp7slow." + strconv.FormatInt(time.Now().UnixNano(), 36)
 	s, err := b.Subscribe(context.Background(), []string{subject}, Handler{
 		Unreadable: func(error) { <-release },
 		Resync: func(since time.Time) {
@@ -115,6 +117,14 @@ func TestSlowConsumerIsReportedAndResyncs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
+	// The burst must stay out of the change stream: stored there, it
+	// reached the next test's consumer (TestDurableConsumerRoundTrip
+	// fetched "0" under -shuffle). Two acknowledged publishes bracket it,
+	// and the stream's sequence may move by the second one only.
+	before, err := b.PublishRaw(context.Background(), publication.DatasetZones, "slow-before-"+subject, []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := range DefaultPendingMsgs + 200 {
 		if err := b.nc.Publish(subject, []byte(strconv.Itoa(i))); err != nil {
 			t.Fatal(err)
@@ -122,6 +132,13 @@ func TestSlowConsumerIsReportedAndResyncs(t *testing.T) {
 	}
 	if err := b.nc.Flush(); err != nil {
 		t.Fatal(err)
+	}
+	after, err := b.PublishRaw(context.Background(), publication.DatasetZones, "slow-after-"+subject, []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Sequence != before.Sequence+1 {
+		t.Errorf("the burst on %s was stored in the change stream: %d messages", subject, after.Sequence-before.Sequence-1)
 	}
 	select {
 	case <-resynced:

@@ -155,7 +155,7 @@ func Missing(pkgs []Package, listed, exclude []string) []string {
 // goList names the packages of the scopes, as `go list` sees them. It is
 // a variable so the tests can stand in for the go command.
 var goList = func() ([]string, error) {
-	args := []string{"list"}
+	args := append(make([]string, 0, 1+len(Scopes)), "list")
 	for _, s := range Scopes {
 		args = append(args, "./"+s+"...")
 	}

@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
-import { Button, StatusBadge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { Button, StatusBadge, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { useConsole, useLoad, type Loaded } from "./context";
 import { mayAct } from "./roles";
@@ -82,7 +82,7 @@ function VersionTable({ list, isFirstPage, reload }: { list: VersionList; isFirs
       <TableBody>
         {list.versions.map((v, i) => (
           <TableRow key={v.id} data-version={v.version}>
-            <TableCell>
+            <TableCell className={TABLE_NOWRAP}>
               <Link href={`/${lang}/console/publications/${encodeURIComponent(v.id)}`} className="underline">
                 {t("cisp.console.publications.version_n", { version: v.version })}
               </Link>

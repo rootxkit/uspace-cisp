@@ -74,6 +74,17 @@ for (const lang of ["en", "ka"] as const) {
         }
       });
 
+      test("the map's accordion passes axe with a row expanded, a section collapsed and a dataset empty", async ({ page, request }) => {
+        expect((await request.post("/__mock/state", { data: { unpublished: ["uspace_airspace"] } })).ok()).toBe(true);
+        await page.goto(`/${lang}`);
+        await expect(page.locator('[data-dataset="uspace_airspace"]')).toHaveAttribute("data-empty", "true");
+        await page.locator('[data-feature="DAR00A1"]').click();
+        await expect(page.locator('[data-panel="DAR00A1"]')).toBeVisible();
+        await page.locator('[data-section-toggle="zones"]').click();
+        await expect(page.locator('[data-section-toggle="zones"]')).toHaveAttribute("aria-expanded", "false");
+        expect(await violations(page), `/${lang}`).toEqual([]);
+      });
+
       test("every signed-in console page passes axe at WCAG 2.2 AA", async ({ page }) => {
         await signInAdmin(page, lang);
         for (const [path, ready] of CONSOLE) {

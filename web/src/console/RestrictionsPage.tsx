@@ -9,7 +9,7 @@
 // shows "not available", never an empty list.
 import { useState } from "react";
 import { useT } from "@rootxkit/uspace-ui/i18n";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { RESTRICTION_STATES, restrictionBadge } from "./badges";
 import { useLoad } from "./context";
@@ -133,7 +133,7 @@ export function RestrictionsPage() {
                 <TableBody>
                   {heads.data.restrictions.map((h) => (
                     <TableRow key={h.id} data-restriction={h.feature_id}>
-                      <TableCell className="font-mono">{h.feature_id}</TableCell>
+                      <TableCell className={cn("font-mono", TABLE_NOWRAP)}>{h.feature_id}</TableCell>
                       <TableCell>
                         <StateBadge spec={restrictionBadge(h.state)} value={h.state} />
                         {h.ended_by !== undefined && (
@@ -143,11 +143,11 @@ export function RestrictionsPage() {
                       <TableCell>
                         <Time iso={h.starts_at} /> – <Time iso={h.ends_at} />
                       </TableCell>
-                      <TableCell className="font-mono">{h.uspace_airspace_id}</TableCell>
+                      <TableCell className={cn("font-mono", TABLE_NOWRAP)}>{h.uspace_airspace_id}</TableCell>
                       <TableCell>
                         {t("cisp.console.restrictions.ansp_value", { ref: h.ansp_ref, version: h.ansp_version })}
                       </TableCell>
-                      <TableCell className="min-w-[18rem] whitespace-normal">
+                      <TableCell className="min-w-[18rem]">
                         <Events head={h} />
                       </TableCell>
                     </TableRow>

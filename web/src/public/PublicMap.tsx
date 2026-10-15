@@ -6,13 +6,12 @@ import { fmtTimeUTC, useLang, useT } from "@rootxkit/uspace-ui/i18n";
 import { MapView, type BBox } from "@rootxkit/uspace-ui/map";
 import type { ZoneType } from "@rootxkit/uspace-ui/model";
 import { useTheme } from "@rootxkit/uspace-ui/theme";
-import { MapPanel, PageHeader, Panel } from "@rootxkit/uspace-ui/ui";
+import { MapPanel, Panel } from "@rootxkit/uspace-ui/ui";
 import { useRuntimeConfig } from "../components/Providers";
 import { BBoxWatcher, MapLayers } from "../map/MapLayers";
 import { AsOfBanner } from "./AsOfBanner";
 import { MAP_DATASETS, type MapDataset } from "./banner";
-import { FeatureList, findFeature } from "./FeatureList";
-import { FeaturePanel } from "./FeaturePanel";
+import { FeatureList } from "./FeatureList";
 import { instantOf, TimeControl, type TimeChoice } from "./TimeControl";
 import { useMapData } from "./useMapData";
 
@@ -37,7 +36,12 @@ function useNowInstant(): string {
   return now;
 }
 
-/** The public zone map: header, banner, the map with its legend over it, time control, panel and list. */
+/**
+ * The public zone map: the dataset status strip, the map with its legend
+ * over it, the time control, and the accordion of every feature with its
+ * details. The page has no visible header (the owner's request of
+ * 2026-10-15); its name is the h1 for assistive technology.
+ */
 export function PublicMap() {
   const t = useT();
   const { lang } = useLang();
@@ -61,7 +65,14 @@ export function PublicMap() {
     appliesAt,
     pollIntervalS: cfg.pollIntervalS,
   });
-  const selected = findFeature(data.features, selectedId);
+  const empty = useMemo(
+    () => ({
+      zones: data.banner.datasets.zones.empty,
+      uspace_airspace: data.banner.datasets.uspace_airspace.empty,
+      restrictions: data.banner.datasets.restrictions.empty,
+    }),
+    [data.banner.datasets],
+  );
   const counts = useMemo(() => {
     const c: Partial<Record<ZoneType, number>> = {};
     for (const d of MAP_DATASETS) {
@@ -79,8 +90,8 @@ export function PublicMap() {
   );
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 sm:p-5">
-      <PageHeader title={t("cisp.app.title")} description={t("cisp.app.tagline")} />
+    <div className="flex min-w-0 flex-1 flex-col gap-3 p-3 sm:p-4">
+      <h1 className="sr-only">{t("cisp.app.title")}</h1>
       <AsOfBanner state={data.banner} />
       {/* A fixed height: the list growing beside the map must not resize it (a resize is a new bbox). */}
       <div className="grid min-w-0 gap-4 lg:h-[72vh] lg:grid-cols-[minmax(0,1fr)_24rem]">
@@ -118,12 +129,12 @@ export function PublicMap() {
           <Panel title={t("cisp.map.time_title")}>
             <TimeControl value={time} onChange={setTime} instantShown={fmtTimeUTC(appliesAt, lang)} />
           </Panel>
-          {selected !== null && <FeaturePanel feature={selected} onClose={() => setSelectedId(null)} />}
           <Panel title={t("cisp.map.features_title")}>
             <FeatureList
               features={data.features}
               undrawable={data.undrawable}
               visible={visible}
+              empty={empty}
               selectedId={selectedId}
               onSelect={setSelectedId}
             />

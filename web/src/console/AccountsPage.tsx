@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useT } from "@rootxkit/uspace-ui/i18n";
 import { ConfirmDialog } from "@rootxkit/uspace-ui/form";
-import { Button, Input, Label, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { Button, Input, Label, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { failureOf, type CallFailure } from "./client";
 import { useConsole, useLoad } from "./context";
@@ -209,7 +209,7 @@ export function AccountsPage() {
           <TableBody>
             {list.data.accounts.map((a) => (
               <TableRow key={a.id} data-account={a.username}>
-                <TableCell className="font-mono">{a.username}</TableCell>
+                <TableCell className={cn("font-mono", TABLE_NOWRAP)}>{a.username}</TableCell>
                 <TableCell>{t(`cisp.console.role.${a.role}`)}</TableCell>
                 <TableCell>{t(`cisp.console.accounts.status.${a.status}`)}</TableCell>
                 <TableCell>

@@ -15,8 +15,10 @@ const MODE_TONE: Record<FeedMode, StatusTone> = {
 
 /**
  * Per dataset the version and update time the map shows (Art. 9(2)), the
- * ANSP's staleness, "unavailable since" when the API cannot serve it, and
- * how changes reach the page: live, polling, or disconnected.
+ * ANSP's staleness, "unavailable since" when the API cannot serve it,
+ * "none yet" in neutral words when nothing has been published in it
+ * (an empty dataset is not an outage), and how changes reach the page:
+ * live, polling, or disconnected.
  */
 export function AsOfBanner({ state }: { state: BannerState }) {
   const t = useT();
@@ -25,7 +27,7 @@ export function AsOfBanner({ state }: { state: BannerState }) {
     <section
       aria-label={t("cisp.banner.label")}
       data-feed={state.mode}
-      className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-panel border border-border bg-card px-4 py-2.5 text-xs text-card-foreground shadow-panel"
+      className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-panel border border-border bg-card px-3 py-2 text-xs text-card-foreground shadow-panel"
     >
       <StatusBadge role="status" data-testid="feed-mode" tone={MODE_TONE[state.mode]}>
         {t(`cisp.feed.${state.mode}`)}
@@ -33,10 +35,18 @@ export function AsOfBanner({ state }: { state: BannerState }) {
       {MAP_DATASETS.map((d) => {
         const s = state.datasets[d];
         return (
-          <p key={d} data-dataset={d} data-unavailable={s.unavailableSince !== null ? "true" : "false"} className="m-0">
+          <p
+            key={d}
+            data-dataset={d}
+            data-unavailable={s.unavailableSince !== null ? "true" : "false"}
+            data-empty={s.empty ? "true" : "false"}
+            className="m-0"
+          >
             <span className="font-semibold">{t(`cisp.dataset.${d}`)}</span>{" "}
             <span className="text-muted-foreground">
-              {s.version === null
+              {s.empty
+                ? t(`cisp.banner.none_yet.${d}`)
+                : s.version === null
                 ? t("cisp.banner.not_yet")
                 : t("cisp.banner.as_of", { version: s.version, updated: fmtTimeUTC(s.updatedAt, lang) })}
             </span>

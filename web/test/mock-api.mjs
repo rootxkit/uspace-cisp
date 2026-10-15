@@ -20,7 +20,9 @@
 // Control (tests only):
 //   GET  /__mock/requests                 the API requests answered
 //   POST /__mock/reset                    stream on, every dataset served at version 1
-//   POST /__mock/state {stream?, unavailable?: [dataset], publisherStaleSince?, outlines?}
+//   POST /__mock/state {stream?, unavailable?: [dataset], unpublished?: [dataset], publisherStaleSince?, outlines?}
+//        unpublished: never published, answered 404 no_version like the
+//        CISP (internal/httpapi/datasets.go noVersion), its ETag "<d>:0"
 //   POST /__mock/bump {dataset}           a new version of one dataset
 //   GET  /__mock/console                  the console requests answered
 //   POST /__mock/console-state {restrictions404?, anspStale?, summaryLog?}
@@ -139,6 +141,7 @@ function reset() {
   state = {
     stream: true,
     unavailable: new Set(),
+    unpublished: new Set(),
     publisherStaleSince: undefined,
     // false: serve circles without cis_display_geometry (an API before Q43).
     outlines: true,
@@ -223,6 +226,18 @@ function publicRead(req, res, url, dataset) {
     problem(res, 503, "cis_stale", "The CIS cannot serve this dataset now", { "Retry-After": "5" });
     return;
   }
+  if (state.unpublished.has(dataset)) {
+    const headers = { ETag: `"${dataset}:0"`, "X-CIS-Version": "0" };
+    if (req.method === "HEAD") {
+      res.writeHead(404, headers);
+      res.end();
+      return;
+    }
+    problem(res, 404, "no_version", "No version yet", headers, `dataset: ${dataset} has no version yet; its ETag is "${dataset}:0"`, [
+      { field: "dataset", reason: `${dataset} has no version yet; its ETag is "${dataset}:0"` },
+    ]);
+    return;
+  }
   const etag = `"${dataset}:${state.versions[dataset]}"`;
   const headers = { ETag: etag, "Cache-Control": "no-cache", "X-CIS-Version": String(state.versions[dataset]) };
   if (req.headers["if-none-match"] === etag) {
@@ -270,6 +285,7 @@ async function control(req, res, path) {
       if (!state.stream) for (const c of clients) c.destroy();
     }
     if (Array.isArray(input.unavailable)) state.unavailable = new Set(input.unavailable);
+    if (Array.isArray(input.unpublished)) state.unpublished = new Set(input.unpublished);
     if ("publisherStaleSince" in input) state.publisherStaleSince = input.publisherStaleSince;
     if (typeof input.outlines === "boolean") state.outlines = input.outlines;
   } else if (path === "/__mock/console-state") {
@@ -336,7 +352,12 @@ let msg = 0;
 function statusFrame() {
   const now = new Date().toISOString();
   const datasets = Object.fromEntries(
-    ["zones", "uspace_airspace", "restrictions"].map((d) => [d, { version: String(state.versions[d]), age_s: 1 }]),
+    // A dataset never published is announced at version "0", as the CISP
+    // does (migrations/relational/0001_init.sql seeds current_version 0).
+    ["zones", "uspace_airspace", "restrictions"].map((d) => [
+      d,
+      { version: state.unpublished.has(d) ? "0" : String(state.versions[d]), age_s: 1 },
+    ]),
   );
   return JSON.stringify({
     schema: "console/status/v1",

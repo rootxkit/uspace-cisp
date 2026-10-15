@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useT } from "@rootxkit/uspace-ui/i18n";
 import { inputToUtc } from "@rootxkit/uspace-ui/form";
-import { Button, Input, Label, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { Button, Input, Label, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@rootxkit/uspace-ui/ui";
 import { useLoad } from "./context";
 import { ConsoleHeader } from "./header";
 import { Loading, TablePanel, ProblemNotice, Time } from "./ui";
@@ -97,15 +97,15 @@ export function AuditPage() {
             <TableBody>
               {list.data.events.map((e) => (
                 <TableRow key={e.id} data-event={e.event_type}>
-                  <TableCell className="font-mono text-xs">{e.id}</TableCell>
+                  <TableCell className={cn("font-mono text-xs", TABLE_NOWRAP)}>{e.id}</TableCell>
                   <TableCell>
                     <Time iso={e.ts} />
                   </TableCell>
                   <TableCell>
                     <span className="text-xs text-muted-foreground">{t(`cisp.console.audit.actor_type.${e.actor_type}`)}</span>{" "}
-                    <span className="font-mono">{e.actor_id}</span>
+                    <span className={cn("font-mono", TABLE_NOWRAP)}>{e.actor_id}</span>
                   </TableCell>
-                  <TableCell className="font-mono">{e.event_type}</TableCell>
+                  <TableCell className={cn("font-mono", TABLE_NOWRAP)}>{e.event_type}</TableCell>
                   <TableCell className="font-mono text-xs">
                     {e.entity_type} {e.entity_id}
                   </TableCell>

@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
-import { configFromEnv, configProblem, createBff, type BffConfig } from "./handlers";
+import { configFromEnv, configProblem, createBff, exactRoutesOf, type BffConfig } from "./handlers";
 
 const ORIGIN = "https://cisp.test";
 const API = "http://api.internal:8080";
@@ -311,6 +311,43 @@ describe("proxy", () => {
     expect(api.calls[0]?.method).toBe("POST");
     expect(api.calls[0]?.url).toBe(`${API}/v1/console/subscriptions/s1/suspend`);
     expect(api.calls[0]?.headers.get("authorization")).toBe("Bearer tok123");
+  });
+
+  it("forwards GET /v1/console/summary, its exact entry, to the API", async () => {
+    const api = mockApi(() => Response.json({ ok: true }));
+    const res = await bffWith(api.fetch).proxy(req("/_bff/api/v1/console/summary", { method: "GET", headers: { cookie } }));
+    expect(res.status).toBe(200);
+    expect(api.calls).toHaveLength(1);
+    expect(api.calls[0]?.method).toBe("GET");
+    expect(api.calls[0]?.url).toBe(`${API}/v1/console/summary`);
+    expect(api.calls[0]?.headers.get("authorization")).toBe("Bearer tok123");
+  });
+
+  it("refuses any other method on the summary before the API, CSRF pair or not, encoded or not", async () => {
+    const api = mockApi(() => Response.json({ ok: true }));
+    const bff = bffWith(api.fetch);
+    for (const method of ["POST", "PUT", "PATCH", "DELETE", "HEAD"]) {
+      for (const path of ["/_bff/api/v1/console/summary", "/_bff/api/v1/console/%73ummary"]) {
+        const res = await bff.proxy(
+          req(path, {
+            method,
+            headers: { cookie, "x-csrf-token": "csrf456", "content-type": "application/json" },
+            ...(method === "HEAD" ? {} : { body: "{}" }),
+          }),
+        );
+        expect(res.status, `${method} ${path}`).toBe(405);
+        expect(res.headers.get("allow")).toBe("GET");
+      }
+    }
+    expect(api.calls).toHaveLength(0);
+  });
+
+  it("names the exact entry of a summary path only", () => {
+    expect(exactRoutesOf("/_bff/api/v1/console/summary")).toEqual([{ method: "GET", path: "/v1/console/summary" }]);
+    expect(exactRoutesOf("/_bff/api/v1/console/%73ummary")).toHaveLength(1);
+    for (const p of ["/_bff/api/v1/console/summary/", "/_bff/api/v1/console/summaryx", "/_bff/api/v1/console/status", "/v1/console/summary", "/_bff/api/v1/console/%E0%A4%A"]) {
+      expect(exactRoutesOf(p), p).toEqual([]);
+    }
   });
 
   it("refuses a path outside /v1/console", async () => {

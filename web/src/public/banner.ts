@@ -1,6 +1,7 @@
 // The "as of" banner's state (spec 02 F3, Art. 9(2); the failure rule of
 // spec 02 §1): per dataset its version and update time, the ANSP's
-// staleness, and "unavailable since" when the API cannot serve it; and
+// staleness, "unavailable since" when the API cannot serve it, and
+// "nothing published yet" when it answers 404 no_version; and
 // for the page whether changes reach it live (the stream), by polling
 // (HEAD on the ETag), or not at all. Pure: events in, state out; the
 // clock is the caller's.
@@ -22,6 +23,11 @@ export interface DatasetState {
   publisherStaleSince: string | null | undefined;
   /** When the API first failed to serve the dataset; null while it serves it. */
   unavailableSince: string | null;
+  /**
+   * The API answered 404 no_version: nothing has been published in this
+   * dataset yet. An empty dataset, not an outage.
+   */
+  empty: boolean;
 }
 
 export interface BannerState {
@@ -50,7 +56,23 @@ export type BannerEvent =
       stale: boolean;
       publisherStaleSince: string | null | undefined;
     }
-  | { kind: "unavailable"; dataset: MapDataset; at: string };
+  | { kind: "unavailable"; dataset: MapDataset; at: string }
+  | { kind: "no_version"; dataset: MapDataset };
+
+/** What a failed read of a dataset means for the page. */
+export type ReadFailure = "no_version" | "unavailable";
+
+/**
+ * A 404 whose problem type is no_version is a dataset nothing has been
+ * published in yet (api/openapi.yaml, GET /public/v1/{dataset}): shown
+ * as empty. Every other failure (a 5xx, another 404, no answer at all)
+ * is an outage, shown as unavailable.
+ */
+export function readFailure(err: unknown): ReadFailure {
+  if (typeof err !== "object" || err === null) return "unavailable";
+  const e = err as { status?: unknown; slug?: unknown };
+  return e.status === 404 && e.slug === "no_version" ? "no_version" : "unavailable";
+}
 
 const EMPTY: DatasetState = {
   version: null,
@@ -59,6 +81,7 @@ const EMPTY: DatasetState = {
   stale: false,
   publisherStaleSince: undefined,
   unavailableSince: null,
+  empty: false,
 };
 
 export function initialBanner(): BannerState {
@@ -117,7 +140,17 @@ export function reduceBanner(s: BannerState, e: BannerEvent): BannerState {
             stale: e.stale,
             publisherStaleSince: e.publisherStaleSince,
             unavailableSince: null,
+            empty: false,
           },
+        },
+      };
+    case "no_version":
+      return {
+        ...s,
+        datasets: {
+          ...s.datasets,
+          // The answer carries no version, update time or ANSP staleness.
+          [e.dataset]: { ...EMPTY, empty: true },
         },
       };
     case "unavailable": {

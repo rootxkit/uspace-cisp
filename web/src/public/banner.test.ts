@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { initialBanner, reduceBanner, type BannerEvent, type BannerState } from "./banner";
+import { initialBanner, readFailure, reduceBanner, type BannerEvent, type BannerState } from "./banner";
 
 function run(events: BannerEvent[], from: BannerState = initialBanner()): BannerState {
   return events.reduce(reduceBanner, from);
@@ -65,5 +65,64 @@ describe("the banner", () => {
     ]);
     expect(s.datasets.restrictions).toMatchObject({ stale: true, publisherStaleSince: "2026-10-02T09:59:00Z" });
     expect(run([served("1")]).datasets.zones.publisherStaleSince).toBeUndefined();
+  });
+});
+
+describe("a dataset nothing has been published in (404 no_version)", () => {
+  const noVersion: BannerEvent = { kind: "no_version", dataset: "restrictions" };
+
+  it("is empty, not unavailable", () => {
+    const s = run([noVersion]);
+    expect(s.datasets.restrictions.empty).toBe(true);
+    expect(s.datasets.restrictions.unavailableSince).toBeNull();
+    expect(s.datasets.restrictions.version).toBeNull();
+    expect(s.datasets.zones.empty).toBe(false);
+  });
+
+  it("clears an earlier unavailable, and a first version clears empty (the twin)", () => {
+    const down = run([{ kind: "unavailable", dataset: "restrictions", at: "2026-10-02T10:00:00Z" }]);
+    expect(down.datasets.restrictions.unavailableSince).not.toBeNull();
+    const empty = run([noVersion], down);
+    expect(empty.datasets.restrictions.unavailableSince).toBeNull();
+    expect(empty.datasets.restrictions.empty).toBe(true);
+    const published = run(
+      [
+        {
+          kind: "served",
+          dataset: "restrictions",
+          version: "1",
+          updatedAt: "2026-10-01T08:00:00Z",
+          etag: '"restrictions:1"',
+          stale: false,
+          publisherStaleSince: undefined,
+        },
+      ],
+      empty,
+    );
+    expect(published.datasets.restrictions.empty).toBe(false);
+    expect(published.datasets.restrictions.version).toBe("1");
+  });
+
+  it("an outage after it is still shown as unavailable", () => {
+    const s = run([noVersion, { kind: "unavailable", dataset: "restrictions", at: "2026-10-02T10:00:00Z" }]);
+    expect(s.datasets.restrictions.unavailableSince).toBe("2026-10-02T10:00:00Z");
+  });
+});
+
+describe("readFailure", () => {
+  it("reads a 404 no_version as an empty dataset", () => {
+    expect(readFailure({ status: 404, slug: "no_version" })).toBe("no_version");
+  });
+
+  it("reads every other failure as unavailable", () => {
+    expect(readFailure({ status: 503, slug: "cis_stale" })).toBe("unavailable");
+    expect(readFailure({ status: 500, slug: null })).toBe("unavailable");
+    // Another 404, or a 404 without a problem body (a HEAD), is not no_version.
+    expect(readFailure({ status: 404, slug: "not_found" })).toBe("unavailable");
+    expect(readFailure({ status: 404, slug: null })).toBe("unavailable");
+    // No answer at all: the network failed.
+    expect(readFailure(new TypeError("Failed to fetch"))).toBe("unavailable");
+    expect(readFailure(new Error("not a feature collection"))).toBe("unavailable");
+    expect(readFailure(undefined)).toBe("unavailable");
   });
 });

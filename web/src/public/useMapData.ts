@@ -7,14 +7,16 @@
 // frame refetches) or, while the stream is not live, by a HEAD on each
 // dataset every poll period (a changed ETag refetches). A dataset the
 // API cannot serve keeps what was last shown and is marked "unavailable
-// since" on the banner: an outage is never drawn as an empty sky.
+// since" on the banner: an outage is never drawn as an empty sky. A
+// dataset nothing has been published in yet (404 no_version) is the
+// opposite case: it is empty, said so in neutral words, never an outage.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { Lang } from "@rootxkit/uspace-ui/i18n";
 import { useFeed, useNowMs } from "@rootxkit/uspace-ui/live";
 import type { BBox } from "@rootxkit/uspace-ui/map";
 import { browserClient } from "../api/client";
 import { toView, type MapFeature } from "../map/adapt";
-import { MAP_DATASETS, initialBanner, reduceBanner, type MapDataset } from "./banner";
+import { MAP_DATASETS, initialBanner, readFailure, reduceBanner, type MapDataset } from "./banner";
 import { obj } from "./format";
 
 /** How often the banner re-reads the clock. Display-only. */
@@ -95,8 +97,15 @@ export function useMapData(opts: {
               : null
             : undefined,
         });
-      } catch {
+      } catch (err) {
         if (mine !== seq.current[dataset]) return;
+        if (readFailure(err) === "no_version") {
+          // Nothing published yet: an empty dataset, not an outage.
+          setFeatures((prev) => ({ ...prev, [dataset]: [] }));
+          setUndrawable((prev) => ({ ...prev, [dataset]: 0 }));
+          dispatch({ kind: "no_version", dataset });
+          return;
+        }
         dispatch({ kind: "unavailable", dataset, at: nowIso() });
       }
     },
@@ -134,8 +143,11 @@ export function useMapData(opts: {
     for (const d of MAP_DATASETS) {
       const v = announced?.[d]?.version;
       if (v === undefined) continue;
-      const shown = bannerRef.current.datasets[d].version;
-      if (shown !== null && v !== shown && requested.current[d] !== v) {
+      const st = bannerRef.current.datasets[d];
+      const shown = st.version;
+      // A first version of a dataset shown as empty is announced too.
+      const moved = shown !== null ? v !== shown : st.empty && v !== "0";
+      if (moved && requested.current[d] !== v) {
         requested.current[d] = v;
         void fetchDataset(d);
       }
@@ -169,13 +181,19 @@ export function useMapData(opts: {
             const { response } = await client.HEAD("/public/v1/{dataset}", { params: { path: { dataset: d } }, cache: "no-store" });
             const etag = response.headers.get("ETag");
             const st = bannerRef.current.datasets[d];
-            // A dataset never served has its first read in flight, or is unavailable.
-            if (etag !== null && ((st.etag !== null && etag !== st.etag) || st.unavailableSince !== null)) {
+            // A dataset never served has its first read in flight, or is
+            // unavailable, or was empty (404 no_version) and now answers.
+            if (etag !== null && ((st.etag !== null && etag !== st.etag) || st.unavailableSince !== null || st.empty)) {
               void fetchDataset(d);
             }
           } catch (err) {
             const status = obj(err)?.["status"];
-            if (typeof status === "number") {
+            if (status === 404) {
+              // A HEAD has no problem body to say no_version: the GET
+              // tells an empty dataset from a missing one. Already known
+              // empty, there is nothing to ask.
+              if (!bannerRef.current.datasets[d].empty) void fetchDataset(d);
+            } else if (typeof status === "number") {
               // The API answered: reachable, but not serving this dataset.
               dispatch({ kind: "unavailable", dataset: d, at: nowIso() });
             } else {

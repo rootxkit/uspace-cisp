@@ -234,3 +234,66 @@ test("circle zones are drawn from the CIS's outline, and say so when it is missi
   await expect(item(page, "TSN001")).toHaveAttribute("data-drawn", "not-drawn");
   await expect(item(page, "TSN001")).toContainText("circle, not drawn on the map");
 });
+
+test("a dataset nothing has been published in is empty, not unavailable", async ({ page, request }) => {
+  await mock(request, "state", { unpublished: ["restrictions"] });
+  await page.goto("/en");
+  const banner = page.locator('[data-dataset="restrictions"]');
+  await expect(banner).toHaveAttribute("data-empty", "true");
+  await expect(banner).toContainText("no restrictions yet");
+  await expect(banner).toHaveAttribute("data-unavailable", "false");
+  await expect(banner).not.toContainText("unavailable");
+  await expect(banner.getByRole("alert")).toHaveCount(0);
+  // The other datasets are served as usual.
+  await expect(page.locator('[data-dataset="zones"]')).toContainText("version 1");
+  // It was asked with GET and answered 404 no_version.
+  expect((await requests(request)).some((r) => r.method === "GET" && r.path === "/public/v1/restrictions")).toBe(true);
+
+  // Georgian, in the same neutral words.
+  await page.goto("/ka");
+  await expect(page.locator('[data-dataset="restrictions"]')).toContainText("შეზღუდვები ჯერ არ არის");
+  await expect(page.locator('[data-dataset="restrictions"]')).not.toContainText("მიუწვდომელია");
+
+  // The first publication arrives (the status frame announces version 1): it is shown.
+  await mock(request, "state", { unpublished: [] });
+  await expect(page.locator('[data-dataset="restrictions"]')).toHaveAttribute("data-empty", "false", { timeout: 10_000 });
+  await expect(page.locator('[data-dataset="restrictions"]')).toContainText("ვერსია 1");
+  await expect(page.locator('[data-layer="restrictions"] [data-feature]')).toHaveCount(2);
+});
+
+test("without the stream, an empty dataset's HEAD 404 keeps it empty, and its first version is read", async ({ page, request }) => {
+  await mock(request, "state", { stream: false, unpublished: ["restrictions"] });
+  await page.goto("/en");
+  await expect(page.getByTestId("feed-mode")).toHaveText("Polling (no live stream)");
+  const banner = page.locator('[data-dataset="restrictions"]');
+  await expect(banner).toHaveAttribute("data-empty", "true");
+  await expect
+    .poll(async () => (await requests(request)).filter((r) => r.method === "HEAD" && r.path === "/public/v1/restrictions").length, {
+      timeout: 10_000,
+    })
+    .toBeGreaterThan(1);
+  await expect(banner).toHaveAttribute("data-unavailable", "false");
+  await expect(banner).toHaveAttribute("data-empty", "true");
+  await mock(request, "state", { unpublished: [] });
+  await expect(banner).toContainText("version 1", { timeout: 10_000 });
+  await expect(banner).toHaveAttribute("data-empty", "false");
+});
+
+test("a real failure is still unavailable: a 503 and a network error on restrictions", async ({ page, request }) => {
+  await mock(request, "state", { unavailable: ["restrictions"] });
+  await page.goto("/en");
+  const banner = page.locator('[data-dataset="restrictions"]');
+  await expect(banner).toHaveAttribute("data-unavailable", "true");
+  await expect(banner).toContainText(/unavailable since \d{4}-\d\d-\d\d \d\d:\d\d:\d\d UTC/);
+  await expect(banner).toHaveAttribute("data-empty", "false");
+  await expect(banner).not.toContainText("no restrictions yet");
+
+  // No answer at all: the request never reaches the API.
+  await mock(request, "state", { unavailable: [] });
+  await page.route("**/public/v1/restrictions**", (route) => route.abort("connectionfailed"));
+  await page.goto("/ka");
+  const ka = page.locator('[data-dataset="restrictions"]');
+  await expect(ka).toHaveAttribute("data-unavailable", "true");
+  await expect(ka).toContainText("მიუწვდომელია");
+  await expect(ka).not.toContainText("შეზღუდვები ჯერ არ არის");
+});

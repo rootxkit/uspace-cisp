@@ -16,6 +16,11 @@ additively within `/v1`.
   latency p50/p95 over the newest attempts of the last hour. Counts
   only. Migration `0015` adds the partial index the failed-deliveries
   count reads (`docs/PLAN.md` section 15 Q52).
+- The console overview's second row of tiles, from the summary:
+  active subscriptions with the other states, failed deliveries in the
+  last 24 h, USSPs listed and the delivery latency p50 / p95 of the
+  last hour, in `en` and `ka`; the BFF forwards the summary with `GET`
+  only.
 
 ## [1.0.0] (C-M3: hardening)
 

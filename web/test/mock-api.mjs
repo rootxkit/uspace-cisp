@@ -23,7 +23,7 @@
 //   POST /__mock/state {stream?, unavailable?: [dataset], publisherStaleSince?, outlines?}
 //   POST /__mock/bump {dataset}           a new version of one dataset
 //   GET  /__mock/console                  the console requests answered
-//   POST /__mock/console-state {restrictions404?, anspStale?}
+//   POST /__mock/console-state {restrictions404?, anspStale?, summaryLog?}
 //
 // Console accounts: see test/mock-console.mjs (test data, not credentials
 // of anything).
@@ -211,7 +211,7 @@ function problem(res, status, slug, title, headers = {}, detail = undefined, err
   );
 }
 
-const consoleApi = createConsole({ json, problem, readJson });
+const consoleApi = createConsole({ json, problem, readJson, usspCount: USSP_LIST.ussps.length });
 
 function publicRead(req, res, url, dataset) {
   if (state.unavailable.has(dataset)) {

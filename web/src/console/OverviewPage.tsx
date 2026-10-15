@@ -1,9 +1,11 @@
 "use client";
 
 // The console's first page, the operations dashboard, from the status
-// document (GET /v1/console/status) and the public read of the current
-// versions for the map: a row of the service's key figures as the API
-// counts them, the map of what is published now, what needs attention,
+// document (GET /v1/console/status), the summary (GET
+// /v1/console/summary) and the public read of the current versions for
+// the map: two rows of the service's key figures as the API counts them
+// (the second, subscribers and deliveries, loads on its own and fails on
+// its own), the map of what is published now, what needs attention,
 // every dataset's current version, every publisher's heartbeat, the
 // health of the API's components and safeguards, and this API instance's
 // counters since it started. The page shows what the API says and
@@ -16,6 +18,7 @@ import { useLoad } from "./context";
 import { ConsoleHeader } from "./header";
 import { OverviewMap } from "./OverviewMap";
 import { ageOnApiClockS, timesShown, warningsOf } from "./StatusStrip";
+import { SummaryTiles } from "./SummaryTiles";
 import { localTime, Loading, ProblemNotice, Time, useInBrowser } from "./ui";
 
 export function OverviewPage() {
@@ -84,6 +87,7 @@ export function OverviewPage() {
               }
             />
           </KpiRow>
+          <SummaryTiles />
 
           <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_26rem]">
             <OverviewMap />

@@ -243,6 +243,77 @@ test.describe("publications", () => {
   });
 });
 
+test.describe("overview summary tiles", () => {
+  /** The summary row's tile whose label starts with `label`. */
+  function tile(page: Page, group: string, label: string) {
+    return page.getByRole("group", { name: group }).locator('[data-slot="stat-tile"]').filter({ hasText: label });
+  }
+
+  test("a viewer sees the subscriptions, failed deliveries, USSPs and latency as the API counts them", async ({ page, request }) => {
+    await signIn(page, VIEWER);
+    await page.goto("/en/console");
+    const group = "Subscribers and deliveries";
+    // The mock's subscriptions: two active, one suspended.
+    const subs = tile(page, group, "Active subscriptions");
+    await expect(subs.locator('[data-part="value"]')).toHaveText("2");
+    await expect(subs.locator('[data-part="hint"]')).toHaveText("0 pending, 1 suspended, 0 deleted");
+    await expect(subs.locator('[data-part="status"]')).toHaveText("1 suspended");
+    // del-0201 failed five minutes ago and is due again.
+    const failed = tile(page, group, "Failed deliveries, last 24 h");
+    await expect(failed.locator('[data-part="value"]')).toHaveText("1");
+    await expect(failed.locator('[data-part="hint"]')).toHaveText("1 due again, 0 given up");
+    await expect(failed).toHaveAttribute("data-tone", "warning");
+    // The USSP list's one entry, version 1.
+    const ussps = tile(page, group, "USSPs listed");
+    await expect(ussps.locator('[data-part="value"]')).toHaveText("1");
+    await expect(ussps.locator('[data-part="hint"]')).toHaveText("USSP list version 1");
+    // The last hour's attempts: 41, 121, 122, 123 ms (the 38 ms one is older).
+    const latency = tile(page, group, "Delivery latency, last 1 h");
+    await expect(latency.locator('[data-part="value"]')).toHaveText("121 / 123ms, p50 / p95");
+    await expect(latency.locator('[data-part="hint"]')).toHaveText("Over 4 attempts");
+    // Through the BFF, once, as GET.
+    const calls = (await consoleCalls(request)).filter((c) => c.path === "/v1/console/summary");
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((c) => c.method === "GET")).toBe(true);
+  });
+
+  test("a delivery log that does not answer leaves the latency unknown and says so; the other tiles stay", async ({ page, request }) => {
+    await request.post("/__mock/console-state", { data: { summaryLog: "unavailable" } });
+    await signIn(page, VIEWER);
+    await page.goto("/en/console");
+    const latency = tile(page, "Subscribers and deliveries", "Delivery latency");
+    await expect(latency.locator('[data-part="status"]')).toHaveText("Delivery log unavailable");
+    await expect(latency.locator('[data-part="value"]')).toHaveAttribute("data-unknown", "");
+    await expect(latency).toHaveAttribute("data-tone", "critical");
+    await expect(tile(page, "Subscribers and deliveries", "Active subscriptions").locator('[data-part="value"]')).toHaveText("2");
+  });
+
+  test("the tiles render in Georgian", async ({ page }) => {
+    await signIn(page, VIEWER, "ka");
+    await page.goto("/ka/console");
+    const group = page.getByRole("group", { name: "გამომწერები და მიწოდებები" });
+    await expect(group.locator('[data-slot="stat-tile"]')).toHaveCount(4);
+    await expect(group).toContainText("აქტიური გამოწერები");
+    await expect(group).toContainText("მიწოდების დაყოვნება");
+  });
+
+  test("the BFF refuses any method but GET on the summary before the API", async ({ page, request }) => {
+    await signIn(page, ADMIN);
+    await page.goto("/en/console");
+    const status = await page.evaluate(async () => {
+      const csrf = /(?:^|; )uspace_csrf=([^;]*)/.exec(document.cookie)?.[1] ?? "";
+      const res = await fetch("/_bff/api/v1/console/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": decodeURIComponent(csrf) },
+        body: "{}",
+      });
+      return res.status;
+    });
+    expect(status).toBe(405);
+    expect((await consoleCalls(request)).some((c) => c.path === "/v1/console/summary" && c.method !== "GET")).toBe(false);
+  });
+});
+
 test.describe("restrictions", () => {
   test("the heads are listed with their events, the ANSP's staleness is called out", async ({ page, request }) => {
     await request.post("/__mock/console-state", { data: { anspStale: true } });

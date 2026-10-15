@@ -352,3 +352,19 @@ func TestReadBBoxBudgetOnPostgres(t *testing.T) {
 }
 
 func vtoa(v int64) string { return strconv.FormatInt(v, 10) }
+
+// The period of validity on PostgreSQL: the authority's publication
+// with its period (validity_test.go) through the real prefilter
+// (applicable_from, applicable_to) and the real reads, applying before
+// the end and not after it.
+func TestPeriodOfValidityOnPostgres(t *testing.T) {
+	st, _ := pgStore(t)
+	h := newPubHarness(t, st)
+	if rec := h.put("zones", []byte(emptyCollection)); rec.Code != 201 && rec.Code != 200 {
+		t.Fatalf("empty = %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := h.put("zones", []byte(authorityPeriodOfValidity)); rec.Code != 201 {
+		t.Fatalf("PUT = %d %s", rec.Code, rec.Body.String())
+	}
+	periodReads(t, h)
+}

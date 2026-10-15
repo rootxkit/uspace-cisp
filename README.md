@@ -15,14 +15,19 @@ it changes.
 - **Never**: authors or edits airspace information, holds operator or
   flight data, judges a flight, or commands an aircraft.
 
-Status: **planning**. `docs/PLAN.md` is the implementation plan; the
+Status: **v1.0.0** (C-M3: hardening, `/v1` stable; see `CHANGELOG.md`
+and `docs/RELEASING.md`). `docs/PLAN.md` is the implementation plan; the
 work packages are in `docs/WORKPACKAGES/` (WP-0 scaffold through WP-13
-release). No code yet.
+release). Processes `api` and `deliver`, tool `cispctl`, UI under `web/`.
+
+Live demo: https://uspace-cisp.chikox.net
 
 | Document | What |
 |---|---|
 | [`docs/PLAN.md`](docs/PLAN.md) | scope and role boundary, architecture, packages, data model, the published API, bus events, security, budgets, testing, deployment, milestones, waves, open questions |
 | [`docs/WORKPACKAGES/`](docs/WORKPACKAGES/) | one brief per work package, each sized for one PR |
+| [`docs/RELEASING.md`](docs/RELEASING.md) | how a version is cut, how `/v1` changes additively, how a new `uspace-core` is taken |
+| [`docs/RUNBOOKS/`](docs/RUNBOOKS/) | deploy, backup and restore, key rotation, console, observability and the two incident runbooks |
 | [`CLAUDE.md`](CLAUDE.md) | hard rules, testing rules, commands and git conventions for every contributor and agent |
 
 Context it depends on:

@@ -22,7 +22,7 @@ export function TimeControl(props: { value: TimeChoice; onChange(v: TimeChoice):
   const id = useId();
   const { value, onChange } = props;
   return (
-    <fieldset className="flex flex-col gap-2 text-sm">
+    <fieldset className="flex flex-col gap-2 text-sm" aria-describedby={`${id}-hint`}>
       <legend className="font-bold">{t("cisp.time.legend")}</legend>
       <label className="flex items-center gap-2">
         <input type="radio" name={`${id}-when`} checked={value.kind === "now"} onChange={() => onChange({ kind: "now" })} />
@@ -44,7 +44,10 @@ export function TimeControl(props: { value: TimeChoice; onChange(v: TimeChoice):
           onChange={(e) => onChange({ kind: "instant", local: e.target.value })}
         />
       </label>
-      <p className="text-xs text-[var(--us-text-muted)]">{t("cisp.time.asked", { instant: props.instantShown })}</p>
+      <p className="m-0 text-xs text-[var(--us-text-muted)]">{t("cisp.time.asked", { instant: props.instantShown })}</p>
+      <p id={`${id}-hint`} data-testid="time-hint" className="m-0 text-xs text-[var(--us-text-muted)]">
+        {t("cisp.time.hint")}
+      </p>
     </fieldset>
   );
 }

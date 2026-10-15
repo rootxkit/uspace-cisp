@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { fmtTimeUTC, useLang, useT } from "@rootxkit/uspace-ui/i18n";
 import type { MapFeature } from "../map/adapt";
 import {
@@ -18,34 +18,24 @@ import {
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[9rem_1fr] gap-2 py-1">
+    <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2 py-1">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd>{children}</dd>
+      <dd className="m-0 min-w-0 break-words">{children}</dd>
     </div>
   );
 }
 
 /**
- * The ED-318 properties of one feature as published: limits in their
- * own reference and unit, the applicability schedule as written, the
- * zone authorities, the restriction's window and state, and the CISP's
- * verdict at the chosen instant (with why an unknown one is drawn).
+ * The ED-318 properties of one feature as published: its identifier and
+ * type, limits in their own reference and unit, the applicability
+ * schedule as written, the zone authorities, the restriction's window and
+ * state, and the CISP's verdict at the chosen instant (with why an
+ * unknown one is drawn). Shown inside the feature's row of the list when
+ * the row is expanded.
  */
-export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClose(): void }) {
+export function FeatureDetails({ feature, id }: { feature: MapFeature; id: string }) {
   const t = useT();
   const { lang } = useLang();
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    heading.current?.focus();
-  }, [feature.id]);
-  // Escape closes the panel wherever the focus is.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
   const p = obj(feature.raw["properties"]) ?? {};
   const restriction = obj(obj(p["extendedProperties"])?.["cis_restriction"]);
   const verdict = applicabilityOf(p);
@@ -56,27 +46,18 @@ export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClos
   const otherReason = localText(p["otherReasonInfo"], lang);
   const conditions = typeof p["restrictionConditions"] === "string" ? p["restrictionConditions"] : null;
   return (
-    <section
-      aria-labelledby={`panel-${feature.id}`}
-      data-panel={feature.id}
-      className="rounded-panel border border-border bg-card p-4 text-sm text-card-foreground shadow-panel"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <h2 id={`panel-${feature.id}`} ref={heading} tabIndex={-1} className="m-0 text-base font-bold outline-none">
-          <span className="font-mono">{feature.id}</span> {feature.view.name ?? ""}
-        </h2>
-        <button type="button" onClick={onClose} aria-label={t("cisp.panel.close")} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-          <span aria-hidden="true">{"×"}</span>
-        </button>
-      </div>
-      <dl>
+    <div id={id} data-panel={feature.id} className="mx-2 mb-2 rounded-md border border-border bg-surface-sunken px-3 py-2 text-xs">
+      <dl className="m-0">
+        <Row label={t("cisp.panel.identifier")}>
+          <span className="font-mono">{feature.id}</span>
+        </Row>
         <Row label={t("cisp.panel.type")}>{t(`zone.type.${feature.view.type}`)}</Row>
         {reasons.length > 0 && <Row label={t("cisp.panel.reason")}>{reasons.join(", ")}</Row>}
         {otherReason !== null && <Row label={t("cisp.panel.other_reason")}>{otherReason}</Row>}
         {feature.view.message !== null && <Row label={t("cisp.panel.message")}>{feature.view.message}</Row>}
         {conditions !== null && <Row label={t("cisp.panel.conditions")}>{conditions}</Row>}
         <Row label={t("cisp.panel.limits")}>
-          <ul data-limits>
+          <ul data-limits className="m-0 list-none p-0">
             {layers.map((l, i) => (
               <li key={i}>{fmtLayer(l, lang, t)}</li>
             ))}
@@ -90,7 +71,7 @@ export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClos
           </Row>
         )}
         <Row label={t("cisp.panel.applicability")}>
-          <ul data-schedule>
+          <ul data-schedule className="m-0 list-none p-0">
             {fmtApplicability(p["limitedApplicability"], t).map((line, i) => (
               <li key={i}>{line}</li>
             ))}
@@ -116,11 +97,11 @@ export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClos
         )}
         {authorities.map((a, i) => (
           <Row key={i} label={t("cisp.panel.authority")}>
-            <dl>
+            <dl className="m-0">
               {authorityRows(a, lang, t).map((r) => (
-                <div key={r.label} className="flex gap-2">
+                <div key={r.label} className="flex flex-wrap gap-x-2">
                   <dt className="text-muted-foreground">{r.label}</dt>
-                  <dd>{r.value}</dd>
+                  <dd className="m-0">{r.value}</dd>
                 </div>
               ))}
             </dl>
@@ -133,6 +114,6 @@ export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClos
           })}
         </Row>
       </dl>
-    </section>
+    </div>
   );
 }

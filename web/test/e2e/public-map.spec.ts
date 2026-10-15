@@ -62,11 +62,15 @@ test("the three layers render from /public/v1/* with the banner live", async ({ 
   await expect(page.locator(".us-map canvas")).toHaveCount(1);
 });
 
-test("clicking a zone opens the panel with its identifier and limits as published", async ({ page }) => {
+test("clicking a zone expands its row with its identifier and limits as published", async ({ page }) => {
   await page.goto("/en");
+  await expect(item(page, "TSR001")).toHaveAttribute("aria-expanded", "false");
   await item(page, "TSR001").click();
+  await expect(item(page, "TSR001")).toHaveAttribute("aria-expanded", "true");
+  await expect(item(page, "TSR001")).toContainText("TSR001 Test authorisation zone");
   const panel = page.locator('[data-panel="TSR001"]');
-  await expect(panel.getByRole("heading")).toContainText("TSR001 Test authorisation zone");
+  await expect(item(page, "TSR001")).toHaveAttribute("aria-controls", (await panel.getAttribute("id")) ?? "");
+  await expect(panel).toContainText("IdentifierTSR001");
   await expect(panel.locator("[data-limits]")).toHaveText("0 m AGL – 600 m above the WGS 84 ellipsoid");
   await expect(panel.locator("[data-schedule]")).toContainText("08:00:00+04:00 to 18:00:00+04:00");
 
@@ -79,9 +83,13 @@ test("clicking a zone opens the panel with its identifier and limits as publishe
   await expect(tsd).toContainText("morning civil twilight (BMCT) to evening civil twilight (EECT)");
   await expect(tsd).toContainText("Planned");
 
-  // The panel closes with Escape and the list keeps every zone reachable by keyboard.
+  // One row is expanded at a time: the first collapsed when the second opened.
+  await expect(panel).toHaveCount(0);
+  await expect(item(page, "TSR001")).toHaveAttribute("aria-expanded", "false");
+  // The row collapses with Escape and the list keeps every zone reachable by keyboard.
   await page.keyboard.press("Escape");
   await expect(tsd).toHaveCount(0);
+  await expect(item(page, "TSD001")).toHaveAttribute("aria-expanded", "false");
   await item(page, "TSC001").focus();
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-panel="TSC001"] [data-limits] li')).toHaveText([
@@ -235,6 +243,56 @@ test("circle zones are drawn from the CIS's outline, and say so when it is missi
   await expect(item(page, "TSN001")).toContainText("circle, not drawn on the map");
 });
 
+test("the object list is an accordion: sections with counts collapse and expand by keyboard", async ({ page }) => {
+  await page.goto("/en");
+  const toggle = (d: string) => page.locator(`[data-section-toggle="${d}"]`);
+  await expect(toggle("zones")).toHaveAttribute("aria-expanded", "true");
+  await expect(toggle("zones").locator("[data-count]")).toHaveText("3");
+  await expect(toggle("uspace_airspace").locator("[data-count]")).toHaveText("1");
+  await expect(toggle("restrictions").locator("[data-count]")).toHaveText("2");
+  // Collapsed: the rows are gone from view and from the tab order; the count stays.
+  await toggle("zones").focus();
+  await page.keyboard.press("Enter");
+  await expect(toggle("zones")).toHaveAttribute("aria-expanded", "false");
+  await expect(item(page, "TSR001")).toBeHidden();
+  await expect(toggle("zones").locator("[data-count]")).toHaveText("3");
+  await expect(item(page, "TSU001")).toBeVisible();
+  // And open again with Space.
+  await page.keyboard.press(" ");
+  await expect(toggle("zones")).toHaveAttribute("aria-expanded", "true");
+  await expect(item(page, "TSR001")).toBeVisible();
+
+  // A restriction's row shows its type, reason, limits, window and state.
+  await item(page, "DAR00A1").focus();
+  await page.keyboard.press("Enter");
+  const details = page.locator('[data-panel="DAR00A1"]');
+  await expect(details).toContainText("IdentifierDAR00A1");
+  await expect(details).toContainText("DAR");
+  await expect(details.locator("[data-limits]")).toHaveText("0 m AGL – 120 m AGL");
+  await expect(details).toContainText("2026-10-01 00:00 UTC to 2027-01-01 00:00 UTC");
+  await expect(details).toContainText("Active");
+  // Collapsing the section of the expanded row clears it.
+  await toggle("restrictions").click();
+  await expect(details).toHaveCount(0);
+  await toggle("restrictions").click();
+  await expect(item(page, "DAR00A1")).toHaveAttribute("aria-expanded", "false");
+});
+
+test("the page has no visible header, and the time panel says what it shows", async ({ page }) => {
+  await page.goto("/en");
+  await expect(page.locator('[data-dataset="zones"]')).toContainText("version 1");
+  // The name is the page's h1 for assistive technology only.
+  const h1 = page.getByRole("heading", { level: 1 });
+  await expect(h1).toHaveText("Common Information Service");
+  await expect(h1).toHaveClass(/sr-only/);
+  await expect(page.getByText("as published by the authority and the air navigation service provider")).toHaveCount(0);
+  await expect(page.getByTestId("time-hint")).toHaveText("The map shows what is in force now, or at the moment you choose.");
+  await page.goto("/ka");
+  await expect(page.getByTestId("time-hint")).toHaveText("რუკა აჩვენებს, რა მოქმედებს ახლა ან თქვენ მიერ არჩეულ მომენტში.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("საერთო საინფორმაციო მომსახურება");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveClass(/sr-only/);
+});
+
 test("a dataset nothing has been published in is empty, not unavailable", async ({ page, request }) => {
   await mock(request, "state", { unpublished: ["restrictions"] });
   await page.goto("/en");
@@ -244,6 +302,8 @@ test("a dataset nothing has been published in is empty, not unavailable", async 
   await expect(banner).toHaveAttribute("data-unavailable", "false");
   await expect(banner).not.toContainText("unavailable");
   await expect(banner.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator('[data-layer="restrictions"] [data-empty-note="none-yet"]')).toHaveText("No restrictions yet.");
+  await expect(page.locator('[data-section-toggle="restrictions"] [data-count]')).toHaveText("0");
   // The other datasets are served as usual.
   await expect(page.locator('[data-dataset="zones"]')).toContainText("version 1");
   // It was asked with GET and answered 404 no_version.
@@ -253,6 +313,7 @@ test("a dataset nothing has been published in is empty, not unavailable", async 
   await page.goto("/ka");
   await expect(page.locator('[data-dataset="restrictions"]')).toContainText("შეზღუდვები ჯერ არ არის");
   await expect(page.locator('[data-dataset="restrictions"]')).not.toContainText("მიუწვდომელია");
+  await expect(page.locator('[data-layer="restrictions"] [data-empty-note="none-yet"]')).toHaveText("შეზღუდვები ჯერ არ არის.");
 
   // The first publication arrives (the status frame announces version 1): it is shown.
   await mock(request, "state", { unpublished: [] });

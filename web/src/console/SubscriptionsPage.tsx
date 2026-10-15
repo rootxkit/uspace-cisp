@@ -10,7 +10,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
-import { Button, Panel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { Button, Panel, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { DELIVERY_STATES, deliveryBadge, SUBSCRIPTION_STATUSES, subscriptionBadge } from "./badges";
 import { BBoxPreview, fmtBBox } from "./BBoxPreview";
@@ -104,7 +104,7 @@ export function SubscriptionsPage() {
                 return (
                   <TableRow key={s.id} data-subscription={s.id}>
                     <TableCell>
-                      <Link href={`/${lang}/console/subscriptions/${encodeURIComponent(s.id)}`} className="font-mono font-semibold underline underline-offset-4">
+                      <Link href={`/${lang}/console/subscriptions/${encodeURIComponent(s.id)}`} className={cn("font-mono font-semibold underline underline-offset-4", TABLE_NOWRAP)}>
                         {s.id}
                       </Link>
                       <div className="text-xs text-muted-foreground">{s.client_id}</div>
@@ -113,11 +113,11 @@ export function SubscriptionsPage() {
                       <StateBadge spec={subscriptionBadge(s.status)} value={s.status} />
                     </TableCell>
                     <TableCell>{s.datasets.map((d) => t(`cisp.console.dataset.${d}`)).join(", ")}</TableCell>
-                    <TableCell className="font-mono text-xs">{fmtBBox(s.bbox) ?? t("cisp.console.subscriptions.bbox_none")}</TableCell>
+                    <TableCell className={cn("font-mono text-xs", TABLE_NOWRAP)}>{fmtBBox(s.bbox) ?? t("cisp.console.subscriptions.bbox_none")}</TableCell>
                     <TableCell>
                       <Time iso={s.last_success_at} />
                     </TableCell>
-                    <TableCell className={s.consecutive_failures > 0 ? "font-semibold text-[var(--us-danger)]" : ""}>
+                    <TableCell className={cn("tabular-nums", TABLE_NOWRAP, s.consecutive_failures > 0 && "font-semibold text-[var(--us-danger)]")}>
                       {s.consecutive_failures}
                     </TableCell>
                     <TableCell>
@@ -301,7 +301,7 @@ export function SubscriptionPage({ id }: { id: string }) {
                 {deliveries.data.deliveries.map((d) => (
                   <TableRow key={d.id} data-delivery={d.id}>
                     <TableCell>
-                      <div className="font-mono text-xs">{d.id}</div>
+                      <div className={cn("font-mono text-xs", TABLE_NOWRAP)}>{d.id}</div>
                       <div className="text-xs">
                         {reasonLabel(t, d.reason)}
                         {d.change_id !== undefined && ` · ${t("cisp.console.deliveries.change", { change: d.change_id })}`}
@@ -310,15 +310,15 @@ export function SubscriptionPage({ id }: { id: string }) {
                     <TableCell data-testid="delivery-state">
                       <StateBadge spec={deliveryBadge(d.state)} value={d.state} />
                     </TableCell>
-                    <TableCell>{d.attempts}</TableCell>
-                    <TableCell className="max-w-[16rem] whitespace-normal break-words">
+                    <TableCell className={cn("tabular-nums", TABLE_NOWRAP)}>{d.attempts}</TableCell>
+                    <TableCell className="max-w-[16rem]">
                       {d.last_status_code ?? "—"}
                       {d.last_error !== undefined && d.last_error !== "" && <div className="text-xs">{d.last_error}</div>}
                     </TableCell>
                     <TableCell>
                       <Time iso={d.next_retry_at} />
                     </TableCell>
-                    <TableCell className="min-w-[24rem] whitespace-normal break-words">
+                    <TableCell className="min-w-[24rem]">
                       <AttemptLog d={d} />
                     </TableCell>
                     <TableCell>

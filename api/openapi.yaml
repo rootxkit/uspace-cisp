@@ -1747,6 +1747,42 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /v1/console/summary:
+    get:
+      operationId: getConsoleSummary
+      tags: [console]
+      summary: The overview's figures
+      description: |
+        Role viewer and above. The console overview's figures, read
+        only, counted by the database on its own clock: the
+        subscriptions per status, the deliveries whose last attempt
+        failed in the last 24 hours (failed, due again; expired, given
+        up), the number of USSPs in the current USSP list, and the
+        delivery latency (50th and 95th percentile of latency_ms) over
+        the newest attempts of the delivery log in the last hour, at
+        most max_attempts of them (sampled says the hour held at least
+        that many). Counts only: no client, callback, contact or
+        account. The latency's log says whether the delivery log was
+        read: complete, unavailable (the timeseries database did not
+        answer; every other figure is still served) or not_configured.
+      x-role: viewer
+      security:
+        - consoleSession: []
+      responses:
+        "200":
+          description: The figures.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleSummary"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /v1/{dataset}:
     get:
       operationId: getDataset
@@ -4462,6 +4498,108 @@ components:
           type: integer
           format: int64
           description: Pass as before_id for the next page; absent on the last page.
+    ConsoleSummary:
+      type: object
+      description: The console overview's figures (GET /v1/console/summary). Counts only.
+      additionalProperties: false
+      required: [now, subscriptions, failed_deliveries, ussps, delivery_latency]
+      properties:
+        now:
+          type: string
+          format: date-time
+          description: The relational database's clock the windows were judged on.
+        subscriptions:
+          type: object
+          description: The number of subscriptions in each status.
+          additionalProperties: false
+          required: [pending_verification, active, suspended, deleted]
+          properties:
+            pending_verification:
+              type: integer
+              format: int64
+              minimum: 0
+            active:
+              type: integer
+              format: int64
+              minimum: 0
+            suspended:
+              type: integer
+              format: int64
+              minimum: 0
+            deleted:
+              type: integer
+              format: int64
+              minimum: 0
+        failed_deliveries:
+          type: object
+          description: The deliveries whose last attempt, within the window, failed.
+          additionalProperties: false
+          required: [window_s, failed, expired]
+          properties:
+            window_s:
+              type: integer
+              minimum: 1
+              description: The window, seconds back from now (86400).
+            failed:
+              type: integer
+              format: int64
+              minimum: 0
+              description: Failed and due again.
+            expired:
+              type: integer
+              format: int64
+              minimum: 0
+              description: Failed and given up (the retry window passed, or the subscription went).
+        ussps:
+          type: object
+          description: The current USSP list.
+          additionalProperties: false
+          required: [version, count]
+          properties:
+            version:
+              type: integer
+              format: int64
+              minimum: 0
+              description: The ussp_list dataset's current version; 0 before the first.
+            count:
+              type: integer
+              format: int64
+              minimum: 0
+              description: The entries of that version (0 when version is 0).
+        delivery_latency:
+          type: object
+          description: The latency of the newest delivery attempts of the window, from the delivery log.
+          additionalProperties: false
+          required: [window_s, max_attempts, log, attempts, sampled]
+          properties:
+            window_s:
+              type: integer
+              minimum: 1
+              description: The window, seconds back from the timeseries database's clock (3600).
+            max_attempts:
+              type: integer
+              minimum: 1
+              description: The most attempts the percentiles are taken over.
+            log:
+              type: string
+              enum: [complete, unavailable, not_configured]
+              description: Whether the delivery log was read.
+            attempts:
+              type: integer
+              format: int64
+              minimum: 0
+              description: The attempts the percentiles were taken over (0 unless log is complete).
+            sampled:
+              type: boolean
+              description: The window held at least max_attempts attempts and only the newest were used.
+            p50_ms:
+              type: integer
+              minimum: 0
+              description: The 50th percentile of latency_ms; absent without attempts.
+            p95_ms:
+              type: integer
+              minimum: 0
+              description: The 95th percentile of latency_ms; absent without attempts.
     ConsoleStatus:
       type: object
       required: [status, counters]

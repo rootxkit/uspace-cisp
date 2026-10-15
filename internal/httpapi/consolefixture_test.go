@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -215,6 +216,65 @@ func (c *fakeConsole) AuditEvents(_ context.Context, f store.AuditFilter) ([]sto
 		}
 	}
 	return out, nil
+}
+
+// ConsoleSummary is the fake's figures: the subscriptions per status,
+// the failed and expired deliveries whose last attempt is within the
+// window of now, and the entries of the current USSP list.
+func (c *fakeConsole) ConsoleSummary(_ context.Context, window time.Duration) (store.ConsoleSummary, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.err(); err != nil {
+		return store.ConsoleSummary{}, err
+	}
+	now := time.Now().UTC()
+	out := store.ConsoleSummary{Now: now, Subscriptions: map[string]int64{}}
+	for _, r := range c.sb().rows {
+		out.Subscriptions[string(r.Status)]++
+	}
+	for _, d := range c.sb().deliveries {
+		if d.LastAttemptAt == nil || d.LastAttemptAt.Before(now.Add(-window)) {
+			continue
+		}
+		switch d.State {
+		case store.DeliveryFailed:
+			out.FailedDeliveries++
+		case store.DeliveryExpired:
+			out.ExpiredDeliveries++
+		}
+	}
+	if id, ok := c.current[publication.DatasetUSSPList]; ok {
+		p := c.pubs[id]
+		var list struct {
+			Ussps []json.RawMessage `json:"ussps"`
+		}
+		if err := json.Unmarshal(p.Body, &list); err != nil {
+			return store.ConsoleSummary{}, err
+		}
+		out.UsspListVersion, out.Ussps = p.Version, int64(len(list.Ussps))
+	}
+	return out, nil
+}
+
+// fakeLatency is the delivery log's latency read: what it answers and
+// what it was asked.
+type fakeLatency struct {
+	mu     sync.Mutex
+	answer store.DeliveryLatency
+	err    error
+	asked  []latencyAsk
+}
+
+type latencyAsk struct {
+	window time.Duration
+	max    int
+}
+
+func (f *fakeLatency) Latency(_ context.Context, window time.Duration, maxAttempts int) (store.DeliveryLatency, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.asked = append(f.asked, latencyAsk{window, maxAttempts})
+	return f.answer, f.err
 }
 
 // consoleAccountStore is what the harness's account service runs on.

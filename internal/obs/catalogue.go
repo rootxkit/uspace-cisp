@@ -138,6 +138,7 @@ func buildCatalogue() []Metric {
 	add(counter("console_logins_refused", "Console logins refused (wrong credentials, locked, TOTP, challenge).", "a burst (password guessing)"))
 	add(counter("console_mfa_challenges", "Console MFA challenges opened (passwords accepted for an account with MFA).", ""))
 	add(counter("console_actions", "Console actions written (accounts, subscriptions, retries, republications).", ""))
+	add(counter("console_summary_log_failed", "Console summaries served without the delivery log (the latency says unavailable).", ""))
 
 	// Store counters mirrored into Prometheus.
 	add(counter("bus_publish_failed", "Committed changes whose bus publish failed (deliver's scan covers them).", "any increase"))

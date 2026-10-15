@@ -77,6 +77,7 @@ section 9) where it names one.
 | `cisp_console_logins_refused_total` | counter | `component` | Console logins refused (wrong credentials, locked, TOTP, challenge). | a burst (password guessing) |
 | `cisp_console_logins_total` | counter | `component` | Console sessions issued. | — |
 | `cisp_console_mfa_challenges_total` | counter | `component` | Console MFA challenges opened (passwords accepted for an account with MFA). | — |
+| `cisp_console_summary_log_failed_total` | counter | `component` | Console summaries served without the delivery log (the latency says unavailable). | — |
 | `cisp_deliveries_delivered_total` | counter | `component` | Webhook delivery outcomes. | — |
 | `cisp_deliveries_due` | gauge | `component` | Deliveries due now. | — |
 | `cisp_deliveries_expired_total` | counter | `component` | Deliveries given up 24 h after their change. | any increase |

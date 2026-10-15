@@ -261,6 +261,27 @@ func (e ConsoleRole) Valid() bool {
 	}
 }
 
+// Defines values for ConsoleSummaryDeliveryLatencyLog.
+const (
+	ConsoleSummaryDeliveryLatencyLogComplete      ConsoleSummaryDeliveryLatencyLog = "complete"
+	ConsoleSummaryDeliveryLatencyLogNotConfigured ConsoleSummaryDeliveryLatencyLog = "not_configured"
+	ConsoleSummaryDeliveryLatencyLogUnavailable   ConsoleSummaryDeliveryLatencyLog = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleSummaryDeliveryLatencyLog enum.
+func (e ConsoleSummaryDeliveryLatencyLog) Valid() bool {
+	switch e {
+	case ConsoleSummaryDeliveryLatencyLogComplete:
+		return true
+	case ConsoleSummaryDeliveryLatencyLogNotConfigured:
+		return true
+	case ConsoleSummaryDeliveryLatencyLogUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DatasetCollectionCisDataset.
 const (
 	DatasetCollectionCisDatasetRestrictions   DatasetCollectionCisDataset = "restrictions"
@@ -1948,6 +1969,68 @@ type ConsoleSubscriptionList struct {
 	Subscriptions []ConsoleSubscription `json:"subscriptions"`
 }
 
+// ConsoleSummary The console overview's figures (GET /v1/console/summary). Counts only.
+type ConsoleSummary struct {
+	// DeliveryLatency The latency of the newest delivery attempts of the window, from the delivery log.
+	DeliveryLatency struct {
+		// Attempts The attempts the percentiles were taken over (0 unless log is complete).
+		Attempts int64 `json:"attempts"`
+
+		// Log Whether the delivery log was read.
+		Log ConsoleSummaryDeliveryLatencyLog `json:"log"`
+
+		// MaxAttempts The most attempts the percentiles are taken over.
+		MaxAttempts int `json:"max_attempts"`
+
+		// P50Ms The 50th percentile of latency_ms; absent without attempts.
+		P50Ms *int `json:"p50_ms,omitempty"`
+
+		// P95Ms The 95th percentile of latency_ms; absent without attempts.
+		P95Ms *int `json:"p95_ms,omitempty"`
+
+		// Sampled The window held at least max_attempts attempts and only the newest were used.
+		Sampled bool `json:"sampled"`
+
+		// WindowS The window, seconds back from the timeseries database's clock (3600).
+		WindowS int `json:"window_s"`
+	} `json:"delivery_latency"`
+
+	// FailedDeliveries The deliveries whose last attempt, within the window, failed.
+	FailedDeliveries struct {
+		// Expired Failed and given up (the retry window passed, or the subscription went).
+		Expired int64 `json:"expired"`
+
+		// Failed Failed and due again.
+		Failed int64 `json:"failed"`
+
+		// WindowS The window, seconds back from now (86400).
+		WindowS int `json:"window_s"`
+	} `json:"failed_deliveries"`
+
+	// Now The relational database's clock the windows were judged on.
+	Now time.Time `json:"now"`
+
+	// Subscriptions The number of subscriptions in each status.
+	Subscriptions struct {
+		Active              int64 `json:"active"`
+		Deleted             int64 `json:"deleted"`
+		PendingVerification int64 `json:"pending_verification"`
+		Suspended           int64 `json:"suspended"`
+	} `json:"subscriptions"`
+
+	// Ussps The current USSP list.
+	Ussps struct {
+		// Count The entries of that version (0 when version is 0).
+		Count int64 `json:"count"`
+
+		// Version The ussp_list dataset's current version; 0 before the first.
+		Version int64 `json:"version"`
+	} `json:"ussps"`
+}
+
+// ConsoleSummaryDeliveryLatencyLog Whether the delivery log was read.
+type ConsoleSummaryDeliveryLatencyLog string
+
 // DatasetCollection An ED-318 FeatureCollection as the CISP serves it: the features
 // as published (canonical JSON), metadata.issued the version's
 // received_at, and the top-level cis_dataset, cis_version and
@@ -3425,6 +3508,9 @@ type ServerInterface interface {
 	// SuspendConsoleSubscription Suspend a subscription
 	// (POST /v1/console/subscriptions/{id}/suspend)
 	SuspendConsoleSubscription(w http.ResponseWriter, r *http.Request, id SubscriptionID)
+	// GetConsoleSummary The overview's figures
+	// (GET /v1/console/summary)
+	GetConsoleSummary(w http.ResponseWriter, r *http.Request)
 	// ListPublications The version history of a dataset
 	// (GET /v1/publications/{dataset})
 	ListPublications(w http.ResponseWriter, r *http.Request, dataset ListPublicationsParamsDataset, params ListPublicationsParams)
@@ -4359,6 +4445,20 @@ func (siw *ServerInterfaceWrapper) SuspendConsoleSubscription(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SuspendConsoleSubscription(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConsoleSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetConsoleSummary(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConsoleSummary(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5574,6 +5674,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/subscriptions/{id}/deliveries/{delivery_id}/retry", wrapper.RetryConsoleDelivery)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/audit", wrapper.ListConsoleAudit)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/status", wrapper.GetConsoleStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/summary", wrapper.GetConsoleSummary)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}", wrapper.GetDataset)
 	m.HandleFunc(http.MethodHead+" "+options.BaseURL+"/v1/{dataset}", wrapper.HeadDataset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/{dataset}/versions", wrapper.ListDatasetVersions)
@@ -8476,6 +8577,88 @@ func (response SuspendConsoleSubscriptiondefaultApplicationProblemPlusJSONRespon
 	return err
 }
 
+type GetConsoleSummaryRequestObject struct {
+}
+
+type GetConsoleSummaryResponseObject interface {
+	VisitGetConsoleSummaryResponse(w http.ResponseWriter) error
+}
+
+type GetConsoleSummary200JSONResponse ConsoleSummary
+
+func (response GetConsoleSummary200JSONResponse) VisitGetConsoleSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleSummary401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetConsoleSummary401ApplicationProblemPlusJSONResponse) VisitGetConsoleSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleSummary403ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsoleSummary403ApplicationProblemPlusJSONResponse) VisitGetConsoleSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleSummary503ApplicationProblemPlusJSONResponse Problem
+
+func (response GetConsoleSummary503ApplicationProblemPlusJSONResponse) VisitGetConsoleSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleSummarydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetConsoleSummarydefaultApplicationProblemPlusJSONResponse) VisitGetConsoleSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListPublicationsRequestObject struct {
 	Dataset ListPublicationsParamsDataset `json:"dataset"`
 	Params  ListPublicationsParams
@@ -11321,6 +11504,9 @@ type StrictServerInterface interface {
 	// SuspendConsoleSubscription Suspend a subscription
 	// (POST /v1/console/subscriptions/{id}/suspend)
 	SuspendConsoleSubscription(ctx context.Context, request SuspendConsoleSubscriptionRequestObject) (SuspendConsoleSubscriptionResponseObject, error)
+	// GetConsoleSummary The overview's figures
+	// (GET /v1/console/summary)
+	GetConsoleSummary(ctx context.Context, request GetConsoleSummaryRequestObject) (GetConsoleSummaryResponseObject, error)
 	// ListPublications The version history of a dataset
 	// (GET /v1/publications/{dataset})
 	ListPublications(ctx context.Context, request ListPublicationsRequestObject) (ListPublicationsResponseObject, error)
@@ -12085,6 +12271,30 @@ func (sh *strictHandler) SuspendConsoleSubscription(w http.ResponseWriter, r *ht
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SuspendConsoleSubscriptionResponseObject); ok {
 		if err := validResponse.VisitSuspendConsoleSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConsoleSummary operation middleware
+func (sh *strictHandler) GetConsoleSummary(w http.ResponseWriter, r *http.Request) {
+	var request GetConsoleSummaryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConsoleSummary(ctx, request.(GetConsoleSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConsoleSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConsoleSummaryResponseObject); ok {
+		if err := validResponse.VisitGetConsoleSummaryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

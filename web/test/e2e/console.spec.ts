@@ -174,9 +174,15 @@ test("a publisher_admin republishes with a reason and the admin's audit shows it
   await page.goto("/en/console/audit");
   const row = page.locator('tr[data-event="console_republish"]');
   await expect(row).toHaveCount(1);
-  // The actor is the account's id, as the CISP records it.
-  await expect(row).toContainText("acc-pub1");
-  await expect(row.getByTestId("audit-payload")).toContainText("subscriber lost the notification");
+  // The CISP records the account's id; the console names it by the
+  // username the accounts list gives, the id in the tooltip.
+  await expect(row.getByTestId("audit-actor").locator("[data-username]")).toHaveText("pub1");
+  await expect(row.getByTestId("audit-actor").locator("[data-username]")).toHaveAttribute("title", "acc-pub1");
+  // The payload is behind the row's expander.
+  await row.getByTestId("row-expander").click();
+  const details = page.locator(`[id="${await row.getByTestId("row-expander").getAttribute("aria-controls")}"]`);
+  await expect(details.getByTestId("audit-payload")).toContainText("subscriber lost the notification");
+  await expect(details).toContainText("acc-pub1");
   // The filter by type keeps it and drops the rest.
   await page.getByLabel("Event type").fill("console_republish");
   await page.getByRole("button", { name: "Apply" }).click();

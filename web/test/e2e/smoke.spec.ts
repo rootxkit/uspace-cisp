@@ -54,10 +54,12 @@ test("/en renders English with the same shell", async ({ page }) => {
 
 test("the locale switch moves between ka and en", async ({ page }) => {
   await page.goto("/ka");
-  await page.getByRole("link", { name: "English" }).click();
+  // The kit's LanguageSwitch: a pressed button per language, each named in itself.
+  await expect(page.getByRole("button", { name: "ქართული" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "English" }).click();
   await expect(page).toHaveURL(/\/en$/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await page.getByRole("link", { name: "ქართული" }).click();
+  await page.getByRole("button", { name: "ქართული" }).click();
   await expect(page).toHaveURL(/\/ka$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(GEORGIAN);
 });

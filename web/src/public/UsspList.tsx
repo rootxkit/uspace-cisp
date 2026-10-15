@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fmtTimeUTC, useLang, useT } from "@rootxkit/uspace-ui/i18n";
 import { browserClient } from "../api/client";
 import type { components } from "../api/types";
+import { PageHeader } from "@rootxkit/uspace-ui/ui";
 import { useRuntimeConfig } from "../components/Providers";
 
 type PublicUsspList = components["schemas"]["PublicUsspList"];
@@ -39,28 +40,32 @@ export function UsspList() {
   }, [client]);
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <h2 className="text-lg font-bold">{t("cisp.ussps.title")}</h2>
-      {load.kind === "loading" && <p role="status">{t("cisp.ussps.loading")}</p>}
+    <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 p-4 sm:p-5">
+      <PageHeader title={t("cisp.ussps.title")} />
+      {load.kind === "loading" && (
+        <p role="status" className="m-0 text-sm text-muted-foreground">
+          {t("cisp.ussps.loading")}
+        </p>
+      )}
       {load.kind === "unavailable" && (
-        <p role="alert" className="font-bold text-[var(--us-danger)]">
+        <p role="alert" className="m-0 font-bold text-[var(--us-danger)]">
           {t("cisp.banner.unavailable_since", { since: fmtTimeUTC(load.since, lang, { seconds: true }) })}
         </p>
       )}
       {load.kind === "served" && (
         <>
-          <p className="text-sm text-[var(--us-text-muted)]" data-dataset="ussp_list">
+          <p className="m-0 text-sm text-muted-foreground" data-dataset="ussp_list">
             {t("cisp.banner.as_of", { version: String(load.list.cis_version), updated: fmtTimeUTC(load.list.cis_updated_at, lang) })}
             {load.stale && <span className="ms-2 text-[var(--us-danger)]">{t("cisp.banner.stale_snapshot")}</span>}
           </p>
-          {load.list.ussps.length === 0 && <p>{t("cisp.ussps.none")}</p>}
-          <ul className="flex flex-col gap-3">
+          {load.list.ussps.length === 0 && <p className="m-0">{t("cisp.ussps.none")}</p>}
+          <ul className="m-0 grid list-none gap-4 p-0 xl:grid-cols-2">
             {load.list.ussps.map((u) => (
-              <li key={u.ussp_id} data-ussp={u.ussp_id} className="rounded border border-[var(--us-border)] p-3">
-                <h3 className="font-bold">
-                  {u.name} <span className="font-mono text-sm">{u.ussp_id}</span>
-                </h3>
-                <dl className="grid grid-cols-[10rem_1fr] gap-x-2 gap-y-1 text-sm">
+              <li key={u.ussp_id} data-ussp={u.ussp_id} className="rounded-panel border border-border bg-card p-4 text-card-foreground shadow-panel">
+                <h2 className="m-0 mb-3 flex flex-wrap items-baseline gap-x-2 text-base font-bold">
+                  {u.name} <span className="font-mono text-sm font-normal text-muted-foreground">{u.ussp_id}</span>
+                </h2>
+                <dl className="m-0 grid grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-[10rem_1fr] [&_dd]:m-0 [&_dt]:text-muted-foreground">
                   <dt>{t("cisp.ussps.status")}</dt>
                   <dd>{t(`cisp.ussps.status.${u.status}`)}</dd>
                   <dt>{t("cisp.ussps.services")}</dt>

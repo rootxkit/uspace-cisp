@@ -23,8 +23,8 @@ export function FeatureList(props: {
     <div className="flex flex-col gap-3">
       {MAP_DATASETS.filter((d) => props.visible[d]).map((d) => (
         <section key={d} aria-label={t(`cisp.dataset.${d}`)} data-layer={d}>
-          <h3 className="text-sm font-bold">
-            {t(`cisp.dataset.${d}`)} <span data-count>{props.features[d].length}</span>
+          <h3 className="m-0 mb-1 flex items-center justify-between text-sm font-semibold">
+            {t(`cisp.dataset.${d}`)} <span data-count className="rounded-full bg-surface-sunken px-2 text-xs tabular-nums">{props.features[d].length}</span>
           </h3>
           {props.features[d].length === 0 && (
             <p className="text-xs text-[var(--us-text-muted)]">{t("cisp.list.none_in_view")}</p>
@@ -46,9 +46,9 @@ export function FeatureList(props: {
                     data-drawn={circle === null ? "as-published" : f.drawnFromOutline ? "outline" : "not-drawn"}
                     aria-pressed={selected}
                     className={[
-                      "w-full rounded px-2 py-1 text-start text-sm hover:bg-[var(--us-hover)]",
+                      "w-full rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                       verdict === "not_applicable" ? "opacity-60" : "",
-                      selected ? "outline outline-2 outline-[var(--us-focus)]" : "",
+                      selected ? "bg-accent-soft text-accent-text" : "",
                     ].join(" ")}
                     onClick={() => props.onSelect(f.id)}
                   >

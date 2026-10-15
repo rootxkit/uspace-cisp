@@ -15,7 +15,8 @@ import { RESTRICTION_STATES, restrictionBadge } from "./badges";
 import { useLoad } from "./context";
 import { FeaturePreview } from "./FeaturePreview";
 import { ageOnApiClockS } from "./StatusStrip";
-import { Loading, ProblemNotice, Section, StateBadge, Time } from "./ui";
+import { ConsoleHeader } from "./header";
+import { Loading, ProblemNotice, Section, StateBadge, TablePanel, Time } from "./ui";
 
 type Head = components["schemas"]["RestrictionHead"];
 type RestrictionState = Head["state"];
@@ -51,16 +52,15 @@ export function RestrictionsPage() {
   const expiryAge = rs?.expiry.last_run_at === undefined || status.data === null ? null : ageOnApiClockS(status.data.now, rs.expiry.last_run_at);
 
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="m-0 text-lg font-bold">{t("cisp.console.nav.restrictions")}</h2>
-      <p className="m-0 text-xs text-[var(--us-text-muted)]">{t("cisp.console.restrictions.read_only")}</p>
+    <>
+      <ConsoleHeader title={t("cisp.console.nav.restrictions")} description={t("cisp.console.restrictions.read_only")} />
       {notAvailable ? (
-        <p role="alert" data-testid="restrictions-not-available" className="m-0 rounded border border-[var(--us-danger)] p-3 text-sm font-semibold">
+        <p role="alert" data-testid="restrictions-not-available" className="m-0 rounded-panel border border-[var(--us-danger)] bg-card p-3 text-sm font-semibold">
           {t("cisp.console.restrictions.not_available")}
         </p>
       ) : (
         <>
-          <div className="flex flex-col gap-1 text-sm" data-testid="restrictions-health">
+          <div className="flex flex-col gap-1 rounded-panel border border-border bg-card p-4 text-sm shadow-panel" data-testid="restrictions-health">
             {anspStale && (
               <p role="alert" className="m-0 font-semibold text-[var(--us-danger)]" data-testid="ansp-stale">
                 {anspStaleSince === null ? (
@@ -97,10 +97,10 @@ export function RestrictionsPage() {
               </p>
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
             {t("cisp.console.restrictions.filter")}
             <select
-              className="rounded border border-[var(--us-border)] bg-[var(--us-surface)] px-2 py-1"
+              className="h-8 max-w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               value={state}
               onChange={(e) => setState(e.target.value as RestrictionState | "")}
             >
@@ -118,6 +118,7 @@ export function RestrictionsPage() {
             (heads.data.restrictions.length === 0 ? (
               <p className="m-0 text-sm">{t("cisp.console.restrictions.none")}</p>
             ) : (
+              <TablePanel label={t("cisp.console.nav.restrictions")}>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -153,6 +154,7 @@ export function RestrictionsPage() {
                   ))}
                 </TableBody>
               </Table>
+              </TablePanel>
             ))}
           {current.length > 0 && (
             <Section titleKey="cisp.console.preview.title">
@@ -161,6 +163,6 @@ export function RestrictionsPage() {
           )}
         </>
       )}
-    </div>
+    </>
   );
 }

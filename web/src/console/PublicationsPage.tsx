@@ -10,11 +10,12 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
-import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { Button, StatusBadge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { useConsole, useLoad, type Loaded } from "./context";
 import { mayAct } from "./roles";
-import { Loading, ProblemNotice, ReasonAction, Time } from "./ui";
+import { ConsoleHeader } from "./header";
+import { Loading, ProblemNotice, ReasonAction, TablePanel, Time } from "./ui";
 
 export const DATASETS = ["zones", "uspace_airspace", "restrictions", "ussp_list"] as const;
 export type Dataset = (typeof DATASETS)[number];
@@ -65,7 +66,7 @@ export function RepublishAction({ version, onDone }: { version: Version; onDone?
 function VersionTable({ list, isFirstPage, reload }: { list: VersionList; isFirstPage: boolean; reload(): void }) {
   const t = useT();
   const { lang } = useLang();
-  if (list.versions.length === 0) return <p className="m-0 text-sm">{t("cisp.console.publications.none")}</p>;
+  if (list.versions.length === 0) return <p className="m-0 p-4 text-sm">{t("cisp.console.publications.none")}</p>;
   return (
     <Table>
       <TableHeader>
@@ -85,7 +86,11 @@ function VersionTable({ list, isFirstPage, reload }: { list: VersionList; isFirs
               <Link href={`/${lang}/console/publications/${encodeURIComponent(v.id)}`} className="underline">
                 {t("cisp.console.publications.version_n", { version: v.version })}
               </Link>
-              {isFirstPage && i === 0 && <span className="ms-2 text-xs font-semibold">{t("cisp.console.publications.current")}</span>}
+              {isFirstPage && i === 0 && (
+                <StatusBadge tone="ok" className="ms-2">
+                  {t("cisp.console.publications.current")}
+                </StatusBadge>
+              )}
             </TableCell>
             <TableCell>
               <Time iso={v.received_at} />
@@ -128,24 +133,31 @@ export function PublicationsPage() {
   );
   const base = `/${lang}/console/publications`;
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="m-0 text-lg font-bold">{t("cisp.console.nav.publications")}</h2>
-      <nav aria-label={t("cisp.console.publications.datasets")} className="flex flex-wrap gap-2">
+    <>
+      <ConsoleHeader title={t("cisp.console.nav.publications")} description={t("cisp.console.page.publications")} />
+      <nav
+        aria-label={t("cisp.console.publications.datasets")}
+        className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-border bg-surface-sunken p-1"
+      >
         {DATASETS.map((d) => (
           <Link
             key={d}
             href={`${base}?dataset=${d}`}
             aria-current={d === dataset ? "page" : undefined}
-            className={`rounded border px-2 py-1 text-sm ${d === dataset ? "border-[var(--us-border-strong)] font-bold" : "border-[var(--us-border)]"}`}
+            className={`rounded-md px-3 py-1.5 text-sm font-semibold no-underline transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${d === dataset ? "bg-card text-foreground shadow-panel" : "text-muted-foreground hover:text-foreground"}`}
           >
             {t(`cisp.console.dataset.${d}`)}
           </Link>
         ))}
       </nav>
-      <p className="m-0 text-xs text-[var(--us-text-muted)]">{t("cisp.console.publications.not_served")}</p>
+      <p className="m-0 text-xs text-muted-foreground">{t("cisp.console.publications.not_served")}</p>
       {list.failure !== null && <ProblemNotice failure={list.failure} />}
       {list.loading && list.data === null && <Loading />}
-      {list.data !== null && <VersionTable list={list.data} isFirstPage={before === undefined} reload={list.reload} />}
+      {list.data !== null && (
+        <TablePanel label={t("cisp.console.page.versions")}>
+          <VersionTable list={list.data} isFirstPage={before === undefined} reload={list.reload} />
+        </TablePanel>
+      )}
       <div className="flex gap-2">
         {before !== undefined && (
           <Button type="button" variant="outline" size="sm" onClick={() => router.push(`${base}?dataset=${dataset}`)}>
@@ -163,6 +175,6 @@ export function PublicationsPage() {
           </Button>
         )}
       </div>
-    </div>
+    </>
   );
 }

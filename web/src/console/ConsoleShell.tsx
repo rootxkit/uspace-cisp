@@ -1,10 +1,12 @@
 "use client";
 
-// The signed-in console's frame: the status strip first, then the
-// navigation by role (an item is hidden below its operation's role; the
-// page is still reachable by address and shows the API's 403), the
-// account menu with sign-out, and the page. A banner under the
-// navigation says what the console can and cannot do: it manages
+// The signed-in console's frame: the kit's AppShell. The sidebar holds
+// the navigation by role in its groups (an item is hidden below its
+// operation's role; the page is still reachable by address and shows the
+// API's 403); the top bar the system name, the stream's live/stale pill,
+// the scheme toggle, the language switch and the account menu with
+// sign-out. Above every page, the status strip, where the operator looks
+// first; below every page, a note of what the console can and cannot do: it manages
 // subscriptions, deliveries, accounts and re-notification, and never
 // edits content (hard rule 2).
 import Link from "next/link";
@@ -12,19 +14,50 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { SessionProvider, useSession } from "@rootxkit/uspace-ui/auth/client";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
+import { useFeed, useNowMs, type LiveFeed } from "@rootxkit/uspace-ui/live";
+import { useTheme } from "@rootxkit/uspace-ui/theme";
+import { AppShell, DropdownMenuItem, StatusPill, UserMenu, type FeedPillState, type NavGroup } from "@rootxkit/uspace-ui/ui";
+import { BrandMark, renderLink, SchemeToggle } from "../components/frame";
 import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@rootxkit/uspace-ui/ui";
+  AccountsIcon,
+  AuditIcon,
+  ExternalIcon,
+  OverviewIcon,
+  PublicationsIcon,
+  RestrictionsIcon,
+  SignOutIcon,
+  SubscriptionsIcon,
+} from "../components/icons";
+import { useRuntimeConfig } from "../components/Providers";
 import { ConsoleProvider, loginPath, useConsole } from "./context";
 import { navFor } from "./roles";
 import { StatusStrip } from "./StatusStrip";
 import { Loading, ProblemNotice } from "./ui";
+
+/** How often the ages on the frame are redrawn. Display-only. */
+const TICK_MS = 1000;
+
+/** The sidebar's groups, in order, and the group and icon of each console page. */
+const GROUPS = ["monitor", "data", "distribution", "admin"] as const;
+type Group = (typeof GROUPS)[number];
+const PLACE: Record<string, { group: Group; icon: ReactNode }> = {
+  "": { group: "monitor", icon: <OverviewIcon /> },
+  "/publications": { group: "data", icon: <PublicationsIcon /> },
+  "/restrictions": { group: "data", icon: <RestrictionsIcon /> },
+  "/subscriptions": { group: "distribution", icon: <SubscriptionsIcon /> },
+  "/accounts": { group: "admin", icon: <AccountsIcon /> },
+  "/audit": { group: "admin", icon: <AuditIcon /> },
+};
+
+/**
+ * The pill's state from the stream: connecting and down as the kit's feed
+ * says; live is stale once the last frame is older than the stale_after_s
+ * the server's status frame sent (the server's bound, never one of ours).
+ */
+export function pillState(feed: Pick<LiveFeed, "connection" | "staleAfterS">, ageS: number | null): FeedPillState {
+  if (feed.connection !== "live") return feed.connection;
+  return feed.staleAfterS !== null && ageS !== null && ageS > feed.staleAfterS ? "stale" : "live";
+}
 
 function AccountMenu() {
   const t = useT();
@@ -35,18 +68,9 @@ function AccountMenu() {
   const [failed, setFailed] = useState(false);
   if (me === null) return null;
   return (
-    <div className="flex items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="outline" size="sm" data-testid="account-menu">
-            {me.account.username}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>
-            {t("cisp.console.account.role", { role: t(`cisp.console.role.${me.account.role}`) })}
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
+    <span className="flex items-center gap-2">
+      <span data-testid="account-menu" className="inline-flex">
+        <UserMenu name={me.account.username} detail={t("cisp.console.account.role", { role: t(`cisp.console.role.${me.account.role}`) })}>
           <DropdownMenuItem
             onSelect={() => {
               setFailed(false);
@@ -55,56 +79,73 @@ function AccountMenu() {
                 .catch(() => setFailed(true));
             }}
           >
+            <SignOutIcon />
             {t("cisp.console.account.sign_out")}
           </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </UserMenu>
+      </span>
       {failed && (
         <span role="alert" className="text-xs text-[var(--us-danger)]">
           {t("cisp.console.account.sign_out_failed")}
         </span>
       )}
-    </div>
+    </span>
   );
 }
 
 function Frame({ children }: { children: ReactNode }) {
   const t = useT();
   const { lang } = useLang();
+  const { brand } = useTheme();
   const pathname = usePathname();
+  const cfg = useRuntimeConfig();
   const { me, role, meFailure } = useConsole();
   const base = `/${lang}/console`;
+  // The status stream (same origin, the session cookie rides the upgrade).
+  const feed = useFeed({ url: `${cfg.apiBaseUrl}/v1/stream`, onFrame: () => undefined });
+  const nowMs = useNowMs(TICK_MS);
+  const ageS = feed.lastFrameAtMs === null ? null : Math.max(0, Math.round((nowMs - feed.lastFrameAtMs) / 1000));
   const items = navFor(role);
+  const nav: NavGroup[] = GROUPS.map((g) => ({
+    id: g,
+    label: t(`cisp.console.nav.group.${g}`),
+    items: items
+      .filter((i) => PLACE[i.path]?.group === g)
+      .map((i) => {
+        const href = `${base}${i.path}`;
+        return {
+          id: i.path === "" ? "overview" : i.path.slice(1),
+          label: t(i.labelKey),
+          href,
+          icon: PLACE[i.path]?.icon,
+          active: i.path === "" ? pathname === base : pathname.startsWith(href),
+        };
+      }),
+  })).filter((g) => g.items.length > 0);
+
   return (
-    <div className="flex flex-col">
-      <StatusStrip />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--us-border)] px-4 py-2">
-        <nav aria-label={t("cisp.console.nav.label")} className="flex flex-wrap gap-3 text-sm">
-          {items.map((i) => {
-            const href = `${base}${i.path}`;
-            const current = i.path === "" ? pathname === base : pathname.startsWith(href);
-            return (
-              <Link
-                key={i.path}
-                href={href}
-                aria-current={current ? "page" : undefined}
-                className={current ? "font-bold underline underline-offset-4" : "underline-offset-4 hover:underline"}
-              >
-                {t(i.labelKey)}
-              </Link>
-            );
-          })}
-        </nav>
-        <AccountMenu />
-      </div>
-      <p className="m-0 border-b border-[var(--us-border)] px-4 py-1 text-xs text-[var(--us-text-muted)]">
-        {t("cisp.console.read_only_notice")}
-      </p>
-      <div className="flex flex-col gap-4 p-4">
+    <AppShell
+      systemName={brand.name}
+      logo={<BrandMark />}
+      nav={nav}
+      renderLink={renderLink}
+      status={me === null ? undefined : <StatusPill state={pillState(feed, ageS)} ageS={ageS} />}
+      actions={<SchemeToggle />}
+      user={<AccountMenu />}
+      sidebarFooter={
+        <Link href={`/${lang}`} className="inline-flex items-center gap-2 font-semibold text-sidebar-text no-underline hover:underline">
+          <ExternalIcon />
+          {t("cisp.console.nav.public_map")}
+        </Link>
+      }
+    >
+      <StatusStrip feed={me === null ? null : feed} nowMs={nowMs} />
+      <div className="mx-auto grid w-full max-w-[96rem] grid-cols-[minmax(0,1fr)] gap-5 p-4 sm:p-6">
         {meFailure !== null && <ProblemNotice failure={meFailure} />}
         {me === null && meFailure === null ? <Loading /> : children}
+        <p className="m-0 border-t border-border pt-3 text-xs text-muted-foreground">{t("cisp.console.read_only_notice")}</p>
       </div>
-    </div>
+    </AppShell>
   );
 }
 

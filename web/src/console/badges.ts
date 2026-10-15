@@ -3,6 +3,7 @@
 // them. A state the API adds later is shown by its own name with the
 // "unknown" tone, never as one of these (the enumerations are open within
 // v1 for consumers that read them).
+import type { StatusTone } from "@rootxkit/uspace-ui/theme";
 import type { components } from "../api/types";
 
 export type DeliveryState = components["schemas"]["Delivery"]["state"];
@@ -70,11 +71,14 @@ export function restrictionBadge(state: string): BadgeSpec {
   return spec(RESTRICTION_TONE, "cisp.console.restriction.state", state);
 }
 
-/** The badge's classes per tone (the kit's tokens). Display-only. */
-export const TONE_CLASS: Record<Tone, string> = {
-  ok: "border-[var(--us-border)] bg-[var(--us-surface-raised)] text-[var(--us-text)]",
-  pending: "border-[var(--us-border)] bg-[var(--us-surface)] text-[var(--us-text-muted)]",
-  attention: "border-[var(--us-danger)] bg-[var(--us-surface-raised)] text-[var(--us-danger)] font-semibold",
-  ended: "border-[var(--us-border)] bg-[var(--us-surface)] text-[var(--us-text-muted)]",
-  unknown: "border-dashed border-[var(--us-border)] text-[var(--us-text)]",
+/**
+ * The kit's status tone that repeats each tone's words (StatusBadge). The
+ * words carry the state; the tone only repeats it. Display-only.
+ */
+export const TONE_STATUS: Record<Tone, StatusTone> = {
+  ok: "ok",
+  pending: "info",
+  attention: "critical",
+  ended: "neutral",
+  unknown: "neutral",
 };

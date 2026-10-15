@@ -8,9 +8,10 @@ judges nothing: no geometry library, no database, no NATS, no key
 bundle check enforce it).
 
 ```
-app/[locale]/(public)/   the public map (WP-10)
-app/[locale]/(console)/  the console (WP-11): login, and the signed-in pages under (signed-in)/
-src/console/             the console's pages, status strip and helpers (/_bff/api/v1/console/* only)
+app/[locale]/(public)/   the public map and the USSP list (WP-10), in a top bar with no sidebar
+app/[locale]/(console)/  the console (WP-11): login, and the signed-in pages under (signed-in)/ in the kit's AppShell
+src/console/             the console's pages, frame, status strip and helpers (/_bff/api/v1/console/* only)
+src/components/          the providers, the public frame, the shared frame parts and icons
 app/%5Fbff/              the three BFF routes: /_bff/login, /_bff/logout, /_bff/api/*
 src/api/                 generated types (uspace-ui-gen-api) and the typed client
 src/bff/handlers.ts      the BFF, on the kit's auth/server helpers
@@ -35,7 +36,8 @@ pnpm test           # vitest: catalogues, BFF, lint rules, branding, bundle chec
 pnpm build
 pnpm check:bundle   # the server bundle names no database, NATS or key variable
 pnpm e2e            # Playwright: next start behind test/mock-api.mjs (run pnpm build first;
-                    # `pnpm exec playwright install chromium` once)
+                    # `pnpm exec playwright install chromium` once), with axe at
+                    # WCAG 2.2 AA on every page in ka and en, light and dark
 ```
 
 ## Running locally

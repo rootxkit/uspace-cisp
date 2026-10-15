@@ -9,10 +9,15 @@
 // field by what it takes (src/console/validation.ts), and anything else
 // by its status: the API's English never reaches the form.
 import { useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BFF_LOGIN_PATH, LoginForm } from "@rootxkit/uspace-ui/auth/client";
 import { retryAfterSOf, parseProblem, problemSlug } from "@rootxkit/uspace-ui/api";
 import { useLang, useT, type Translate } from "@rootxkit/uspace-ui/i18n";
+import { useTheme } from "@rootxkit/uspace-ui/theme";
+import { LanguageSwitch, PageHeader, Panel } from "@rootxkit/uspace-ui/ui";
+import { BrandMark, SchemeToggle } from "../components/frame";
+import { LockIcon } from "../components/icons";
 import { fieldMessages, fieldSentence } from "./validation";
 
 /** The login refusals the console words itself (the API's slugs). */
@@ -69,12 +74,45 @@ export function localisingFetch(t: Translate, base: typeof fetch = fetch): typeo
 export function LoginPage() {
   const t = useT();
   const { lang } = useLang();
+  const { brand } = useTheme();
   const router = useRouter();
   const doFetch = useMemo(() => localisingFetch(t), [t]);
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <p className="m-0 max-w-prose text-sm text-[var(--us-text-muted)]">{t("cisp.console.login.intro")}</p>
-      <LoginForm action={BFF_LOGIN_PATH} fetch={doFetch} onSuccess={() => router.replace(`/${lang}/console`)} />
+    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-overlay"
+      >
+        {t("cisp.skip")}
+      </a>
+      <header className="flex min-h-[var(--us-topbar-height)] flex-wrap items-center gap-3 border-b border-border bg-topbar px-4 py-2 sm:px-5">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md">
+            <BrandMark />
+          </span>
+          <span className="min-w-0 truncate text-sm font-bold">{brand.name}</span>
+        </span>
+        <span className="ms-auto flex items-center gap-2">
+          <SchemeToggle />
+          <LanguageSwitch />
+        </span>
+      </header>
+      <main id="main" tabIndex={-1} className="flex flex-1 items-start justify-center px-4 py-10 outline-none sm:items-center">
+        <div className="grid w-full max-w-md gap-5">
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="inline-flex size-10 items-center justify-center rounded-lg bg-accent-soft text-accent-text">
+              <LockIcon />
+            </span>
+            <PageHeader title={t("cisp.console.login.title")} description={t("cisp.console.login.intro")} />
+          </div>
+          <Panel>
+            <LoginForm action={BFF_LOGIN_PATH} fetch={doFetch} onSuccess={() => router.replace(`/${lang}/console`)} />
+          </Panel>
+          <Link href={`/${lang}`} className="justify-self-start text-sm font-semibold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+            {t("cisp.console.login.back")}
+          </Link>
+        </div>
+      </main>
     </div>
   );
 }

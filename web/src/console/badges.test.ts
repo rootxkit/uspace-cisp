@@ -8,7 +8,7 @@ import {
   restrictionBadge,
   SUBSCRIPTION_STATUSES,
   subscriptionBadge,
-  TONE_CLASS,
+  TONE_STATUS,
 } from "./badges";
 
 const catalogues: Record<string, string>[] = [en, ka];
@@ -19,7 +19,7 @@ describe("delivery state badges", () => {
       const b = deliveryBadge(s);
       expect(b.labelKey, s).toBe(`cisp.console.delivery.state.${s}`);
       for (const c of catalogues) expect(c[b.labelKey ?? ""], s).toBeTruthy();
-      expect(TONE_CLASS[b.tone]).toBeTruthy();
+      expect(TONE_STATUS[b.tone]).toBeTruthy();
     }
   });
 

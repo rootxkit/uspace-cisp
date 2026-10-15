@@ -15,7 +15,8 @@ import type { components } from "../api/types";
 import { failureOf, type CallFailure } from "./client";
 import { useConsole, useLoad } from "./context";
 import { ROLES, type ConsoleRole } from "./roles";
-import { Loading, ProblemNotice, Section, Time } from "./ui";
+import { ConsoleHeader } from "./header";
+import { Loading, TablePanel, ProblemNotice, Section, Time } from "./ui";
 
 type Account = components["schemas"]["ConsoleAccount"];
 type Created = components["schemas"]["ConsoleAccountCreated"];
@@ -29,7 +30,7 @@ function CopyValue({ value, testId }: { value: string; testId: string }) {
   const [copied, setCopied] = useState<boolean | null>(null);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <code className="break-all rounded bg-[var(--us-surface-sunken)] px-2 py-1 font-mono" data-testid={testId}>
+      <code className="break-all rounded-md bg-surface-sunken px-2 py-1 font-mono" data-testid={testId}>
         {value}
       </code>
       <Button
@@ -55,7 +56,7 @@ function CopyValue({ value, testId }: { value: string; testId: string }) {
 function OnceSecrets({ password, totpUri, onDismiss }: { password?: string; totpUri?: string; onDismiss(): void }) {
   const t = useT();
   return (
-    <div role="alert" className="flex flex-col gap-2 rounded border border-[var(--us-danger)] p-3 text-sm" data-testid="once-secrets">
+    <div role="alert" className="flex flex-col gap-2 rounded-panel border border-[var(--us-danger)] bg-card p-4 text-sm shadow-panel" data-testid="once-secrets">
       <p className="m-0 font-semibold">{t("cisp.console.accounts.once_warning")}</p>
       {password !== undefined && (
         <>
@@ -113,7 +114,7 @@ function CreateForm({ onCreated }: { onCreated(c: Created): void }) {
         <Label htmlFor="new-role">{t("cisp.console.accounts.role")}</Label>
         <select
           id="new-role"
-          className="rounded border border-[var(--us-border)] bg-[var(--us-surface)] px-2 py-1"
+          className="h-9 max-w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           value={role}
           onChange={(e) => setRole(e.target.value as ConsoleRole)}
         >
@@ -176,8 +177,8 @@ export function AccountsPage() {
   const list = useLoad(async (c) => (await c.GET("/v1/console/accounts")).data ?? null, "accounts");
   const [secrets, setSecrets] = useState<{ password?: string; totpUri?: string } | null>(null);
   return (
-    <div className="flex flex-col gap-4">
-      <h2 className="m-0 text-lg font-bold">{t("cisp.console.nav.accounts")}</h2>
+    <>
+      <ConsoleHeader title={t("cisp.console.nav.accounts")} description={t("cisp.console.page.accounts")} />
       {list.failure !== null && <ProblemNotice failure={list.failure} />}
       {secrets !== null && <OnceSecrets {...secrets} onDismiss={() => setSecrets(null)} />}
       {list.failure === null && (
@@ -192,6 +193,7 @@ export function AccountsPage() {
       )}
       {list.loading && list.data === null && <Loading />}
       {list.data !== null && (
+        <TablePanel label={t("cisp.console.nav.accounts")}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -258,7 +260,8 @@ export function AccountsPage() {
             ))}
           </TableBody>
         </Table>
+        </TablePanel>
       )}
-    </div>
+    </>
   );
 }

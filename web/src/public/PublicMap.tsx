@@ -6,6 +6,7 @@ import { fmtTimeUTC, useLang, useT } from "@rootxkit/uspace-ui/i18n";
 import { MapView, type BBox } from "@rootxkit/uspace-ui/map";
 import type { ZoneType } from "@rootxkit/uspace-ui/model";
 import { useTheme } from "@rootxkit/uspace-ui/theme";
+import { MapPanel, PageHeader, Panel } from "@rootxkit/uspace-ui/ui";
 import { useRuntimeConfig } from "../components/Providers";
 import { BBoxWatcher, MapLayers } from "../map/MapLayers";
 import { AsOfBanner } from "./AsOfBanner";
@@ -36,7 +37,7 @@ function useNowInstant(): string {
   return now;
 }
 
-/** The public zone map: banner, map, time control, legend, list and panel. */
+/** The public zone map: header, banner, the map with its legend over it, time control, panel and list. */
 export function PublicMap() {
   const t = useT();
   const { lang } = useLang();
@@ -78,13 +79,18 @@ export function PublicMap() {
   );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 sm:p-5">
+      <PageHeader title={t("cisp.app.title")} description={t("cisp.app.tagline")} />
       <AsOfBanner state={data.banner} />
       {/* A fixed height: the list growing beside the map must not resize it (a resize is a new bbox). */}
-      <div className="flex flex-col lg:h-[75vh] lg:flex-row">
-        <div className="relative h-[50vh] lg:h-auto lg:flex-1">
+      <div className="grid min-w-0 gap-4 lg:h-[72vh] lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <MapPanel
+          className="lg:h-full"
+          mapClassName="h-[55vh] lg:h-full"
+          legend={<ZoneLegend counts={counts} className="border-0 bg-transparent p-0 shadow-none" />}
+        >
           {cfg.mapView === null ? (
-            <p role="alert" className="p-4 text-[var(--us-danger)]">
+            <p role="alert" className="m-0 p-4 text-[var(--us-danger)]">
               {t("cisp.map.not_configured", { problem: cfg.mapViewProblem ?? "" })}
             </p>
           ) : (
@@ -107,21 +113,21 @@ export function PublicMap() {
               </MapView>
             )
           )}
-        </div>
-        <aside
-          aria-label={t("cisp.map.side")}
-          className="flex w-full flex-col gap-4 border-[var(--us-border)] p-3 lg:w-[26rem] lg:overflow-y-auto lg:border-s"
-        >
-          <TimeControl value={time} onChange={setTime} instantShown={fmtTimeUTC(appliesAt, lang)} />
+        </MapPanel>
+        <aside aria-label={t("cisp.map.side")} className="flex min-w-0 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto [&>*]:shrink-0">
+          <Panel title={t("cisp.map.time_title")}>
+            <TimeControl value={time} onChange={setTime} instantShown={fmtTimeUTC(appliesAt, lang)} />
+          </Panel>
           {selected !== null && <FeaturePanel feature={selected} onClose={() => setSelectedId(null)} />}
-          <ZoneLegend counts={counts} defaultCollapsed />
-          <FeatureList
-            features={data.features}
-            undrawable={data.undrawable}
-            visible={visible}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
+          <Panel title={t("cisp.map.features_title")}>
+            <FeatureList
+              features={data.features}
+              undrawable={data.undrawable}
+              visible={visible}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
+          </Panel>
         </aside>
       </div>
     </div>

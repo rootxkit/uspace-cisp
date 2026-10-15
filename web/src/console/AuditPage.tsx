@@ -9,7 +9,8 @@ import { useT } from "@rootxkit/uspace-ui/i18n";
 import { inputToUtc } from "@rootxkit/uspace-ui/form";
 import { Button, Input, Label, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
 import { useLoad } from "./context";
-import { Loading, ProblemNotice, Time } from "./ui";
+import { ConsoleHeader } from "./header";
+import { Loading, TablePanel, ProblemNotice, Time } from "./ui";
 
 export interface AuditFilter {
   since: string;
@@ -46,10 +47,10 @@ export function AuditPage() {
     `${JSON.stringify(applied)}:${before ?? ""}`,
   );
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="m-0 text-lg font-bold">{t("cisp.console.nav.audit")}</h2>
+    <>
+      <ConsoleHeader title={t("cisp.console.nav.audit")} description={t("cisp.console.page.audit")} />
       <form
-        className="flex flex-wrap items-end gap-3"
+        className="flex flex-wrap items-end gap-3 rounded-panel border border-border bg-card p-4 shadow-panel"
         onSubmit={(e) => {
           e.preventDefault();
           setPages([]);
@@ -81,6 +82,7 @@ export function AuditPage() {
         (list.data.events.length === 0 ? (
           <p className="m-0 text-sm">{t("cisp.console.audit.none")}</p>
         ) : (
+          <TablePanel label={t("cisp.console.nav.audit")}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -100,7 +102,7 @@ export function AuditPage() {
                     <Time iso={e.ts} />
                   </TableCell>
                   <TableCell>
-                    <span className="text-xs text-[var(--us-text-muted)]">{t(`cisp.console.audit.actor_type.${e.actor_type}`)}</span>{" "}
+                    <span className="text-xs text-muted-foreground">{t(`cisp.console.audit.actor_type.${e.actor_type}`)}</span>{" "}
                     <span className="font-mono">{e.actor_id}</span>
                   </TableCell>
                   <TableCell className="font-mono">{e.event_type}</TableCell>
@@ -116,6 +118,7 @@ export function AuditPage() {
               ))}
             </TableBody>
           </Table>
+          </TablePanel>
         ))}
       <div className="flex gap-2">
         {pages.length > 0 && (
@@ -129,6 +132,6 @@ export function AuditPage() {
           </Button>
         )}
       </div>
-    </div>
+    </>
   );
 }

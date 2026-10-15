@@ -7,8 +7,8 @@
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { fmtTimeUTC, LOCALES, useLang, useT } from "@rootxkit/uspace-ui/i18n";
 import { ConfirmDialog } from "@rootxkit/uspace-ui/form";
-import { Button } from "@rootxkit/uspace-ui/ui";
-import { TONE_CLASS, type BadgeSpec } from "./badges";
+import { Button, Panel, StatusBadge } from "@rootxkit/uspace-ui/ui";
+import { TONE_STATUS, type BadgeSpec } from "./badges";
 import { failureOf, type CallFailure } from "./client";
 import { fieldMessages } from "./validation";
 
@@ -63,13 +63,14 @@ export function Time({ iso }: { iso: string | null | undefined }) {
 export function StateBadge({ spec, value }: { spec: BadgeSpec; value: string }) {
   const t = useT();
   return (
-    <span
+    <StatusBadge
       data-state={value}
       data-tone={spec.tone}
-      className={`inline-block rounded border px-1.5 py-0.5 text-xs ${TONE_CLASS[spec.tone]}`}
+      tone={TONE_STATUS[spec.tone]}
+      variant={spec.tone === "unknown" ? "outline" : "soft"}
     >
       {spec.labelKey === null ? value : t(spec.labelKey)}
-    </span>
+    </StatusBadge>
   );
 }
 
@@ -95,7 +96,11 @@ export function ProblemNotice({ failure }: { failure: CallFailure }) {
           ? t("cisp.console.problem.not_found")
           : t("cisp.console.problem.refused", { status: failure.status });
   return (
-    <div role="alert" data-status={failure.status} className="rounded border border-[var(--us-danger)] p-3 text-sm">
+    <div
+      role="alert"
+      data-status={failure.status}
+      className="rounded-panel border border-[var(--us-danger)] bg-card p-3 text-sm text-card-foreground shadow-panel"
+    >
       <p className="m-0 font-semibold text-[var(--us-danger)]">{lead}</p>
       {p !== null && fields === null && (
         <p className="m-0 mt-1">
@@ -176,7 +181,7 @@ export function ReasonAction(props: {
     }
   };
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex max-w-full min-w-0 flex-col items-start gap-1">
       <ConfirmDialog
         titleKey={props.titleKey}
         bodyKey={props.bodyKey}
@@ -185,7 +190,14 @@ export function ReasonAction(props: {
         destructive={props.destructive ?? false}
         onConfirm={(reason) => void run(reason ?? "")}
         trigger={
-          <Button type="button" size="sm" variant="outline" disabled={busy} data-testid={props.testId}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            data-testid={props.testId}
+            className="h-auto min-h-8 max-w-full py-1 text-start whitespace-normal"
+          >
             {t(props.labelKey)}
           </Button>
         }
@@ -200,14 +212,63 @@ export function ReasonAction(props: {
   );
 }
 
-/** A section with a heading. */
-export function Section({ titleKey, vars, children }: { titleKey: string; vars?: Record<string, string | number>; children: ReactNode }) {
+/** A titled panel of a console page (the kit's Panel, named by its heading). */
+export function Section({
+  titleKey,
+  vars,
+  description,
+  actions,
+  flush,
+  children,
+}: {
+  titleKey: string;
+  vars?: Record<string, string | number>;
+  description?: ReactNode;
+  actions?: ReactNode;
+  /** A table runs edge to edge. */
+  flush?: boolean;
+  children: ReactNode;
+}) {
   const t = useT();
   return (
-    <section className="flex flex-col gap-2">
-      <h3 className="m-0 text-base font-semibold">{t(titleKey, vars)}</h3>
+    <Panel
+      title={t(titleKey, vars)}
+      bodyClassName="flex flex-col gap-2"
+      padding={flush === true ? "none" : "default"}
+      {...(description === undefined ? {} : { description })}
+      {...(actions === undefined ? {} : { actions })}
+    >
       {children}
-    </section>
+    </Panel>
+  );
+}
+
+/**
+ * A table in a panel without a heading of its own (the page's header
+ * names it). The panel is the table's horizontal scroller, a labelled
+ * region the keyboard can reach and scroll (WCAG 2.1.1), so a wide table
+ * stays readable beside the sidebar.
+ */
+export function TablePanel({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Panel padding="none">
+      <ScrollRegion label={label}>{children}</ScrollRegion>
+    </Panel>
+  );
+}
+
+/** A table's horizontal scroller: a labelled region the keyboard can reach. */
+export function ScrollRegion({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div
+      role="region"
+      aria-label={label}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls must be reachable by keyboard (WCAG 2.1.1; axe scrollable-region-focusable)
+      tabIndex={0}
+      className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&_[data-slot=table-container]]:overflow-visible [&_td:first-child]:ps-4 [&_td:last-child]:pe-4 [&_th:first-child]:ps-4 [&_th:last-child]:pe-4"
+    >
+      {children}
+    </div>
   );
 }
 
@@ -215,7 +276,7 @@ export function Section({ titleKey, vars, children }: { titleKey: string; vars?:
 export function Loading() {
   const t = useT();
   return (
-    <p role="status" className="m-0 text-sm text-[var(--us-text-muted)]">
+    <p role="status" className="m-0 text-sm text-muted-foreground">
       {t("cisp.console.loading")}
     </p>
   );

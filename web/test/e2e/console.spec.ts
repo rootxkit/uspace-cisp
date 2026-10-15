@@ -27,6 +27,11 @@ async function signIn(page: Page, who: { username: string; password: string }, l
   if (who.username === ADMIN.username) expect(await bffLogin(page, { username: who.username, otp: CODE })).toBe(200);
 }
 
+/** The top bar's user menu: the kit's UserMenu, named by the signed-in account. */
+function accountMenu(page: Page) {
+  return page.getByTestId("account-menu").getByRole("button");
+}
+
 async function consoleCalls(request: APIRequestContext): Promise<{ method: string; path: string }[]> {
   return (await (await request.get("/__mock/console")).json()) as { method: string; path: string }[];
 }
@@ -49,7 +54,8 @@ test.describe("sign-in", () => {
     await page.getByLabel("Password").fill(VIEWER.password);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/en\/console$/);
-    await expect(page.getByTestId("account-menu")).toHaveText(VIEWER.username);
+    await expect(accountMenu(page)).toHaveAccessibleName(`Account menu: ${VIEWER.username}`);
+    await expect(accountMenu(page)).toContainText(VIEWER.username);
     // No code was asked for.
     await expect(page.getByLabel("One-time code")).toHaveCount(0);
   });
@@ -69,7 +75,8 @@ test.describe("sign-in", () => {
     await code.fill(CODE);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/en\/console$/);
-    await expect(page.getByTestId("account-menu")).toHaveText(ADMIN.username);
+    await expect(accountMenu(page)).toHaveAccessibleName(`Account menu: ${ADMIN.username}`);
+    await expect(accountMenu(page)).toContainText(ADMIN.username);
     const posts = (await consoleCalls(request)).filter((c) => c.method === "POST").map((c) => c.path);
     expect(posts).toEqual(["/v1/console/session", "/v1/console/session/mfa", "/v1/console/session/mfa"]);
   });
@@ -100,7 +107,7 @@ test.describe("sign-in", () => {
   test("sign-out ends the session", async ({ page }) => {
     await signIn(page, VIEWER);
     await page.goto("/en/console");
-    await page.getByTestId("account-menu").click();
+    await accountMenu(page).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/en\/console\/login$/);
     await page.goto("/en/console");

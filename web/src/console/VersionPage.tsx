@@ -5,13 +5,13 @@
 // map preview of the features it touched when it is still the current
 // version, and the republish action on the current version.
 import { useState } from "react";
-import Link from "next/link";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
-import { Button } from "@rootxkit/uspace-ui/ui";
+import { Button, Panel } from "@rootxkit/uspace-ui/ui";
 import { useLoad } from "./context";
 import { anythingHidden, diffView, PATHS_SHOWN, type FeatureRow, type PathChange, type PublicationDiff } from "./diff";
 import { FeaturePreview, isMapDataset } from "./FeaturePreview";
 import { isDataset, reasonLabel, RepublishAction } from "./PublicationsPage";
+import { ConsoleHeader } from "./header";
 import { Loading, ProblemNotice, Section, Time } from "./ui";
 
 function Paths({ paths, hidden, truncatedByApi }: { paths: PathChange[]; hidden: number; truncatedByApi: boolean }) {
@@ -21,7 +21,7 @@ function Paths({ paths, hidden, truncatedByApi }: { paths: PathChange[]; hidden:
       <ul className="m-0 ps-5 text-xs" data-testid="diff-paths">
         {paths.map((p, i) => (
           <li key={`${p.path}-${i}`}>
-            <code>{p.path === "" ? "/" : p.path}</code> <span className="text-[var(--us-text-muted)]">{t(`cisp.console.diff.op.${p.op}`)}</span>
+            <code>{p.path === "" ? "/" : p.path}</code> <span className="text-muted-foreground">{t(`cisp.console.diff.op.${p.op}`)}</span>
           </li>
         ))}
       </ul>
@@ -44,7 +44,7 @@ function Group({ titleKey, rows }: { titleKey: string; rows: FeatureRow[] }) {
   return (
     <Section titleKey={titleKey} vars={{ count: rows.length }}>
       {rows.length === 0 ? (
-        <p className="m-0 text-sm text-[var(--us-text-muted)]">{t("cisp.console.diff.none")}</p>
+        <p className="m-0 text-sm text-muted-foreground">{t("cisp.console.diff.none")}</p>
       ) : (
         <ul className="m-0 flex flex-col gap-2 ps-0">
           {rows.map((r) => (
@@ -75,9 +75,11 @@ export function DiffBody({ diff }: { diff: PublicationDiff }) {
           {t("cisp.console.diff.features_truncated", { count: diff.features.length })}
         </p>
       )}
-      <Group titleKey="cisp.console.diff.added" rows={v.added} />
-      <Group titleKey="cisp.console.diff.changed" rows={v.changed} />
-      <Group titleKey="cisp.console.diff.removed" rows={v.removed} />
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <Group titleKey="cisp.console.diff.added" rows={v.added} />
+        <Group titleKey="cisp.console.diff.changed" rows={v.changed} />
+        <Group titleKey="cisp.console.diff.removed" rows={v.removed} />
+      </div>
       {(diff.body_paths !== undefined || v.bodyPathsTruncatedByApi) && (
         <Section titleKey="cisp.console.diff.body_paths">
           <Paths paths={v.bodyPaths} hidden={v.hiddenBodyPaths} truncatedByApi={v.bodyPathsTruncatedByApi} />
@@ -114,18 +116,30 @@ export function VersionPage({ id }: { id: string }) {
   const isCurrent = p !== undefined && current.data !== null && current.data.id === p.id;
   const touched = diff.data?.features.filter((f) => f.op !== "removed").map((f) => f.feature_id) ?? [];
   return (
-    <div className="flex flex-col gap-4">
-      <Link href={`/${lang}/console/publications${dataset === null ? "" : `?dataset=${dataset}`}`} className="text-sm underline">
-        {t("cisp.console.publications.back")}
-      </Link>
+    <>
+      <ConsoleHeader
+        title={
+          p === undefined ? (
+            <span className="font-mono">{id}</span>
+          ) : (
+            t("cisp.console.version.title", { dataset: t(`cisp.console.dataset.${p.dataset}`), version: p.version })
+          )
+        }
+        description={t("cisp.console.page.version")}
+        trail={[
+          {
+            label: t("cisp.console.nav.publications"),
+            href: `/${lang}/console/publications${dataset === null ? "" : `?dataset=${dataset}`}`,
+          },
+        ]}
+        {...(p !== undefined && isCurrent ? { actions: <RepublishAction version={p} onDone={current.reload} /> } : {})}
+      />
       {diff.failure !== null && <ProblemNotice failure={diff.failure} />}
       {diff.loading && diff.data === null && <Loading />}
       {p !== undefined && diff.data !== null && (
         <>
-          <h2 className="m-0 text-lg font-bold">
-            {t("cisp.console.version.title", { dataset: t(`cisp.console.dataset.${p.dataset}`), version: p.version })}
-          </h2>
-          <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+          <Panel>
+          <dl className="m-0 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_1fr] [&_dt]:text-muted-foreground">
             <dt>{t("cisp.console.publications.received")}</dt>
             <dd className="m-0">
               <Time iso={p.received_at} />
@@ -152,7 +166,7 @@ export function VersionPage({ id }: { id: string }) {
                   : t("cisp.console.version.superseded", { version: current.data.version })}
             </dd>
           </dl>
-          {isCurrent && <RepublishAction version={p} onDone={current.reload} />}
+          </Panel>
           <DiffBody diff={diff.data} />
           {isMapDataset(p.dataset) && touched.length > 0 && (
             <Section titleKey="cisp.console.preview.title">
@@ -165,6 +179,6 @@ export function VersionPage({ id }: { id: string }) {
           )}
         </>
       )}
-    </div>
+    </>
   );
 }

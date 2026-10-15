@@ -10,7 +10,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
-import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { Button, Panel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { DELIVERY_STATES, deliveryBadge, SUBSCRIPTION_STATUSES, subscriptionBadge } from "./badges";
 import { BBoxPreview, fmtBBox } from "./BBoxPreview";
@@ -18,7 +18,8 @@ import type { ConsoleClient } from "./client";
 import { useConsole, useLoad } from "./context";
 import { reasonLabel } from "./PublicationsPage";
 import { mayAct } from "./roles";
-import { Loading, ProblemNotice, ReasonAction, Section, StateBadge, Time } from "./ui";
+import { ConsoleHeader } from "./header";
+import { Loading, ProblemNotice, ReasonAction, ScrollRegion, Section, StateBadge, TablePanel, Time } from "./ui";
 
 type ConsoleSubscription = components["schemas"]["ConsoleSubscription"];
 type SubscriptionStatus = components["schemas"]["Subscription"]["status"];
@@ -58,12 +59,12 @@ export function SubscriptionsPage() {
     `${status}:${cursor ?? ""}`,
   );
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="m-0 text-lg font-bold">{t("cisp.console.nav.subscriptions")}</h2>
-      <label className="flex items-center gap-2 text-sm">
+    <>
+      <ConsoleHeader title={t("cisp.console.nav.subscriptions")} description={t("cisp.console.page.subscriptions")} />
+      <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
         {t("cisp.console.subscriptions.filter")}
         <select
-          className="rounded border border-[var(--us-border)] bg-[var(--us-surface)] px-2 py-1"
+          className="h-8 max-w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           value={status}
           onChange={(e) => {
             setAfter([]);
@@ -84,6 +85,7 @@ export function SubscriptionsPage() {
         (list.data.subscriptions.length === 0 ? (
           <p className="m-0 text-sm">{t("cisp.console.subscriptions.none")}</p>
         ) : (
+          <TablePanel label={t("cisp.console.nav.subscriptions")}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -102,10 +104,10 @@ export function SubscriptionsPage() {
                 return (
                   <TableRow key={s.id} data-subscription={s.id}>
                     <TableCell>
-                      <Link href={`/${lang}/console/subscriptions/${encodeURIComponent(s.id)}`} className="font-mono underline">
+                      <Link href={`/${lang}/console/subscriptions/${encodeURIComponent(s.id)}`} className="font-mono font-semibold underline underline-offset-4">
                         {s.id}
                       </Link>
-                      <div className="text-xs">{s.client_id}</div>
+                      <div className="text-xs text-muted-foreground">{s.client_id}</div>
                     </TableCell>
                     <TableCell>
                       <StateBadge spec={subscriptionBadge(s.status)} value={s.status} />
@@ -126,6 +128,7 @@ export function SubscriptionsPage() {
               })}
             </TableBody>
           </Table>
+          </TablePanel>
         ))}
       <div className="flex gap-2">
         {after.length > 0 && (
@@ -139,7 +142,7 @@ export function SubscriptionsPage() {
           </Button>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -194,11 +197,12 @@ export function SubscriptionPage({ id }: { id: string }) {
   };
   const s = sub.data?.subscription;
   return (
-    <div className="flex flex-col gap-4">
-      <Link href={`/${lang}/console/subscriptions`} className="text-sm underline">
-        {t("cisp.console.subscriptions.back")}
-      </Link>
-      <h2 className="m-0 font-mono text-lg font-bold">{id}</h2>
+    <>
+      <ConsoleHeader
+        title={<span className="font-mono">{id}</span>}
+        description={t("cisp.console.page.subscription")}
+        trail={[{ label: t("cisp.console.nav.subscriptions"), href: `/${lang}/console/subscriptions` }]}
+      />
       {sub.failure !== null && <ProblemNotice failure={sub.failure} />}
       {sub.loading && sub.data === null && <Loading />}
       {!sub.loading && sub.data === null && sub.failure === null && (
@@ -207,8 +211,8 @@ export function SubscriptionPage({ id }: { id: string }) {
         </p>
       )}
       {s !== undefined && (
-        <>
-          <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+        <Panel bodyClassName="flex flex-col gap-4">
+          <dl className="m-0 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_1fr] [&_dt]:text-muted-foreground">
             <dt>{t("cisp.console.subscriptions.client")}</dt>
             <dd className="m-0">{s.client_id}</dd>
             <dt>{t("cisp.console.subscriptions.status")}</dt>
@@ -262,22 +266,25 @@ export function SubscriptionPage({ id }: { id: string }) {
               />
             )}
           </div>
-          <Section titleKey="cisp.console.subscriptions.bbox">
-            <BBoxPreview bbox={s.bbox} />
-          </Section>
-        </>
+        </Panel>
       )}
-      <Section titleKey="cisp.console.deliveries.title">
+      {s !== undefined && (
+        <Section titleKey="cisp.console.subscriptions.bbox">
+          <BBoxPreview bbox={s.bbox} />
+        </Section>
+      )}
+      <Section titleKey="cisp.console.deliveries.title" flush>
         {deliveries.failure !== null && <ProblemNotice failure={deliveries.failure} />}
         {deliveries.data !== null && deliveries.data.log !== "complete" && (
-          <p role="alert" className="m-0 text-sm font-semibold" data-testid="log-state">
+          <p role="alert" className="m-0 px-4 pt-3 text-sm font-semibold" data-testid="log-state">
             {t(`cisp.console.deliveries.log.${deliveries.data.log}`)}
           </p>
         )}
         {deliveries.data !== null &&
           (deliveries.data.deliveries.length === 0 ? (
-            <p className="m-0 text-sm">{t("cisp.console.deliveries.none")}</p>
+            <p className="m-0 p-4 text-sm">{t("cisp.console.deliveries.none")}</p>
           ) : (
+            <ScrollRegion label={t("cisp.console.deliveries.title")}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -337,8 +344,9 @@ export function SubscriptionPage({ id }: { id: string }) {
                 ))}
               </TableBody>
             </Table>
+            </ScrollRegion>
           ))}
       </Section>
-    </div>
+    </>
   );
 }

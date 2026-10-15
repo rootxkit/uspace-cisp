@@ -19,7 +19,7 @@ import {
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[9rem_1fr] gap-2 py-1">
-      <dt className="text-[var(--us-text-muted)]">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
     </div>
   );
@@ -59,13 +59,13 @@ export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClos
     <section
       aria-labelledby={`panel-${feature.id}`}
       data-panel={feature.id}
-      className="rounded border border-[var(--us-border)] bg-[var(--us-surface-raised)] p-3 text-sm"
+      className="rounded-panel border border-border bg-card p-4 text-sm text-card-foreground shadow-panel"
     >
       <div className="flex items-start justify-between gap-2">
-        <h2 id={`panel-${feature.id}`} ref={heading} tabIndex={-1} className="text-base font-bold">
+        <h2 id={`panel-${feature.id}`} ref={heading} tabIndex={-1} className="m-0 text-base font-bold outline-none">
           <span className="font-mono">{feature.id}</span> {feature.view.name ?? ""}
         </h2>
-        <button type="button" onClick={onClose} aria-label={t("cisp.panel.close")} className="rounded px-2">
+        <button type="button" onClick={onClose} aria-label={t("cisp.panel.close")} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
           <span aria-hidden="true">{"×"}</span>
         </button>
       </div>
@@ -119,7 +119,7 @@ export function FeaturePanel({ feature, onClose }: { feature: MapFeature; onClos
             <dl>
               {authorityRows(a, lang, t).map((r) => (
                 <div key={r.label} className="flex gap-2">
-                  <dt className="text-[var(--us-text-muted)]">{r.label}</dt>
+                  <dt className="text-muted-foreground">{r.label}</dt>
                   <dd>{r.value}</dd>
                 </div>
               ))}

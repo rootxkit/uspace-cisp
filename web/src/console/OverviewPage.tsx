@@ -8,27 +8,65 @@
 // its own), the map of what is published now, what needs attention,
 // every dataset's current version, every publisher's heartbeat, the
 // health of the API's components and safeguards, and this API instance's
-// counters since it started. The page shows what the API says and
-// decides nothing: stale is the API's verdict, ages are on its clock.
+// counters since it started (collapsed: they are technical, worded where
+// the console knows them). The page shows what the API says and decides
+// nothing: stale is the API's verdict, ages are on its clock, and every
+// time is in UTC.
 import Link from "next/link";
-import { fmtTimeUTC, useLang, useT } from "@rootxkit/uspace-ui/i18n";
+import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
 import { EmptyState, KpiRow, Panel, StatTile, StatusBadge } from "@rootxkit/uspace-ui/ui";
 import { CheckIcon, HealthIcon, LockIcon, PublicationsIcon, RestrictionsIcon, SourceIcon } from "../components/icons";
 import { useLoad } from "./context";
 import { ConsoleHeader } from "./header";
+import { componentLabel, countersShown } from "./labels";
 import { OverviewMap } from "./OverviewMap";
-import { ageOnApiClockS, timesShown, warningsOf } from "./StatusStrip";
+import { ageOnApiClockS, componentShown, timesShown, warningsOf } from "./StatusStrip";
 import { SummaryTiles } from "./SummaryTiles";
-import { localTime, Loading, ProblemNotice, Time, useInBrowser } from "./ui";
+import { Loading, ProblemNotice, Time, useUtcTime } from "./ui";
+
+/** This API instance's counters, behind a disclosure: grouped by component, each by its label where known, its code in the tooltip. */
+function TechnicalCounters({ counters }: { counters: Record<string, number> }) {
+  const t = useT();
+  const { lang } = useLang();
+  const groups = countersShown(t, counters);
+  const total = groups.reduce((n, g) => n + g.counters.length, 0);
+  return (
+    <details className="group rounded-md border border-border" data-testid="technical-counters">
+      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
+        {t("cisp.console.overview.counters_technical", { count: total })}
+      </summary>
+      <div className="grid gap-2 border-t border-border px-3 py-2">
+        <p className="m-0 text-xs text-muted-foreground">{t("cisp.console.overview.counters")}</p>
+        {total === 0 ? (
+          <p className="m-0 text-xs">{t("cisp.console.overview.no_counters")}</p>
+        ) : (
+          groups.map((g) => (
+            <div key={g.component} data-component={g.component}>
+              <h3 className="m-0 mb-0.5 text-xs font-semibold" title={g.component}>
+                {g.label}
+              </h3>
+              <ul className="m-0 grid list-none gap-0.5 p-0 text-xs">
+                {g.counters.map((c) => (
+                  <li key={c.key} className="flex justify-between gap-2" title={c.key} data-counter={c.key}>
+                    <span className={c.label === null ? "min-w-0 truncate font-mono" : "min-w-0"}>{c.label ?? c.key}</span>
+                    <span className="tabular-nums">{c.value.toLocaleString(lang)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        )}
+      </div>
+    </details>
+  );
+}
 
 export function OverviewPage() {
   const t = useT();
   const { lang } = useLang();
-  const browser = useInBrowser();
   const st = useLoad(async (c) => (await c.GET("/v1/console/status")).data ?? null, "overview");
   const s = st.data?.status ?? null;
-  const counters = Object.entries(st.data?.counters ?? {}).sort(([a], [b]) => a.localeCompare(b));
-  const shown = (iso: string) => (browser ? localTime(iso, lang) : null) ?? fmtTimeUTC(iso, lang);
+  const shown = useUtcTime();
   const stale = s?.publishers.filter((p) => p.stale).length ?? 0;
   const published = s?.datasets.filter((d) => d.current_version > 0).length ?? 0;
   const warnings = s === null ? [] : warningsOf(s);
@@ -115,7 +153,7 @@ export function OverviewPage() {
                       key={`${w.key}-${JSON.stringify(w.vars)}`}
                       className="rounded-md border border-[var(--us-danger)] px-3 py-2 text-sm font-semibold text-[var(--us-danger)]"
                     >
-                      {t(w.key, timesShown(w.vars, shown))}
+                      {t(w.key, componentShown(t, timesShown(w.vars, shown)))}
                     </li>
                   ))}
                 </ul>
@@ -189,8 +227,8 @@ export function OverviewPage() {
                 ) : (
                   <ul className="m-0 grid list-none gap-1 p-0">
                     {s.degraded.map((d) => (
-                      <li key={d.component} className="font-semibold text-[var(--us-danger)]">
-                        {d.component} <Time iso={d.since} /> {d.reason ?? ""}
+                      <li key={d.component} className="font-semibold text-[var(--us-danger)]" data-component={d.component}>
+                        <span title={d.component}>{componentLabel(t, d.component)}</span> <Time iso={d.since} /> {d.reason ?? ""}
                       </li>
                     ))}
                   </ul>
@@ -211,21 +249,7 @@ export function OverviewPage() {
                     </StatusBadge>
                   </p>
                 )}
-                <div>
-                  <h3 className="m-0 mb-1 text-xs font-semibold text-muted-foreground">{t("cisp.console.overview.counters")}</h3>
-                  {counters.length === 0 ? (
-                    <p className="m-0 text-xs">{t("cisp.console.overview.no_counters")}</p>
-                  ) : (
-                    <ul className="m-0 grid list-none gap-0.5 p-0 text-xs">
-                      {counters.map(([k, v]) => (
-                        <li key={k} className="flex justify-between gap-2 font-mono">
-                          <span className="min-w-0 truncate">{k}</span>
-                          <span className="tabular-nums">{v.toLocaleString(lang)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                <TechnicalCounters counters={st.data?.counters ?? {}} />
               </div>
             </Panel>
           </div>

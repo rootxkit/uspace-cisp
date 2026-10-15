@@ -10,11 +10,12 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
-import { Button, StatusBadge, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rootxkit/uspace-ui/ui";
+import { Button, StatusBadge, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { useConsole, useLoad, type Loaded } from "./context";
 import { mayAct } from "./roles";
 import { ConsoleHeader } from "./header";
+import { CopyId, DetailsRow, ExpandCell, Facts, ShortId, useExpander } from "./present";
 import { Loading, ProblemNotice, ReasonAction, TablePanel, Time } from "./ui";
 
 export const DATASETS = ["zones", "uspace_airspace", "restrictions", "ussp_list"] as const;
@@ -65,51 +66,76 @@ export function RepublishAction({ version, onDone }: { version: Version; onDone?
 
 function VersionTable({ list, isFirstPage, reload }: { list: VersionList; isFirstPage: boolean; reload(): void }) {
   const t = useT();
-  const { lang } = useLang();
   if (list.versions.length === 0) return <p className="m-0 p-4 text-sm">{t("cisp.console.publications.none")}</p>;
   return (
-    <Table>
+    <Table data-testid="versions-table">
       <TableHeader>
         <TableRow>
+          <TableHead className="w-8">
+            <span className="sr-only">{t("cisp.console.row.details")}</span>
+          </TableHead>
           <TableHead>{t("cisp.console.publications.version")}</TableHead>
           <TableHead>{t("cisp.console.publications.received")}</TableHead>
-          <TableHead>{t("cisp.console.publications.publisher")}</TableHead>
           <TableHead>{t("cisp.console.publications.counts")}</TableHead>
-          <TableHead>{t("cisp.console.publications.reason")}</TableHead>
           <TableHead>{t("cisp.console.publications.actions")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {list.versions.map((v, i) => (
-          <TableRow key={v.id} data-version={v.version}>
-            <TableCell className={TABLE_NOWRAP}>
-              <Link href={`/${lang}/console/publications/${encodeURIComponent(v.id)}`} className="underline">
-                {t("cisp.console.publications.version_n", { version: v.version })}
-              </Link>
-              {isFirstPage && i === 0 && (
-                <StatusBadge tone="ok" className="ms-2">
-                  {t("cisp.console.publications.current")}
-                </StatusBadge>
-              )}
-            </TableCell>
-            <TableCell>
-              <Time iso={v.received_at} />
-            </TableCell>
-            <TableCell>{v.publisher}</TableCell>
-            <TableCell>
-              {t("cisp.console.publications.counts_value", {
-                features: v.feature_count,
-                added: v.added,
-                changed: v.changed,
-                removed: v.removed,
-              })}
-            </TableCell>
-            <TableCell>{reasonLabel(t, v.reason)}</TableCell>
-            <TableCell>{isFirstPage && i === 0 && <RepublishAction version={v} onDone={reload} />}</TableCell>
-          </TableRow>
+          <VersionRow key={v.id} v={v} current={isFirstPage && i === 0} reload={reload} />
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+/**
+ * One version: its number, time, feature count and the action in the
+ * row; the publisher, the reason, the changes and the id behind its
+ * expander.
+ */
+function VersionRow({ v, current, reload }: { v: Version; current: boolean; reload(): void }) {
+  const t = useT();
+  const { lang } = useLang();
+  const x = useExpander();
+  const name = t("cisp.console.publications.version_n", { version: v.version });
+  return (
+    <>
+      <TableRow data-version={v.version}>
+        <ExpandCell {...x} label={name} />
+        <TableCell>
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Link href={`/${lang}/console/publications/${encodeURIComponent(v.id)}`} className={cn("underline", TABLE_NOWRAP)}>
+              {name}
+            </Link>
+            {current && <StatusBadge tone="ok">{t("cisp.console.publications.current")}</StatusBadge>}
+          </span>
+        </TableCell>
+        <TableCell>
+          <Time iso={v.received_at} />
+        </TableCell>
+        <TableCell className={cn("tabular-nums", TABLE_NOWRAP)} data-testid="version-counts">
+          {v.feature_count.toLocaleString(lang)}
+          <span className="ms-2 text-xs text-muted-foreground">
+            {t("cisp.console.publications.changes_value", { added: v.added, changed: v.changed, removed: v.removed })}
+          </span>
+        </TableCell>
+        <TableCell className="w-48">{current && <RepublishAction version={v} onDone={reload} />}</TableCell>
+      </TableRow>
+      <DetailsRow open={x.open} detailsId={x.detailsId} colSpan={5}>
+        <Facts
+          items={[
+            { term: t("cisp.console.publications.publisher"), value: <ShortId id={v.publisher} /> },
+            { term: t("cisp.console.publications.reason"), value: reasonLabel(t, v.reason) },
+            {
+              term: t("cisp.console.publications.changes"),
+              value: t("cisp.console.publications.counts_value", { features: v.feature_count, added: v.added, changed: v.changed, removed: v.removed }),
+            },
+            { term: t("cisp.console.publications.id"), value: <CopyId id={v.id} /> },
+          ]}
+        />
+      </DetailsRow>
+    </>
   );
 }
 

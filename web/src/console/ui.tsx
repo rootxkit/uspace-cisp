@@ -1,69 +1,63 @@
 "use client";
 
-// The console's small display parts: a time in the viewer's zone with
-// its UTC value on hover, a state badge, the API's refusal shown in
-// full, and the confirm-with-a-reason action every audited act goes
-// through.
-import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { fmtTimeUTC, LOCALES, useLang, useT } from "@rootxkit/uspace-ui/i18n";
+// The console's small display parts: a time in UTC laid out for the
+// page's language, a state badge, the API's refusal shown in full, and
+// the confirm-with-a-reason action every audited act goes through.
+import { useState, type ReactNode } from "react";
+import { useT, type Translate } from "@rootxkit/uspace-ui/i18n";
 import { ConfirmDialog } from "@rootxkit/uspace-ui/form";
 import { Button, Panel, StatusBadge } from "@rootxkit/uspace-ui/ui";
 import { TONE_STATUS, type BadgeSpec } from "./badges";
 import { failureOf, type CallFailure } from "./client";
 import { fieldMessages } from "./validation";
 
-function noSubscribe(): () => void {
-  return () => undefined;
-}
-
-/** True in the browser after hydration; false while rendering on the server. */
-export function useInBrowser(): boolean {
-  return useSyncExternalStore(
-    noSubscribe,
-    () => true,
-    () => false,
-  );
+function two(n: number): string {
+  return String(n).padStart(2, "0");
 }
 
 /**
- * The viewer's local rendering of an RFC 3339 instant ("2 Oct 2026,
- * 18:03:00 GMT+4"); the UTC value is the title. The server, which does not
- * know the viewer's zone, renders the UTC value (spec 03 preamble: convert
- * at the display layer only).
+ * An RFC 3339 instant in UTC, laid out for the page's language from the
+ * catalogue ("15 Oct 2026, 22:07:49 UTC", "15 ოქტ. 2026, 22:07:49 UTC"):
+ * the console says UTC everywhere, as its filters do, never the viewer's
+ * zone. The month names are the catalogue's, not the browser's: a browser
+ * without Georgian locale data formats ka-GE in English. Null when the
+ * value is not a time.
  */
-export function localTime(iso: string, lang: "ka" | "en"): string | null {
+export function utcTime(iso: string, t: Translate): string | null {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
-  return new Intl.DateTimeFormat(LOCALES[lang], {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-    timeZoneName: "short",
-  }).format(new Date(ms));
+  const d = new Date(ms);
+  return t("cisp.console.time.utc", {
+    day: d.getUTCDate(),
+    month: t(`cisp.console.time.month.${d.getUTCMonth() + 1}`),
+    year: d.getUTCFullYear(),
+    time: `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}:${two(d.getUTCSeconds())}`,
+  });
 }
 
+/** utcTime in the page's language, with a dash for a value that is not a time. */
+export function useUtcTime(): (iso: string) => string {
+  const t = useT();
+  return (iso) => utcTime(iso, t) ?? "—";
+}
+
+/** A time in UTC in the page's language; its RFC 3339 value is the title. */
 export function Time({ iso }: { iso: string | null | undefined }) {
-  const { lang } = useLang();
-  const browser = useInBrowser();
+  const t = useT();
   if (iso === null || iso === undefined || iso === "") return <span>—</span>;
-  const utc = fmtTimeUTC(iso, lang, { seconds: true });
-  const local = browser ? localTime(iso, lang) : null;
   return (
-    <time dateTime={iso} title={utc} className="whitespace-nowrap">
-      {local ?? utc}
+    <time dateTime={iso} title={iso} className="whitespace-nowrap" data-testid="utc-time">
+      {utcTime(iso, t) ?? iso}
     </time>
   );
 }
 
-/** A state as a badge, labelled from the catalogue, or as sent when unknown. */
-export function StateBadge({ spec, value }: { spec: BadgeSpec; value: string }) {
+/** A state as a badge, labelled from the catalogue, or as sent when unknown; `wrap` lets a long label wrap in a narrow column. */
+export function StateBadge({ spec, value, wrap = false }: { spec: BadgeSpec; value: string; wrap?: boolean }) {
   const t = useT();
   return (
     <StatusBadge
+      {...(wrap ? { className: "h-auto min-h-6 py-0.5 whitespace-normal" } : {})}
       data-state={value}
       data-tone={spec.tone}
       tone={TONE_STATUS[spec.tone]}

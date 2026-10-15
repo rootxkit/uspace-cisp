@@ -46,7 +46,8 @@ const PUBLIC: [string, string][] = [
   ["/console/login", "form"],
 ];
 const CONSOLE: [string, string][] = [
-  ["/console", '[data-slot="kpi-row"]'],
+  // The overview's second row of tiles loads on its own (the summary).
+  ["/console", '[data-testid="overview-summary"] [data-slot="stat-tile"]'],
   ["/console/publications?dataset=zones", "tr[data-version]"],
   ["/console/publications/pub-zones-2", '[data-testid="diff"]'],
   ["/console/restrictions", "tr[data-restriction]"],

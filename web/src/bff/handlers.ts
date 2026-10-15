@@ -13,7 +13,8 @@
 //   POST /v1/console/session/mfa {mfa_token, code}.
 // - proxy: the kit's `proxy`, forwarding /_bff/api/v1/console/* with the
 //   session cookie as the bearer; unsafe methods need X-CSRF-Token equal
-//   to the CSRF cookie.
+//   to the CSRF cookie. A path of PROXY_EXACT_ROUTES is forwarded only
+//   with its own method; any other is refused 405 before the API.
 // - logout: the kit's CSRF check and cookie clearing around the API's
 //   DELETE /v1/console/session, sent through the kit's `forward` (the
 //   kit's own logout POSTs, and the CISP revokes with DELETE).
@@ -24,6 +25,7 @@
 // This file may import only the kit's BFF helpers and next/server
 // (eslint-rules/no-server-business-logic.mjs).
 import {
+  BFF_API_PREFIX,
   bffHandlers,
   checkCsrf,
   clearSession,
@@ -43,6 +45,43 @@ export const CONSOLE_MFA_PATH = "/v1/console/session/mfa";
 
 /** What the proxy may reach: the console API and nothing else. */
 export const PROXY_ALLOW_PATHS: RegExp[] = [/^\/v1\/console\/[^/]/];
+
+/** One console operation the proxy allows by its exact path and method. */
+export interface ExactRoute {
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  path: string;
+}
+
+/**
+ * The console operations the proxy allows by exact path and method: the
+ * path is forwarded with its method only, and any other method on it is
+ * a 405 problem before the API is called (least privilege at the BFF,
+ * not only at the API). Each is read only unless said otherwise.
+ */
+export const PROXY_EXACT_ROUTES: readonly ExactRoute[] = [
+  // The overview's figures (docs/PLAN.md §15 Q52), viewer and above.
+  { method: "GET", path: "/v1/console/summary" },
+];
+
+/**
+ * The exact routes of the API path a BFF path names, each segment
+ * decoded (so `%73ummary` is `summary`); none for a path outside the
+ * proxy or one that does not decode, which the kit refuses itself.
+ */
+export function exactRoutesOf(bffPath: string): ExactRoute[] {
+  if (!bffPath.startsWith(`${BFF_API_PREFIX}/`)) return [];
+  let path: string;
+  try {
+    path = bffPath
+      .slice(BFF_API_PREFIX.length)
+      .split("/")
+      .map((seg) => decodeURIComponent(seg))
+      .join("/");
+  } catch {
+    return [];
+  }
+  return PROXY_EXACT_ROUTES.filter((r) => r.path === path);
+}
 
 export interface BffConfig {
   /** The API as the web container reaches it (CISP_API_INTERNAL_URL). */
@@ -125,7 +164,17 @@ export function createBff(cfg: BffConfig): Bff {
     return res;
   };
 
-  return { login: kit.login, logout, proxy: kit.proxy };
+  const proxy: Handler = async (req) => {
+    const exact = exactRoutesOf(req.nextUrl.pathname);
+    if (exact.length > 0 && !exact.some((r) => r.method === req.method)) {
+      const res = problem(405, "method_not_allowed", "Method not allowed", `${req.method} is not allowed on this console path`);
+      res.headers.set("Allow", exact.map((r) => r.method).join(", "));
+      return res;
+    }
+    return kit.proxy(req);
+  };
+
+  return { login: kit.login, logout, proxy };
 }
 
 /** The largest CISP_WEB_TRUSTED_PROXY_HOPS taken (a bound on a malformed value, not a policy). */

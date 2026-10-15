@@ -11,7 +11,9 @@
 // and lock1 (viewer; lock1 is the lockout scenario's).
 //
 // Control (through test/mock-api.mjs):
-//   POST /__mock/console-state {restrictions404?, anspStale?}
+//   POST /__mock/console-state {restrictions404?, anspStale?, summaryLog?}
+//   (summaryLog: "complete", "unavailable" or "not_configured", what the
+//   summary's delivery_latency.log says)
 import { randomBytes } from "node:crypto";
 
 export const MOCK_TOTP_CODE = "246810";
@@ -41,7 +43,18 @@ const ROUTES = [
   ["POST", /^\/v1\/console\/subscriptions\/([^/]+)\/deliveries\/([^/]+)\/retry$/, "publisher_admin"],
   ["GET", /^\/v1\/console\/audit$/, "admin"],
   ["GET", /^\/v1\/console\/status$/, "viewer"],
+  ["GET", /^\/v1\/console\/summary$/, "viewer"],
 ];
+
+/** GET /v1/console/summary's windows and bound (internal/httpapi/console.go). */
+const SUMMARY_FAILED_WINDOW_S = 86_400;
+const SUMMARY_LATENCY_WINDOW_S = 3_600;
+const SUMMARY_MAX_ATTEMPTS = 10_000;
+
+/** percentile_disc: the smallest value whose cumulative share reaches p. */
+function percentileDisc(sorted, p) {
+  return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+}
 
 function iso(ms) {
   return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -292,7 +305,7 @@ function counts(deliveries) {
   return c;
 }
 
-export function createConsole({ json, problem, readJson }) {
+export function createConsole({ json, problem, readJson, usspCount }) {
   let s;
   const requests = [];
 
@@ -333,6 +346,7 @@ export function createConsole({ json, problem, readJson }) {
       changeCursor: 41,
       restrictions404: false,
       anspStale: false,
+      summaryLog: "complete",
     };
     audit("system", "system", "dataset_published", "publication", "pub-zones-2", { dataset: "zones", version: 2 });
     requests.length = 0;
@@ -443,6 +457,34 @@ export function createConsole({ json, problem, readJson }) {
     };
   }
 
+  /** The overview's figures, from the fixture as the CISP counts them: counts only. */
+  function summary() {
+    const now = Date.now();
+    const subscriptions = { pending_verification: 0, active: 0, suspended: 0, deleted: 0 };
+    const failed = { window_s: SUMMARY_FAILED_WINDOW_S, failed: 0, expired: 0 };
+    const latencies = [];
+    for (const x of s.subscriptions) {
+      subscriptions[x.sub.status] += 1;
+      for (const d of x.deliveries) {
+        const last = d.last_attempt_at === undefined ? null : Date.parse(d.last_attempt_at);
+        if ((d.state === "failed" || d.state === "expired") && last !== null && last >= now - SUMMARY_FAILED_WINDOW_S * 1000) failed[d.state] += 1;
+        for (const a of d.log ?? []) if (Date.parse(a.at) >= now - SUMMARY_LATENCY_WINDOW_S * 1000) latencies.push(a.latency_ms);
+      }
+    }
+    latencies.sort((a, b) => a - b);
+    const complete = s.summaryLog === "complete";
+    const latency = {
+      window_s: SUMMARY_LATENCY_WINDOW_S,
+      max_attempts: SUMMARY_MAX_ATTEMPTS,
+      log: s.summaryLog,
+      attempts: complete ? latencies.length : 0,
+      sampled: false,
+      ...(complete && latencies.length > 0 ? { p50_ms: percentileDisc(latencies, 0.5), p95_ms: percentileDisc(latencies, 0.95) } : {}),
+    };
+    const ussp = s.publications.ussp_list[0]?.version ?? 0;
+    return { now: iso(now), subscriptions, failed_deliveries: failed, ussps: { version: ussp, count: ussp === 0 ? 0 : usspCount }, delivery_latency: latency };
+  }
+
   async function handle(req, res, path, url) {
     const body = req.method === "POST" || req.method === "PATCH" ? await readJson(req) : {};
     requests.push({ method: req.method, path, keys: Object.keys(body).sort() });
@@ -470,6 +512,7 @@ export function createConsole({ json, problem, readJson }) {
       return json(res, 200, { account: publicView(who.account), session: { jti: who.token, issued_at: now, expires_at: iso(Date.now() + SESSION_TTL_MS) } });
     }
     if (path === "/v1/console/status") return json(res, 200, status());
+    if (path === "/v1/console/summary") return json(res, 200, summary());
 
     if (path === "/v1/console/publications") {
       const ds = url.searchParams.get("dataset");
@@ -630,7 +673,8 @@ export function createConsole({ json, problem, readJson }) {
   function control(input) {
     if (typeof input.restrictions404 === "boolean") s.restrictions404 = input.restrictions404;
     if (typeof input.anspStale === "boolean") s.anspStale = input.anspStale;
-    return { restrictions404: s.restrictions404, anspStale: s.anspStale };
+    if (["complete", "unavailable", "not_configured"].includes(input.summaryLog)) s.summaryLog = input.summaryLog;
+    return { restrictions404: s.restrictions404, anspStale: s.anspStale, summaryLog: s.summaryLog };
   }
 
   return { handle, reset, control, requests };

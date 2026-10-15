@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+const consoleFailedDeliveries = `-- name: ConsoleFailedDeliveries :one
+SELECT count(*) FILTER (WHERE state = 'failed')::bigint AS failed,
+       count(*) FILTER (WHERE state = 'expired')::bigint AS expired,
+       now()::timestamptz AS now
+FROM deliveries
+WHERE state IN ('failed', 'expired')
+  AND last_attempt_at >= now() - make_interval(secs => $1::float8)
+`
+
+type ConsoleFailedDeliveriesRow struct {
+	Failed  int64
+	Expired int64
+	Now     time.Time
+}
+
+// The deliveries whose last attempt failed within the window, on the
+// database's clock: failed (due again) and expired (given up). A range
+// scan of deliveries_failed_recent_idx (migration 0015), bounded by the
+// window.
+func (q *Queries) ConsoleFailedDeliveries(ctx context.Context, windowS float64) (ConsoleFailedDeliveriesRow, error) {
+	row := q.db.QueryRow(ctx, consoleFailedDeliveries, windowS)
+	var i ConsoleFailedDeliveriesRow
+	err := row.Scan(&i.Failed, &i.Expired, &i.Now)
+	return i, err
+}
+
 const consoleNow = `-- name: ConsoleNow :one
 
 SELECT now()::timestamptz AS now
@@ -40,6 +66,39 @@ func (q *Queries) ConsoleResumeSubscription(ctx context.Context, id string) erro
 	return err
 }
 
+const consoleSubscriptionTotals = `-- name: ConsoleSubscriptionTotals :many
+SELECT status, count(*)::bigint AS n
+FROM subscriptions
+GROUP BY status
+`
+
+type ConsoleSubscriptionTotalsRow struct {
+	Status string
+	N      int64
+}
+
+// The overview's subscriptions per status. subscriptions is a registry
+// (a row per client subscription), not a hot table: four groups.
+func (q *Queries) ConsoleSubscriptionTotals(ctx context.Context) ([]ConsoleSubscriptionTotalsRow, error) {
+	rows, err := q.db.Query(ctx, consoleSubscriptionTotals)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ConsoleSubscriptionTotalsRow
+	for rows.Next() {
+		var i ConsoleSubscriptionTotalsRow
+		if err := rows.Scan(&i.Status, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const consoleSuspendSubscription = `-- name: ConsoleSuspendSubscription :exec
 UPDATE subscriptions SET status = 'suspended', suspended_reason = $1 WHERE id = $2
 `
@@ -52,6 +111,30 @@ type ConsoleSuspendSubscriptionParams struct {
 func (q *Queries) ConsoleSuspendSubscription(ctx context.Context, arg ConsoleSuspendSubscriptionParams) error {
 	_, err := q.db.Exec(ctx, consoleSuspendSubscription, arg.Reason, arg.ID)
 	return err
+}
+
+const consoleUsspCount = `-- name: ConsoleUsspCount :one
+SELECT d.current_version,
+       COALESCE(jsonb_array_length(convert_from(p.body, 'UTF8')::jsonb -> 'ussps'), 0)::bigint AS ussps
+FROM datasets d
+LEFT JOIN publications p ON p.dataset = d.name AND p.version = d.current_version
+WHERE d.name = $1
+`
+
+type ConsoleUsspCountRow struct {
+	CurrentVersion int64
+	Ussps          int64
+}
+
+// The current USSP list's version and the number of its entries: one
+// row of datasets and one of publications by their keys (a list holds
+// at most 200 entries). The body is the accepted, validated JSON. ussps
+// is 0 before the first version; current_version says which.
+func (q *Queries) ConsoleUsspCount(ctx context.Context, dataset string) (ConsoleUsspCountRow, error) {
+	row := q.db.QueryRow(ctx, consoleUsspCount, dataset)
+	var i ConsoleUsspCountRow
+	err := row.Scan(&i.CurrentVersion, &i.Ussps)
+	return i, err
 }
 
 const countLoginChallengeAttempt = `-- name: CountLoginChallengeAttempt :exec

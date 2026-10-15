@@ -10,6 +10,49 @@ import (
 	"time"
 )
 
+const deliveryLatency = `-- name: DeliveryLatency :one
+SELECT count(*)::bigint AS attempts,
+       COALESCE(percentile_disc(0.5) WITHIN GROUP (ORDER BY latency_ms), 0)::integer AS p50_ms,
+       COALESCE(percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms), 0)::integer AS p95_ms,
+       now()::timestamptz AS now
+FROM (
+    SELECT latency_ms
+    FROM delivery_attempts
+    WHERE at >= now() - make_interval(secs => $1::float8)
+    ORDER BY at DESC
+    LIMIT $2::bigint
+) recent
+`
+
+type DeliveryLatencyParams struct {
+	WindowS float64
+	MaxRows int64
+}
+
+type DeliveryLatencyRow struct {
+	Attempts int64
+	P50Ms    int32
+	P95Ms    int32
+	Now      time.Time
+}
+
+// The console overview's delivery latency: the newest attempts of the
+// window (at most max_rows of them, the hypertable's time index read
+// newest first, so only the window's chunks are touched), their count
+// and the 50th and 95th percentile of latency_ms, on the database's
+// clock. The percentiles are 0 when there is no attempt; the count says.
+func (q *Queries) DeliveryLatency(ctx context.Context, arg DeliveryLatencyParams) (DeliveryLatencyRow, error) {
+	row := q.db.QueryRow(ctx, deliveryLatency, arg.WindowS, arg.MaxRows)
+	var i DeliveryLatencyRow
+	err := row.Scan(
+		&i.Attempts,
+		&i.P50Ms,
+		&i.P95Ms,
+		&i.Now,
+	)
+	return i, err
+}
+
 const insertDeliveryAttempt = `-- name: InsertDeliveryAttempt :exec
 
 INSERT INTO delivery_attempts (

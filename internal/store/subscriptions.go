@@ -386,3 +386,32 @@ func (l *DeliveryLog) AttemptsOf(ctx context.Context, subscriptionID string, del
 	}
 	return out, nil
 }
+
+// DeliveryLatency is the delivery log's latency over a window, on the
+// timeseries database's clock.
+type DeliveryLatency struct {
+	Now time.Time
+	// Attempts is the number of attempts the percentiles were taken
+	// over: the window's, or its newest maxAttempts when it held more.
+	Attempts int64
+	// P50Ms and P95Ms are the 50th and 95th percentiles of latency_ms
+	// (an attempt's own latency, percentile_disc); nil without attempts.
+	P50Ms, P95Ms *int
+}
+
+// Latency is the latency of the attempts logged within window, the
+// newest maxAttempts at most (1 to 1<<20).
+func (l *DeliveryLog) Latency(ctx context.Context, window time.Duration, maxAttempts int) (DeliveryLatency, error) {
+	r, err := timeseries.New(l.pool).DeliveryLatency(ctx, timeseries.DeliveryLatencyParams{
+		WindowS: window.Seconds(), MaxRows: int64(min(max(maxAttempts, 1), 1<<20)),
+	})
+	if err != nil {
+		return DeliveryLatency{}, fmt.Errorf("delivery latency: %w", err)
+	}
+	out := DeliveryLatency{Now: r.Now.UTC(), Attempts: r.Attempts}
+	if r.Attempts > 0 {
+		p50, p95 := int(r.P50Ms), int(r.P95Ms)
+		out.P50Ms, out.P95Ms = &p50, &p95
+	}
+	return out, nil
+}

@@ -850,3 +850,52 @@ func (s *Store) EnsureEventPartitions(ctx context.Context, months int) ([]string
 	}
 	return created, nil
 }
+
+// ConsoleSummary is the console overview's figures from the relational
+// database, read in one read-only transaction on its clock. It holds
+// counts only: no client, callback, contact or account.
+type ConsoleSummary struct {
+	// Now is the database's clock the windows were judged on.
+	Now time.Time
+	// Subscriptions is the number of subscriptions per status (a status
+	// with none is absent).
+	Subscriptions map[string]int64
+	// FailedDeliveries and ExpiredDeliveries are the deliveries whose
+	// last attempt, within the window, failed: due again, and given up.
+	FailedDeliveries, ExpiredDeliveries int64
+	// UsspListVersion is the USSP list's current version (0: never
+	// published) and Ussps the number of its entries.
+	UsspListVersion, Ussps int64
+}
+
+// ConsoleSummary is the overview's figures: the subscriptions per
+// status, the deliveries that failed within failedWindow and the
+// current USSP list's entry count. Every count is SQL over an index or a
+// key, bounded (docs/PLAN.md section 15 Q52).
+func (s *Store) ConsoleSummary(ctx context.Context, failedWindow time.Duration) (ConsoleSummary, error) {
+	out := ConsoleSummary{Subscriptions: map[string]int64{}}
+	err := s.readOnly(ctx, func(q *relational.Queries) error {
+		totals, err := q.ConsoleSubscriptionTotals(ctx)
+		if err != nil {
+			return fmt.Errorf("subscription totals: %w", err)
+		}
+		for _, t := range totals {
+			out.Subscriptions[t.Status] = t.N
+		}
+		failed, err := q.ConsoleFailedDeliveries(ctx, failedWindow.Seconds())
+		if err != nil {
+			return fmt.Errorf("failed deliveries: %w", err)
+		}
+		out.Now, out.FailedDeliveries, out.ExpiredDeliveries = failed.Now.UTC(), failed.Failed, failed.Expired
+		ussps, err := q.ConsoleUsspCount(ctx, string(publication.DatasetUSSPList))
+		if err != nil {
+			return fmt.Errorf("ussp count: %w", err)
+		}
+		out.UsspListVersion, out.Ussps = ussps.CurrentVersion, ussps.Ussps
+		return nil
+	})
+	if err != nil {
+		return ConsoleSummary{}, err
+	}
+	return out, nil
+}

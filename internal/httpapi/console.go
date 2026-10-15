@@ -20,6 +20,7 @@ import (
 	"github.com/rootxkit/uspace-cisp/internal/obs"
 	"github.com/rootxkit/uspace-cisp/internal/publication"
 	"github.com/rootxkit/uspace-cisp/internal/store"
+	"github.com/rootxkit/uspace-cisp/internal/subscription"
 )
 
 // The console (docs/PLAN.md section 6.6, WP-8). THE CONSOLE HAS NO WRITE
@@ -62,6 +63,7 @@ var ConsoleRoles = map[string]string{
 	"POST /v1/console/subscriptions/{id}/deliveries/{delivery_id}/retry": auth.RolePublisherAdmin,
 	"GET /v1/console/audit":                                              auth.RoleAdmin,
 	"GET /v1/console/status":                                             auth.RoleViewer,
+	"GET /v1/console/summary":                                            auth.RoleViewer,
 }
 
 // consoleBodyRoutes are the console operations that carry a body:
@@ -171,7 +173,28 @@ type ConsoleStore interface {
 	SuspendSubscriptionAudited(ctx context.Context, id, reason string, e store.Event) error
 	ResumeSubscriptionAudited(ctx context.Context, id, pingID string, e store.Event) error
 	AuditEvents(ctx context.Context, f store.AuditFilter) ([]store.AuditRow, error)
+	ConsoleSummary(ctx context.Context, failedWindow time.Duration) (store.ConsoleSummary, error)
 }
+
+// DeliveryLatencyLog is the delivery log's latency read
+// (*store.DeliveryLog on the timeseries database, through the api's
+// read-only role).
+type DeliveryLatencyLog interface {
+	Latency(ctx context.Context, window time.Duration, maxAttempts int) (store.DeliveryLatency, error)
+}
+
+// The overview's windows and bound (GET /v1/console/summary,
+// docs/PLAN.md section 15 Q52): failed deliveries over the last 24 h,
+// latency over the newest MaxSummaryLatencyAttempts attempts of the last
+// hour.
+const (
+	SummaryFailedWindow       = 24 * time.Hour
+	SummaryLatencyWindow      = time.Hour
+	MaxSummaryLatencyAttempts = 10_000
+	// CounterSummaryLogFailed counts the summaries served without the
+	// delivery log (log unavailable).
+	CounterSummaryLogFailed = "console_summary_log_failed"
+)
 
 // The audit events of the console's actions.
 const (
@@ -205,6 +228,9 @@ type Console struct {
 	Report *StatusReport
 	// Registry gives the process counters (nil: none).
 	Registry *obs.Status
+	// Latency reads the delivery log's latency for the summary; nil: the
+	// summary's latency says not_configured.
+	Latency DeliveryLatencyLog
 	// PublicBaseURL makes the pull_url of a republished change.
 	PublicBaseURL string
 	Logger        *slog.Logger
@@ -341,6 +367,11 @@ func (r consoleResponse) VisitListConsoleAuditResponse(w http.ResponseWriter) er
 
 // VisitGetConsoleStatusResponse implements gen.GetConsoleStatusResponseObject.
 func (r consoleResponse) VisitGetConsoleStatusResponse(w http.ResponseWriter) error {
+	return r.w.write(w)
+}
+
+// VisitGetConsoleSummaryResponse implements gen.GetConsoleSummaryResponseObject.
+func (r consoleResponse) VisitGetConsoleSummaryResponse(w http.ResponseWriter) error {
 	return r.w.write(w)
 }
 
@@ -1057,4 +1088,46 @@ func (s *Server) GetConsoleStatus(ctx context.Context, _ gen.GetConsoleStatusReq
 		body.Counters = c.Registry.Totals()
 	}
 	return ok(http.StatusOK, body), nil
+}
+
+// GetConsoleSummary is the overview's figures (viewer): counted by the
+// databases on their clocks, read only, counts and no personal data. A
+// delivery log that does not answer leaves the latency unavailable and
+// the other figures served (fail visible, counted).
+func (s *Server) GetConsoleSummary(ctx context.Context, _ gen.GetConsoleSummaryRequestObject) (gen.GetConsoleSummaryResponseObject, error) {
+	c := s.Console
+	if c == nil || c.Store == nil {
+		return consoleUnavailable(ctx), nil
+	}
+	sum, err := c.Store.ConsoleSummary(ctx, SummaryFailedWindow)
+	if err != nil {
+		return c.failure(ctx, err)
+	}
+	var out gen.ConsoleSummary
+	out.Now = sum.Now.UTC()
+	out.Subscriptions.PendingVerification = sum.Subscriptions[string(subscription.PendingVerification)]
+	out.Subscriptions.Active = sum.Subscriptions[string(subscription.Active)]
+	out.Subscriptions.Suspended = sum.Subscriptions[string(subscription.Suspended)]
+	out.Subscriptions.Deleted = sum.Subscriptions[string(subscription.Deleted)]
+	out.FailedDeliveries.WindowS = int(SummaryFailedWindow / time.Second)
+	out.FailedDeliveries.Failed, out.FailedDeliveries.Expired = sum.FailedDeliveries, sum.ExpiredDeliveries
+	out.Ussps.Version, out.Ussps.Count = sum.UsspListVersion, sum.Ussps
+	lat := &out.DeliveryLatency
+	lat.WindowS, lat.MaxAttempts, lat.Log = int(SummaryLatencyWindow/time.Second), MaxSummaryLatencyAttempts, gen.ConsoleSummaryDeliveryLatencyLogNotConfigured
+	if c.Latency != nil {
+		l, err := c.Latency.Latency(ctx, SummaryLatencyWindow, MaxSummaryLatencyAttempts)
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			return consoleResponse{}, err
+		case err != nil:
+			lat.Log = gen.ConsoleSummaryDeliveryLatencyLogUnavailable
+			c.counter(CounterSummaryLogFailed, "Console summaries served without the delivery log (the latency says unavailable).")
+			c.logger().LogAttrs(ctx, slog.LevelWarn, "console summary: delivery log not read", slog.String("error", err.Error()))
+		default:
+			lat.Log = gen.ConsoleSummaryDeliveryLatencyLogComplete
+			lat.Attempts, lat.Sampled = l.Attempts, l.Attempts >= MaxSummaryLatencyAttempts
+			lat.P50Ms, lat.P95Ms = l.P50Ms, l.P95Ms
+		}
+	}
+	return ok(http.StatusOK, out), nil
 }

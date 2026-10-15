@@ -22,3 +22,21 @@ SELECT at, delivery_id, subscription_id, change_id, attempt, status_code, error,
 FROM delivery_attempts
 WHERE subscription_id = sqlc.arg(subscription_id) AND delivery_id = ANY(sqlc.arg(delivery_ids)::text[])
 ORDER BY at, attempt;
+
+-- name: DeliveryLatency :one
+-- The console overview's delivery latency: the newest attempts of the
+-- window (at most max_rows of them, the hypertable's time index read
+-- newest first, so only the window's chunks are touched), their count
+-- and the 50th and 95th percentile of latency_ms, on the database's
+-- clock. The percentiles are 0 when there is no attempt; the count says.
+SELECT count(*)::bigint AS attempts,
+       COALESCE(percentile_disc(0.5) WITHIN GROUP (ORDER BY latency_ms), 0)::integer AS p50_ms,
+       COALESCE(percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms), 0)::integer AS p95_ms,
+       now()::timestamptz AS now
+FROM (
+    SELECT latency_ms
+    FROM delivery_attempts
+    WHERE at >= now() - make_interval(secs => sqlc.arg(window_s)::float8)
+    ORDER BY at DESC
+    LIMIT sqlc.arg(max_rows)::bigint
+) recent;

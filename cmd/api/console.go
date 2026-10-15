@@ -143,6 +143,13 @@ func startConsole(ctx context.Context, cfg *config.API, keys consoleKeys, sec *s
 		Accounts: accounts, Store: st, Subscriptions: server.Subscriptions, Restrictions: server.Restrictions,
 		Report: server.Status, Registry: status, PublicBaseURL: cfg.PublicBaseURL, Logger: logger,
 	}
+	// The summary's latency reads the same delivery log as the
+	// deliveries list (CISP_TIMESERIES_URL); without it, not_configured.
+	if server.Subscriptions != nil {
+		if l, ok := server.Subscriptions.Log.(*store.DeliveryLog); ok && l != nil {
+			c.Latency = l
+		}
+	}
 	comp.SetHealthy()
 	logger.InfoContext(ctx, "console ready", "issuer", keys.issuer.Issuer(), "session_kid", keys.issuer.KID(),
 		"secrets_kid", keys.sealer.KeyID(), "secrets_kids", keys.sealer.KeyIDs())

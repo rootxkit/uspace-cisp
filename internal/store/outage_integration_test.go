@@ -93,6 +93,8 @@ func TestAnOutageIsNotAnAbsence(t *testing.T) {
 		},
 		"RestrictionPlacement": func(s *Store, _ *DeliveryLog) error { _, err := s.RestrictionPlacement(ctx, "U", circle); return err },
 		"AttemptsOf":           func(_ *Store, l *DeliveryLog) error { _, err := l.AttemptsOf(ctx, "s", []string{"d"}); return err },
+		"ConsoleSummary":       func(s *Store, _ *DeliveryLog) error { _, err := s.ConsoleSummary(ctx, time.Hour); return err },
+		"Latency":              func(_ *Store, l *DeliveryLog) error { _, err := l.Latency(ctx, time.Hour, 10); return err },
 	}
 	for name, c := range calls {
 		if err := c(live, liveLog); err != nil {

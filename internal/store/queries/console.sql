@@ -209,3 +209,33 @@ UPDATE login_challenges SET attempts = attempts + 1 WHERE token_hash = $1;
 
 -- name: UseLoginChallenge :exec
 UPDATE login_challenges SET used_at = sqlc.arg(used_at) WHERE token_hash = sqlc.arg(token_hash);
+
+-- name: ConsoleSubscriptionTotals :many
+-- The overview's subscriptions per status. subscriptions is a registry
+-- (a row per client subscription), not a hot table: four groups.
+SELECT status, count(*)::bigint AS n
+FROM subscriptions
+GROUP BY status;
+
+-- name: ConsoleFailedDeliveries :one
+-- The deliveries whose last attempt failed within the window, on the
+-- database's clock: failed (due again) and expired (given up). A range
+-- scan of deliveries_failed_recent_idx (migration 0015), bounded by the
+-- window.
+SELECT count(*) FILTER (WHERE state = 'failed')::bigint AS failed,
+       count(*) FILTER (WHERE state = 'expired')::bigint AS expired,
+       now()::timestamptz AS now
+FROM deliveries
+WHERE state IN ('failed', 'expired')
+  AND last_attempt_at >= now() - make_interval(secs => sqlc.arg(window_s)::float8);
+
+-- name: ConsoleUsspCount :one
+-- The current USSP list's version and the number of its entries: one
+-- row of datasets and one of publications by their keys (a list holds
+-- at most 200 entries). The body is the accepted, validated JSON. ussps
+-- is 0 before the first version; current_version says which.
+SELECT d.current_version,
+       COALESCE(jsonb_array_length(convert_from(p.body, 'UTF8')::jsonb -> 'ussps'), 0)::bigint AS ussps
+FROM datasets d
+LEFT JOIN publications p ON p.dataset = d.name AND p.version = d.current_version
+WHERE d.name = sqlc.arg(dataset);

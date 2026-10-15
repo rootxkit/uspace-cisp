@@ -151,17 +151,47 @@ describe("subscriptions", () => {
 });
 
 describe("times", () => {
-  it("a time is rendered in the viewer's zone with the zone named, in both languages", async () => {
-    const { localTime } = await import("./ui");
-    for (const lang of ["en", "ka"] as const) {
-      const s = localTime("2026-10-02T12:00:30Z", lang);
-      expect(s, lang).not.toBeNull();
-      expect(s, lang).toMatch(/2026/);
-    }
+  const catalogue = async (lang: "en" | "ka"): Promise<Translate> => {
+    const words = (await import(`../i18n/${lang}.json`)) as { default: Record<string, string> };
+    return (key, vars) => (words.default[key] ?? key).replace(/\{(\w+)\}/g, (_, k: string) => String(vars?.[k] ?? ""));
+  };
+
+  it("a time is rendered in UTC, laid out by each catalogue, and says UTC", async () => {
+    const { utcTime } = await import("./ui");
+    // 02:07:49 in Tbilisi is the evening before in UTC: the zone is UTC, never the viewer's.
+    expect(utcTime("2026-10-16T02:07:49+04:00", await catalogue("en"))).toBe("15 Oct 2026, 22:07:49 UTC");
+    expect(utcTime("2026-10-16T02:07:49+04:00", await catalogue("ka"))).toBe("15 ოქტ. 2026, 22:07:49 UTC");
+    // The pair: a UTC instant keeps its wall clock.
+    expect(utcTime("2026-01-02T03:04:05Z", await catalogue("en"))).toBe("2 Jan 2026, 03:04:05 UTC");
   });
 
   it("an unreadable time renders nothing", async () => {
-    const { localTime } = await import("./ui");
-    expect(localTime("not a time", "en")).toBeNull();
+    const { utcTime } = await import("./ui");
+    expect(utcTime("not a time", await catalogue("en"))).toBeNull();
+  });
+});
+
+describe("labels for the API's codes", () => {
+  const words: Translate = (key) => `<${key}>`;
+
+  it("a known event type, component and counter are worded; an unknown one is kept as sent", async () => {
+    const { componentLabel, countersShown, eventLabel } = await import("./labels");
+    expect(eventLabel(words, "publication_accepted")).toBe("<cisp.console.audit.event.publication_accepted>");
+    expect(eventLabel(words, "made_up_event")).toBeNull();
+    expect(componentLabel(words, "nats")).toBe("<cisp.console.component.nats>");
+    expect(componentLabel(words, "made_up")).toBe("made_up");
+    const groups = countersShown(words, { "nats.nats_slow_consumer": 2, "auth.accepted": 5, "auth.made_up_counter": 1 });
+    expect(groups.map((g) => g.component)).toEqual(["auth", "nats"]);
+    expect(groups[0]?.counters).toEqual([
+      { key: "auth.accepted", component: "auth", label: "<cisp.console.counter.accepted>", value: 5 },
+      { key: "auth.made_up_counter", component: "auth", label: null, value: 1 },
+    ]);
+  });
+
+  it("a long id is shortened by its head and tail; a short one is kept whole", async () => {
+    const { shortId } = await import("./present");
+    expect(shortId("01JXR5Q2ZK8M3T7V9W4Y6B1C0D")).toBe("01JX…6B1C0D");
+    expect(shortId("sub-01")).toBe("sub-01");
+    expect(shortId("authority-01")).toBe("authority-01");
   });
 });

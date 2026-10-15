@@ -1,22 +1,24 @@
 "use client";
 
 // Subscriptions: every client's subscriptions (GET
-// /v1/console/subscriptions) with status, datasets, box, last success,
-// consecutive failures and deliveries per state; and a subscription's
-// page with its deliveries and their attempt log (GET
+// /v1/console/subscriptions): id and client, status, datasets, last
+// success and consecutive failures in the row, the box, the deliveries
+// per state and the callback behind the row expander; and a
+// subscription's page with its deliveries and their attempt log (GET
 // /v1/console/subscriptions/{id}/deliveries) and the publisher_admin
 // actions suspend, resume and retry, each confirmed with its consequence
 // and a reason.
 import { useState } from "react";
 import Link from "next/link";
 import { useLang, useT } from "@rootxkit/uspace-ui/i18n";
-import { Button, Panel, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@rootxkit/uspace-ui/ui";
+import { Button, Panel, StatusBadge, TABLE_NOWRAP, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@rootxkit/uspace-ui/ui";
 import type { components } from "../api/types";
 import { DELIVERY_STATES, deliveryBadge, SUBSCRIPTION_STATUSES, subscriptionBadge } from "./badges";
 import { BBoxPreview, fmtBBox } from "./BBoxPreview";
 import type { ConsoleClient } from "./client";
 import { useConsole, useLoad } from "./context";
-import { reasonLabel } from "./PublicationsPage";
+import { CopyButton, CopyId, DetailsRow, ExpandCell, Facts, ShortId, useExpander } from "./present";
+import { DATASETS, reasonLabel } from "./PublicationsPage";
 import { mayAct } from "./roles";
 import { ConsoleHeader } from "./header";
 import { Loading, ProblemNotice, ReasonAction, ScrollRegion, Section, StateBadge, TablePanel, Time } from "./ui";
@@ -43,9 +45,97 @@ function Counts({ s }: { s: ConsoleSubscription }) {
   );
 }
 
-export function SubscriptionsPage() {
+/**
+ * The datasets of a subscription on one line: how many of all, with
+ * their names in the tooltip and for a screen reader (the names are
+ * long, in Georgian most of all, and wrapped word by word in a column).
+ */
+function DatasetCount({ datasets }: { datasets: readonly string[] }) {
+  const t = useT();
+  const names = datasets.map((d) => t(`cisp.console.dataset.${d}`)).join(", ");
+  return (
+    <span title={names} data-testid="subscription-datasets" data-datasets={datasets.join(" ")} className="inline-flex">
+      <StatusBadge tone="info" variant="outline" dot={false}>
+        <span aria-hidden="true">{t("cisp.console.subscriptions.datasets_count", { count: datasets.length, total: DATASETS.length })}</span>
+        <span className="sr-only">{names}</span>
+      </StatusBadge>
+    </span>
+  );
+}
+
+/** The datasets as one badge each (the row's details). */
+function DatasetBadges({ datasets }: { datasets: readonly string[] }) {
+  const t = useT();
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {datasets.map((d) => (
+        <StatusBadge key={d} tone="info" variant="outline" dot={false}>
+          {t(`cisp.console.dataset.${d}`)}
+        </StatusBadge>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * One subscription: its id (short, with a copy button) over its client,
+ * the status, the datasets, the last success and the failures in the
+ * row; the box, the deliveries and the callback behind its expander.
+ */
+function SubscriptionRow({ cs }: { cs: ConsoleSubscription }) {
   const t = useT();
   const { lang } = useLang();
+  const x = useExpander();
+  const s = cs.subscription;
+  return (
+    <>
+      <TableRow data-subscription={s.id}>
+        <ExpandCell {...x} label={s.id} />
+        <TableCell>
+          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+            <Link href={`/${lang}/console/subscriptions/${encodeURIComponent(s.id)}`} className="font-semibold underline underline-offset-4">
+              <ShortId id={s.id} />
+            </Link>
+            <CopyButton value={s.id} />
+          </span>
+          <div className="text-xs text-muted-foreground">
+            <ShortId id={s.client_id} className="font-sans" />
+          </div>
+        </TableCell>
+        <TableCell className="max-w-36">
+          <StateBadge spec={subscriptionBadge(s.status)} value={s.status} wrap />
+        </TableCell>
+        <TableCell>
+          <DatasetCount datasets={s.datasets} />
+        </TableCell>
+        <TableCell>
+          <Time iso={s.last_success_at} />
+        </TableCell>
+        <TableCell className={cn("tabular-nums", TABLE_NOWRAP, s.consecutive_failures > 0 && "font-semibold text-[var(--us-danger)]")}>
+          {s.consecutive_failures}
+        </TableCell>
+      </TableRow>
+      <DetailsRow open={x.open} detailsId={x.detailsId} colSpan={6}>
+        <Facts
+          items={[
+            { term: t("cisp.console.subscriptions.id"), value: <CopyId id={s.id} /> },
+            { term: t("cisp.console.subscriptions.client"), value: s.client_id },
+            { term: t("cisp.console.subscriptions.datasets"), value: <DatasetBadges datasets={s.datasets} /> },
+            {
+              term: t("cisp.console.subscriptions.bbox"),
+              value: <span className="font-mono">{fmtBBox(s.bbox) ?? t("cisp.console.subscriptions.bbox_none")}</span>,
+            },
+            { term: t("cisp.console.subscriptions.deliveries"), value: <Counts s={cs} /> },
+            { term: t("cisp.console.subscriptions.callback"), value: <span className="font-mono break-all">{s.callback_url}</span> },
+          ]}
+        />
+      </DetailsRow>
+    </>
+  );
+}
+
+export function SubscriptionsPage() {
+  const t = useT();
   const [status, setStatus] = useState<SubscriptionStatus | "">("");
   const [after, setAfter] = useState<string[]>([]);
   const cursor = after.at(-1);
@@ -86,48 +176,29 @@ export function SubscriptionsPage() {
           <p className="m-0 text-sm">{t("cisp.console.subscriptions.none")}</p>
         ) : (
           <TablePanel label={t("cisp.console.nav.subscriptions")}>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("cisp.console.subscriptions.subscription")}</TableHead>
-                <TableHead>{t("cisp.console.subscriptions.status")}</TableHead>
-                <TableHead>{t("cisp.console.subscriptions.datasets")}</TableHead>
-                <TableHead>{t("cisp.console.subscriptions.bbox")}</TableHead>
-                <TableHead>{t("cisp.console.subscriptions.last_success")}</TableHead>
-                <TableHead>{t("cisp.console.subscriptions.failures")}</TableHead>
-                <TableHead>{t("cisp.console.subscriptions.deliveries")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.data.subscriptions.map((cs) => {
-                const s = cs.subscription;
-                return (
-                  <TableRow key={s.id} data-subscription={s.id}>
-                    <TableCell>
-                      <Link href={`/${lang}/console/subscriptions/${encodeURIComponent(s.id)}`} className={cn("font-mono font-semibold underline underline-offset-4", TABLE_NOWRAP)}>
-                        {s.id}
-                      </Link>
-                      <div className="text-xs text-muted-foreground">{s.client_id}</div>
-                    </TableCell>
-                    <TableCell>
-                      <StateBadge spec={subscriptionBadge(s.status)} value={s.status} />
-                    </TableCell>
-                    <TableCell>{s.datasets.map((d) => t(`cisp.console.dataset.${d}`)).join(", ")}</TableCell>
-                    <TableCell className={cn("font-mono text-xs", TABLE_NOWRAP)}>{fmtBBox(s.bbox) ?? t("cisp.console.subscriptions.bbox_none")}</TableCell>
-                    <TableCell>
-                      <Time iso={s.last_success_at} />
-                    </TableCell>
-                    <TableCell className={cn("tabular-nums", TABLE_NOWRAP, s.consecutive_failures > 0 && "font-semibold text-[var(--us-danger)]")}>
-                      {s.consecutive_failures}
-                    </TableCell>
-                    <TableCell>
-                      <Counts s={cs} />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+            <Table data-testid="subscriptions-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8">
+                    <span className="sr-only">{t("cisp.console.row.details")}</span>
+                  </TableHead>
+                  <TableHead>{t("cisp.console.subscriptions.subscription")}</TableHead>
+                  <TableHead>{t("cisp.console.subscriptions.status")}</TableHead>
+                  <TableHead>{t("cisp.console.subscriptions.datasets")}</TableHead>
+                  <TableHead>{t("cisp.console.subscriptions.last_success")}</TableHead>
+                  <TableHead>
+                    <abbr title={t("cisp.console.subscriptions.failures")} className="no-underline">
+                      {t("cisp.console.subscriptions.failures_short")}
+                    </abbr>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.data.subscriptions.map((cs) => (
+                  <SubscriptionRow key={cs.subscription.id} cs={cs} />
+                ))}
+              </TableBody>
+            </Table>
           </TablePanel>
         ))}
       <div className="flex gap-2">

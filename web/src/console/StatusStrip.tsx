@@ -11,12 +11,13 @@
 // stream is the frame's (src/console/ConsoleShell), which also shows its
 // pill in the top bar.
 import { useEffect } from "react";
-import { fmtTimeUTC, useLang, useT } from "@rootxkit/uspace-ui/i18n";
+import { useLang, useT, type Translate } from "@rootxkit/uspace-ui/i18n";
 import type { LiveFeed } from "@rootxkit/uspace-ui/live";
 import { FeedStatusBar } from "@rootxkit/uspace-ui/status";
 import type { components } from "../api/types";
 import { useLoad } from "./context";
-import { localTime, ProblemNotice, Time, useInBrowser } from "./ui";
+import { componentLabel } from "./labels";
+import { ProblemNotice, Time, useUtcTime } from "./ui";
 
 export type ConsoleStatus = components["schemas"]["ConsoleStatus"];
 type Status = components["schemas"]["Status"];
@@ -70,6 +71,12 @@ export function timesShown(
   return out;
 }
 
+/** The vars with a degraded component named by its label where the console knows it. */
+export function componentShown(t: Translate, vars: Record<string, string | number>): Record<string, string | number> {
+  const c = vars["component"];
+  return typeof c === "string" ? { ...vars, component: componentLabel(t, c) } : vars;
+}
+
 /** The strip; `feed` is null until the caller is known (nothing to show yet). */
 export function StatusStrip({ feed, nowMs }: { feed: LiveFeed | null; nowMs: number }) {
   const t = useT();
@@ -80,7 +87,7 @@ export function StatusStrip({ feed, nowMs }: { feed: LiveFeed | null; nowMs: num
     const id = setInterval(reload, STATUS_POLL_MS);
     return () => clearInterval(id);
   }, [reload]);
-  const browser = useInBrowser();
+  const utc = useUtcTime();
   const s = status.data?.status ?? null;
 
   return (
@@ -124,7 +131,7 @@ export function StatusStrip({ feed, nowMs }: { feed: LiveFeed | null; nowMs: num
       {s !== null &&
         warningsOf(s).map((w) => (
           <p key={`${w.key}-${JSON.stringify(w.vars)}`} role="alert" className="m-0 font-semibold text-[var(--us-danger)]">
-            {t(w.key, timesShown(w.vars, (iso) => (browser ? localTime(iso, lang) : null) ?? fmtTimeUTC(iso, lang)))}
+            {t(w.key, componentShown(t, timesShown(w.vars, utc)))}
           </p>
         ))}
       {status.failure !== null && status.failure.status !== 401 && (

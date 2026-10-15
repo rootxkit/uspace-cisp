@@ -285,10 +285,10 @@ function seedSubscriptions(now) {
     },
     {
       sub: {
-        id: "sub-03",
+        id: "01JXR5Q2ZK8M3T7V9W4Y6B1C0D",
         client_id: "ussp-test-01",
         callback_url: "https://test.example.invalid/v1/cis/notifications",
-        datasets: ["ussp_list"],
+        datasets: ["zones", "uspace_airspace", "restrictions", "ussp_list"],
         status: "suspended",
         created_at: T0,
         suspended_reason: `suspended by admin1 at ${T0}: callback retired`,
@@ -348,7 +348,7 @@ export function createConsole({ json, problem, readJson, usspCount }) {
       anspStale: false,
       summaryLog: "complete",
     };
-    audit("system", "system", "dataset_published", "publication", "pub-zones-2", { dataset: "zones", version: 2 });
+    audit("client", "authority-01", "publication_accepted", "publication", "pub-zones-2", { dataset: "zones", version: 2 });
     requests.length = 0;
   }
   reset();
@@ -453,7 +453,15 @@ export function createConsole({ json, problem, readJson, usspCount }) {
           ansp_stale_since: s.anspStale ? iso(now - 60_000) : undefined,
         },
       },
-      counters: { "console.sessions_issued": s.next, "deliver.attempts": 5 },
+      // Names as the CISP keys them ("<component>.<counter>"); the last is one the console does not word.
+      counters: {
+        "auth.accepted": 12,
+        "console_auth.rejected_no_token": 3,
+        "console_auth.session_accepted": s.next,
+        "console.console_logins": s.next,
+        "nats.nats_slow_consumer": 0,
+        "stream.frames_coalesced": 1,
+      },
     };
   }
 

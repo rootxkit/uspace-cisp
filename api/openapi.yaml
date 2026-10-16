@@ -1956,7 +1956,10 @@ paths:
         detached JWS over the same bytes, made when first served and
         kept per version. The stored body_sha256 is checked before
         serving: a mismatch is 500 integrity and an error log line,
-        never the bytes. Token scope cis.read.
+        never the bytes. X-CIS-Publisher names the client id that
+        published the version (uspace-cisp for a version the CISP made);
+        it is informational, outside every signature, and nothing is
+        decided on it. Token scope cis.read.
 
         A restrictions version the CISP makes when a restriction expires
         (reason restriction_expired, publisher uspace-cisp) has no
@@ -2049,6 +2052,13 @@ paths:
             X-CIS-Signature:
               required: true
               description: The CISP's compact detached JWS over the bytes.
+              schema:
+                type: string
+            X-CIS-Publisher:
+              description: |
+                The client id that published the version (uspace-cisp
+                for one the CISP made). Informational: outside every
+                signature.
               schema:
                 type: string
             X-Publisher-Signature:

@@ -11167,6 +11167,7 @@ type GetDatasetVersion200ResponseHeaders struct {
 	ETag                *string
 	LastModified        *string
 	XCISMappedFrom      *string
+	XCISPublisher       *string
 	XCISSignature       string
 	XCISVersion         *int64
 	XPublisherKid       *string
@@ -11196,6 +11197,9 @@ func (response GetDatasetVersion200ApplicationGeoPlusJSONResponse) VisitGetDatas
 	}
 	if response.Headers.XCISMappedFrom != nil {
 		w.Header().Set("X-CIS-Mapped-From", fmt.Sprint(*response.Headers.XCISMappedFrom))
+	}
+	if response.Headers.XCISPublisher != nil {
+		w.Header().Set("X-CIS-Publisher", fmt.Sprint(*response.Headers.XCISPublisher))
 	}
 	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
 	if response.Headers.XCISVersion != nil {
@@ -11236,6 +11240,9 @@ func (response GetDatasetVersion200JSONResponse) VisitGetDatasetVersionResponse(
 	if response.Headers.XCISMappedFrom != nil {
 		w.Header().Set("X-CIS-Mapped-From", fmt.Sprint(*response.Headers.XCISMappedFrom))
 	}
+	if response.Headers.XCISPublisher != nil {
+		w.Header().Set("X-CIS-Publisher", fmt.Sprint(*response.Headers.XCISPublisher))
+	}
 	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
 	if response.Headers.XCISVersion != nil {
 		w.Header().Set("X-CIS-Version", fmt.Sprint(*response.Headers.XCISVersion))
@@ -11274,6 +11281,9 @@ func (response GetDatasetVersion200ApplicationVndEd269PlusJSONResponse) VisitGet
 	}
 	if response.Headers.XCISMappedFrom != nil {
 		w.Header().Set("X-CIS-Mapped-From", fmt.Sprint(*response.Headers.XCISMappedFrom))
+	}
+	if response.Headers.XCISPublisher != nil {
+		w.Header().Set("X-CIS-Publisher", fmt.Sprint(*response.Headers.XCISPublisher))
 	}
 	w.Header().Set("X-CIS-Signature", fmt.Sprint(response.Headers.XCISSignature))
 	if response.Headers.XCISVersion != nil {

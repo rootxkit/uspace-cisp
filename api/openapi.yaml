@@ -1956,7 +1956,24 @@ paths:
         detached JWS over the same bytes, made when first served and
         kept per version. The stored body_sha256 is checked before
         serving: a mismatch is 500 integrity and an error log line,
-        never the bytes. Token scope cis.read.
+        never the bytes. X-CIS-Publisher names the client id that
+        published the version (uspace-cisp for a version the CISP made);
+        it is informational, outside every signature, and nothing is
+        decided on it. Token scope cis.read.
+
+        A restrictions version the CISP makes when a restriction expires
+        (reason restriction_expired, publisher uspace-cisp) has no
+        X-Publisher-Signature; its bytes are the CISP's expiry record,
+        application/json {op: expire, restriction_id, feature_id,
+        ends_at, at}: the restriction's ULID, the ED-318 identifier of
+        the feature the version removes, the ends_at of the window it
+        ends (the endDateTime of the feature's limitedApplicability),
+        and the CISP's clock at the expiry, all RFC 3339 UTC except
+        restriction_id and feature_id. A consumer verifies
+        X-CIS-Signature over these bytes with the CISP's JWKS under its
+        publisher-signature rules and installs the version by the F3
+        rule (uspace-lab docs/spec/02-interfaces.md) instead of holding
+        it; op expire is never accepted from a publisher.
 
         A version published as ED-269 (WP-12) is stored as the ED-318
         uspace-core mapped it to: these bytes are served with
@@ -2035,6 +2052,13 @@ paths:
             X-CIS-Signature:
               required: true
               description: The CISP's compact detached JWS over the bytes.
+              schema:
+                type: string
+            X-CIS-Publisher:
+              description: |
+                The client id that published the version (uspace-cisp
+                for one the CISP made). Informational: outside every
+                signature.
               schema:
                 type: string
             X-Publisher-Signature:
@@ -2827,7 +2851,9 @@ components:
           type: string
         publisher:
           type: string
-          description: The client id that published the version.
+          description: |
+            The client id that published the version; uspace-cisp for a
+            version the CISP made (restriction_expired).
         received_at:
           type: string
           format: date-time

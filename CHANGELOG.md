@@ -9,6 +9,18 @@ additively within `/v1`.
 
 ### Added
 
+- The expiry version of a restriction (reason `restriction_expired`,
+  publisher `uspace-cisp`) names what it ends: its body, the CISP's
+  expiry record, gains `feature_id` (the ED-318 identifier it removes)
+  and `ends_at` (the window's end, the feature's signed `endDateTime`)
+  beside `op`, `restriction_id` and `at`, all covered by
+  `X-CIS-Signature` at `GET /v1/restrictions/versions/{v}`. Consumers
+  can then install the version by the F3 rule (uspace-lab
+  `docs/spec/02-interfaces.md`, erratum 2026-10-16) instead of holding
+  it. Additive: no member of the record is removed or renamed.
+- `X-CIS-Publisher` on every `GET /v1/{dataset}/versions/{v}` answer:
+  the client id that published the version (`uspace-cisp` for one the
+  CISP made). Informational, outside every signature.
 - `GET /v1/console/summary` (`viewer`+, additive): the console
   overview's figures, counted by the databases on their clocks and
   bounded: subscriptions per status, deliveries failed or expired in the

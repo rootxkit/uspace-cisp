@@ -271,13 +271,37 @@ func (rs *Restrictions) ExpireTick(ctx context.Context) (int, bool, error) {
 	return expired, true, nil
 }
 
+// expiryRecord is the body of a version the CISP makes when a restriction
+// expires: the bytes X-CIS-Signature covers at /v1/restrictions/versions/{v}.
+// feature_id and ends_at name the removed feature and the signed end of
+// its period, so a consumer can install the version by the F3 rule
+// (uspace-lab docs/spec/02-interfaces.md) instead of holding it. op
+// expire is never a publisher's op: a PATCH carrying it is refused.
+type expiryRecord struct {
+	Op            restriction.Op `json:"op"`
+	RestrictionID string         `json:"restriction_id"`
+	FeatureID     string         `json:"feature_id"`
+	EndsAt        string         `json:"ends_at"`
+	At            string         `json:"at"`
+}
+
 // expire ends one head if it is still planned or active and past its ends_at under
 // the lock (the ANSP may have extended or ended it meanwhile).
 func (rs *Restrictions) expire(ctx context.Context, id string, now time.Time) (bool, error) {
 	if rs.Signer == nil {
 		return false, errors.New("no CISP signing key (CISP_SIGNING_KEY_FILE): an expiry cannot be published")
 	}
-	body, err := json.Marshal(map[string]string{"op": string(restriction.OpExpire), "restriction_id": id, "at": now.Format(time.RFC3339Nano)})
+	// The record names the head as read here; under the lock a head whose
+	// feature or ends_at has moved since (an extend) is left for the next
+	// tick, so the record always states the window it ends.
+	read, err := rs.Store.Restriction(ctx, id, false)
+	if err != nil {
+		return false, err
+	}
+	body, err := json.Marshal(expiryRecord{
+		Op: restriction.OpExpire, RestrictionID: id, FeatureID: read.FeatureID,
+		EndsAt: read.EndsAt.UTC().Format(time.RFC3339Nano), At: now.UTC().Format(time.RFC3339Nano),
+	})
 	if err != nil {
 		return false, err
 	}
@@ -287,6 +311,9 @@ func (rs *Restrictions) expire(ctx context.Context, id string, now time.Time) (b
 		Decide: func(head *restriction.Head, current []store.StoredFeature) (store.RestrictionDecision, error) {
 			if head == nil {
 				return store.RestrictionDecision{}, store.ErrNotFound
+			}
+			if head.FeatureID != read.FeatureID || !head.EndsAt.Equal(read.EndsAt) {
+				return store.RestrictionDecision{Head: *head}, nil // moved since the read: the next tick
 			}
 			next, ok := restriction.Expire(*head, now)
 			if !ok {

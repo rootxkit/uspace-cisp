@@ -52,6 +52,7 @@ const (
 	HeaderAgeS          = "X-CIS-Age-S"
 	HeaderPublisherSig  = "X-Publisher-Signature"
 	HeaderPublisherKID  = "X-Publisher-Kid"
+	HeaderCISPublisher  = "X-CIS-Publisher"
 	HeaderMappedFrom    = "X-CIS-Mapped-From"
 	retryAfterStaleS    = "5"
 	mediaGeoJSON        = "application/geo+json"
@@ -1140,6 +1141,7 @@ func (r *Reads) version(ctx context.Context, req gen.GetDatasetVersionRequestObj
 	}
 	h["Content-Type"] = p.ContentType
 	h[HeaderSignature] = sig
+	h[HeaderCISPublisher] = p.PublisherClientID
 	if p.SourceBody != nil {
 		// The publisher signed the ED-269 it sent, not this mapping of
 		// it: its signature is served with the source (source=true).
@@ -1213,6 +1215,7 @@ func (r *Reads) source(ctx context.Context, ds publication.Dataset, p store.Stor
 	}
 	h["Content-Type"] = *p.SourceContentType
 	h[HeaderSignature] = sig
+	h[HeaderCISPublisher] = p.PublisherClientID
 	if p.PublisherSignature != nil {
 		h[HeaderPublisherSig] = *p.PublisherSignature
 	}
@@ -1267,6 +1270,7 @@ func (r *Reads) exportED269(ctx context.Context, ds publication.Dataset, p store
 	r.count(CounterED269Exported)
 	h["Content-Type"] = dataset.MediaTypeED269
 	h[HeaderSignature] = sig
+	h[HeaderCISPublisher] = p.PublisherClientID
 	h[HeaderMappedFrom] = dataset.MappedFromED318
 	return readResponse{status: http.StatusOK, headers: h, body: out}, nil
 }

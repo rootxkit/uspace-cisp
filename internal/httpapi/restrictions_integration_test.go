@@ -326,6 +326,17 @@ func TestRestrictionExpiryOnPostgres(t *testing.T) {
 	if err != nil || pub.Reason != string(publication.ReasonRestrictionExpired) || pub.PublisherSignature != nil || pub.PublisherClientID != store.SystemPublisher {
 		t.Errorf("expiry publication %+v %v", pub.Reason, err)
 	}
+	// The record names the head it ended as PostgreSQL stores it.
+	var record map[string]string
+	if err := json.Unmarshal(pub.Body, &record); err != nil {
+		t.Fatalf("expiry record %v: %s", err, pub.Body)
+	}
+	ended, err := st.Restriction(ctx, record["restriction_id"], false)
+	recEnds, errEnds := time.Parse(time.RFC3339Nano, record["ends_at"])
+	if err != nil || record["op"] != string(restriction.OpExpire) || record["feature_id"] != ended.FeatureID ||
+		errEnds != nil || !recEnds.Equal(ended.EndsAt) || record["at"] == "" {
+		t.Errorf("expiry record %s (head %+v %v)", pub.Body, ended.Head, err)
+	}
 	if datasetVersion(t, st) < before+1 {
 		t.Errorf("no version: %d", datasetVersion(t, st))
 	}

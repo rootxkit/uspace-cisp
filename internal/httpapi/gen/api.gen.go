@@ -2345,7 +2345,8 @@ type PublicationVersion struct {
 	Etag         string `json:"etag"`
 	FeatureCount int    `json:"feature_count"`
 
-	// Publisher The client id that published the version.
+	// Publisher The client id that published the version; uspace-cisp for a
+	// version the CISP made (restriction_expired).
 	Publisher  string                   `json:"publisher"`
 	Reason     PublicationVersionReason `json:"reason"`
 	ReceivedAt time.Time                `json:"received_at"`

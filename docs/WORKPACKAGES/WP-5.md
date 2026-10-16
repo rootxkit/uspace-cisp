@@ -120,7 +120,17 @@ In `api`, a ticker every 5 s (leader-elected by
 `pg_try_advisory_lock(hash("restriction_expiry"))` so replicas do not
 race): `Expire` every `Active` head past `ends_at`, each through
 `PublishTx` with `reason: restriction_expired`, `publisher_signature`
-null, `events` actor `system`. The tick is a counter and a gauge
+null, `events` actor `system`. The version's body is the CISP's expiry
+record `{op: expire, restriction_id, feature_id, ends_at, at}`
+(`application/json`): the ED-318 identifier the version removes, the
+`ends_at` of the window it ends (the feature's signed `endDateTime`) and
+the tick's database clock. A head whose feature or `ends_at` moved
+between the read and the lock (an extend) is left for the next tick, so
+the record always names the window it ends. Consumers verify
+`X-CIS-Signature` over these bytes and install the version by the F3 rule
+(uspace-lab `docs/spec/02-interfaces.md`) instead of holding it; `op:
+expire` is never a publisher's op (a PATCH carrying it is `400`). Every
+version answer carries the informational `X-CIS-Publisher`. The tick is a counter and a gauge
 (`restrictions_active`, `restrictions_expired_total`); the job's last
 run time is in `/v1/status` and the status line flags a job older than
 30 s at error level (E-02: a dead ticker must be visible).

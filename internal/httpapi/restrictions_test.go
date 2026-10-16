@@ -1064,3 +1064,47 @@ func TestRestrictionsHeadWhileANSPStale(t *testing.T) {
 		t.Errorf("heard: HEAD signature %q, GET %q", sig, get.Header().Get(HeaderSignature))
 	}
 }
+
+// The restrictions dataset is cached for a few seconds, so a public map
+// does not show an ended restriction for the zones' minute; the ETag
+// revalidation stays, and zones keep CISP_READ_MAX_AGE_S.
+func TestRestrictionsReadsCacheForSecondsZonesForAMinute(t *testing.T) {
+	h, t0 := restrictionHarness(t)
+	if rec := h.postRestriction(createDoc("NOTAM-9", 1, "planned", "DAR9Z9Z", t0.Add(10*time.Minute), t0.Add(2*time.Hour))); rec.Code != http.StatusCreated {
+		t.Fatalf("create = %d %s", rec.Code, rec.Body.String())
+	}
+	h.publishReadZones()
+	if err := h.cache.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// A publisher never heard from is served uncached whatever the max-age.
+	if got := h.read(http.MethodGet, "/v1/restrictions").Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("silent publisher: Cache-Control %q, want no-store", got)
+	}
+	h.pubs.Now = func() time.Time { return t0 }
+	body := `{"sent_at":"` + t0.Format(time.RFC3339) + `","active_refs":[]}`
+	if _, rec := h.heartbeat(h.anspToken(), body, func(r *http.Request) { r.Header.Set(auth.HeaderClientCertSubject, anspSubject) }); rec.Code != http.StatusNoContent {
+		t.Fatalf("heartbeat = %d %s", rec.Code, rec.Body.String())
+	}
+
+	for _, target := range []string{"/v1/restrictions", "/public/v1/restrictions"} {
+		rec := h.read(http.MethodGet, target)
+		if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "public, max-age=10" || rec.Header().Get("ETag") == "" {
+			t.Errorf("GET %s = %d, Cache-Control %q, ETag %q", target, rec.Code, rec.Header().Get("Cache-Control"), rec.Header().Get("ETag"))
+		}
+		// Revalidation is kept: a matching ETag is a 304 with the same short lifetime.
+		again := h.read(http.MethodGet, target, "If-None-Match", rec.Header().Get("ETag"))
+		if again.Code != http.StatusNotModified || again.Header().Get("Cache-Control") != "public, max-age=10" {
+			t.Errorf("revalidate %s = %d, Cache-Control %q", target, again.Code, again.Header().Get("Cache-Control"))
+		}
+		if head := h.read(http.MethodHead, target); head.Header().Get("Cache-Control") != "public, max-age=10" {
+			t.Errorf("HEAD %s Cache-Control %q", target, head.Header().Get("Cache-Control"))
+		}
+	}
+	// The pair: zones are left as they were.
+	for _, target := range []string{"/v1/zones", "/public/v1/zones"} {
+		if got := h.read(http.MethodGet, target).Header().Get("Cache-Control"); got != "public, max-age=60" {
+			t.Errorf("GET %s Cache-Control %q, want max-age=60", target, got)
+		}
+	}
+}

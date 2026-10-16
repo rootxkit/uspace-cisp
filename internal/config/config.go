@@ -84,7 +84,11 @@ type API struct {
 	PublicBaseURL string
 	IssuerURL     string
 	ReadMaxAge    time.Duration
-	PublicRPM     int64
+	// ReadRestrictionsMaxAge is the Cache-Control max-age of the
+	// restrictions dataset alone: a restriction that has ended must not
+	// stay on a public map for the zones' minute.
+	ReadRestrictionsMaxAge time.Duration
+	PublicRPM              int64
 	// TrustedProxyCIDR lists the proxies (Caddy) whose X-Forwarded-For
 	// names the client of a public read.
 	TrustedProxyCIDR          []string
@@ -228,6 +232,7 @@ func LoadAPI(environ []string) (*API, error) {
 		PublicBaseURL:             e.str(EnvPublicBaseURL),
 		IssuerURL:                 e.str(EnvIssuerURL),
 		ReadMaxAge:                e.seconds(EnvReadMaxAgeS),
+		ReadRestrictionsMaxAge:    e.seconds(EnvReadRestrictionsMaxAgeS),
 		PublicRPM:                 e.integer(EnvPublicRPM),
 		TrustedProxyCIDR:          e.list(EnvTrustedProxyCIDR),
 		MaxPublicationBytes:       e.integer(EnvMaxPublicationBytes),
@@ -457,6 +462,7 @@ func (c *API) Validate() error {
 	p = urlOK(p, EnvPublicBaseURL, c.PublicBaseURL, "http", "https")
 	p = urlOK(p, EnvIssuerURL, c.IssuerURL, "http", "https")
 	p = durationIn(p, EnvReadMaxAgeS, c.ReadMaxAge, 0, 24*time.Hour)
+	p = durationIn(p, EnvReadRestrictionsMaxAgeS, c.ReadRestrictionsMaxAge, 0, 24*time.Hour)
 	p = intIn(p, EnvPublicRPM, c.PublicRPM, 1, 1_000_000)
 	for i, cidr := range c.TrustedProxyCIDR {
 		if _, err := netip.ParsePrefix(cidr); err != nil {

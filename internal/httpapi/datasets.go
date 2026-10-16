@@ -132,6 +132,10 @@ type Reads struct {
 	Signer store.Signer
 	// MaxAge is CISP_READ_MAX_AGE_S, the Cache-Control max-age.
 	MaxAge time.Duration
+	// RestrictionsMaxAge is CISP_READ_RESTRICTIONS_MAX_AGE_S, the
+	// Cache-Control max-age of the restrictions dataset alone: short, so
+	// a public map shows an ended restriction for seconds, not a minute.
+	RestrictionsMaxAge time.Duration
 	// PublicBaseURL prefixes pull_url in the change feed.
 	PublicBaseURL string
 	// MaxDeltaVersions is how far back since_version reaches (0:
@@ -216,8 +220,12 @@ func (r *Reads) maxDelta() int64 {
 	return r.MaxDeltaVersions
 }
 
-func (r *Reads) cacheControl() string {
-	return defaultCacheControl + strconv.FormatInt(int64(r.MaxAge/time.Second), 10)
+func (r *Reads) cacheControl(ds publication.Dataset) string {
+	maxAge := r.MaxAge
+	if ds == publication.DatasetRestrictions {
+		maxAge = r.RestrictionsMaxAge
+	}
+	return defaultCacheControl + strconv.FormatInt(int64(maxAge/time.Second), 10)
 }
 
 // --- responses -----------------------------------------------------------
@@ -533,7 +541,7 @@ func (r *Reads) headers(ds publication.Dataset, version int64, modified time.Tim
 		h["Last-Modified"] = modified.UTC().Format(http.TimeFormat)
 	}
 	if staleSince == nil {
-		h["Cache-Control"] = r.cacheControl()
+		h["Cache-Control"] = r.cacheControl(ds)
 		return h
 	}
 	// Never cached anywhere: a stale answer must not outlive the outage.

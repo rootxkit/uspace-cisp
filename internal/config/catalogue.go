@@ -64,6 +64,7 @@ const (
 	EnvPublicBaseURL             = "CISP_PUBLIC_BASE_URL"
 	EnvIssuerURL                 = "CISP_ISSUER_URL"
 	EnvReadMaxAgeS               = "CISP_READ_MAX_AGE_S"
+	EnvReadRestrictionsMaxAgeS   = "CISP_READ_RESTRICTIONS_MAX_AGE_S"
 	EnvPublicRPM                 = "CISP_PUBLIC_RPM"
 	EnvTrustedProxyCIDR          = "CISP_TRUSTED_PROXY_CIDR"
 	EnvMaxPublicationBytes       = "CISP_MAX_PUBLICATION_BYTES"
@@ -130,6 +131,7 @@ var Catalogue = []Var{
 	{Name: EnvPublicBaseURL, Default: "", PendingGCAA: true},
 	{Name: EnvIssuerURL, Default: "", PendingGCAA: true},
 	{Name: EnvReadMaxAgeS, Default: "60"},
+	{Name: EnvReadRestrictionsMaxAgeS, Default: "10"},
 	{Name: EnvPublicRPM, Default: "60"},
 	{Name: EnvTrustedProxyCIDR, Default: ""},
 	{Name: EnvMaxPublicationBytes, Default: "8388608"},

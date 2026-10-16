@@ -283,7 +283,7 @@ func (h *pubHarness) withReads(st PublicationStore, server *Server, status *obs.
 	}
 	h.cache = store.NewSnapshotCache(rs, store.CacheConfig{})
 	h.reads = &Reads{
-		Store: rs, Cache: h.cache, Signer: KeyRingSigner{Keys: h.ring}, MaxAge: time.Minute,
+		Store: rs, Cache: h.cache, Signer: KeyRingSigner{Keys: h.ring}, MaxAge: time.Minute, RestrictionsMaxAge: 10 * time.Second,
 		PublicBaseURL: "https://uspace-cisp.example.test", Status: status, Logger: logger,
 	}
 	h.limiter = NewRateLimiter(RateLimiterConfig{RPM: 1_000_000, Component: status.Component("ratelimit"), Cheap: h.reads.NotModified})

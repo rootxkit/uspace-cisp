@@ -417,7 +417,7 @@ func publications(cfg *config.API, st *store.Store, sec *security, status *obs.S
 // a stored version is signed at serve time with the CISP's key ring.
 func reads(cfg *config.API, st *store.Store, cache *store.SnapshotCache, sec *security, status *obs.Status, logger *slog.Logger) *httpapi.Reads {
 	r := &httpapi.Reads{
-		Store: st, Cache: cache, MaxAge: cfg.ReadMaxAge, PublicBaseURL: cfg.PublicBaseURL,
+		Store: st, Cache: cache, MaxAge: cfg.ReadMaxAge, RestrictionsMaxAge: cfg.ReadRestrictionsMaxAge, PublicBaseURL: cfg.PublicBaseURL,
 		MaxPublicationBytes: cfg.MaxPublicationBytes, Status: status, Logger: logger,
 	}
 	if sec.keys != nil {
